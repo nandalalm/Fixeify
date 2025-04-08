@@ -1,0 +1,15 @@
+export const MESSAGES = {
+  EMAIL_REQUIRED: "Email is required",
+  OTP_SENT: "OTP sent to email",
+  INVALID_OTP: "Invalid or expired OTP",
+  EMAIL_NOT_VERIFIED: "Email not verified",
+  USER_NOT_FOUND: "User not found",
+  ACCESS_DENIED: "Access Denied",
+  INVALID_TOKEN: "Invalid Token",
+  SERVER_ERROR: "Something went wrong!",
+  ACCOUNT_BANNED: "Your account is banned. Please contact support.",
+  NAME_EMAIL_PASSWORD_ROLE_REQUIRED: "Name, email, password, and role are required",
+  EMAIL_PASSWORD_ROLE_REQUIRED: "Email, password, and role are required",
+  NO_REFRESH_TOKEN: "No refresh token provided",
+  INCORRECT_PASSWORD:"Incorrect password. Please try again.",
+};

@@ -1,26 +1,30 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { MESSAGES } from "../constants/messages";
+import { HttpError } from "./errorMiddleware";
 
 interface AuthRequest extends Request {
-  user?: { userId: string };
+  userId?: string; 
 }
 
 export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
-  const token = req.header("Authorization")?.split(" ")[1];
-  if (!token) {
-    return res.status(401).json({ message: "Access Denied" });
-  }
-
-  const secret = process.env.ACCESS_TOKEN_SECRET;
-  if (!secret) {
-    return res.status(500).json({ message: "Server configuration error: ACCESS_TOKEN_SECRET not set" });
-  }
-
-  jwt.verify(token, secret, (err, decoded) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid Token" });
+  try {
+    const authHeader = req.header("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      throw new HttpError(401, MESSAGES.ACCESS_DENIED);
     }
-    req.user = decoded as { userId: string };
+
+    const token = authHeader.split(" ")[1];
+    if (!token) throw new HttpError(401, MESSAGES.ACCESS_DENIED);
+
+    const secret = process.env.ACCESS_TOKEN_SECRET;
+    if (!secret) throw new HttpError(500, "Server configuration error: ACCESS_TOKEN_SECRET not set");
+
+    
+    const decoded = jwt.verify(token, secret) as { userId: string };
+    req.userId = decoded.userId; 
     next();
-  });
+  } catch (err) {
+    next(err instanceof HttpError ? err : new HttpError(403, MESSAGES.INVALID_TOKEN));
+  }
 };

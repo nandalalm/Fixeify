@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // Add useEffect
 import { useDispatch } from "react-redux";
-import { setUser, setAccessToken } from "../store/authSlice";
+import { setAuth, UserRole } from "../store/authSlice";
 import { loginUser } from "../api/authApi";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom"; // Add useLocation
 import { z } from "zod";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline"; 
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const adminLoginSchema = z.object({
   email: z.string().email("Invalid email address").trim(),
@@ -20,9 +20,15 @@ const AdminLogin = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string>("");
-  const [showPassword, setShowPassword] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation(); // Track current route
+
+  // Log route changes to detect redirects
+  useEffect(() => {
+    console.log("Current location:", location.pathname);
+  }, [location]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -38,33 +44,51 @@ const AdminLogin = () => {
 
     try {
       adminLoginSchema.parse(formData);
-
+      console.log("Attempting admin login with:", formData);
       const { accessToken, user } = await loginUser(formData.email, formData.password, "admin");
-      dispatch(setAccessToken(accessToken));
-      dispatch(setUser({ name: user.name, email: user.email, role: user.role }));
+      const mappedUser = {
+        ...user,
+        role: user.role === "admin" ? UserRole.ADMIN : user.role === "user" ? UserRole.USER : UserRole.PRO,
+      };
+      dispatch(setAuth({ user: mappedUser, accessToken }));
+      console.log("Admin login successful, navigating to: /admin-dashboard");
       navigate("/admin-dashboard");
     } catch (error) {
+      console.log("Admin login error:", error);
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
         error.errors.forEach((err) => {
           fieldErrors[err.path[0]] = err.message;
         });
         setErrors(fieldErrors);
-      } else if (error instanceof Error) {
-        const message = error.message;
-        if (message === "Email not registered") {
-          setServerError("The email you have entered is not registered. Please sign up.");
-        } else if (message === "Incorrect password") {
-          setServerError("Incorrect password");
-        } else if (message === "Invalid role for this user") {
-          setServerError("This email is not registered as an admin account.");
-        } else if (message === "Session expired. Please log in again.") {
-          setServerError(message);
-        } else {
-          setServerError("Login failed. Please try again.");
-        }
       } else {
-        setServerError("An unexpected error occurred");
+        const err = error as any;
+        if (err.response) {
+          const status = err.response.status;
+          const message = err.response.data?.message || "Login failed";
+          console.log(`API Error - Status: ${status}, Message: ${message}`);
+
+          switch (status) {
+            case 404:
+              setServerError("The email you entered is not registered as an admin. Please sign up.");
+              break;
+            case 401:
+              setServerError("Incorrect password. Please try again.");
+              break;
+            case 400:
+              if (message === "Access Denied") {
+                setServerError("This email is not registered as an admin account.");
+              } else {
+                setServerError(message);
+              }
+              break;
+            default:
+              setServerError("Login failed. Please try again.");
+          }
+        } else {
+          setServerError("Unable to connect to the server. Please try again later.");
+        }
+        console.log("Error state set, serverError:", serverError); // Log after setting
       }
     }
   };
@@ -123,11 +147,7 @@ const AdminLogin = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700 transition-colors duration-200"
                 >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" />
-                  )}
+                  {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                 </button>
               </div>
               {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}

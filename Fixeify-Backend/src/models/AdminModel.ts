@@ -14,9 +14,7 @@ const adminSchema = new Schema<IAdmin>(
     password: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
   },
-  {
-    timestamps: false, 
-  }
+  { timestamps: false }
 );
 
 export default mongoose.model<IAdmin>("Admin", adminSchema);

@@ -1,3 +1,5 @@
+import { UserRole } from "../../enums/roleEnum";
+
 export class UserRegistrationRequest {
   constructor(
     public name: string,
@@ -14,25 +16,10 @@ export class UserLoginRequest {
   constructor(
     public email: string,
     public password: string,
-    public role: "user" | "pro" | "admin" // Add "admin" role
+    public role: UserRole
   ) {
     if (!email || !password || !role) {
       throw new Error("Email, password, and role are required");
     }
   }
-}
-
-export class UserResponse {
-  constructor(
-    public name: string,
-    public email: string,
-    public role: "user" | "pro" | "admin" // Add "admin" role
-  ) {}
-}
-
-export class LoginResponse {
-  constructor(
-    public accessToken: string,
-    public user: UserResponse
-  ) {}
 }

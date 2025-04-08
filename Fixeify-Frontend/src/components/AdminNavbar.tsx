@@ -1,10 +1,10 @@
-
 import type { FC } from "react";
 import { Home, Users, Award, Grid, Calendar, HelpCircle, Star, User, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { LucideProps } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { logoutUser } from "../store/authSlice";
+import { AppDispatch } from "../store/store";
 
 interface NavItem {
   icon: FC<LucideProps>;
@@ -20,18 +20,19 @@ interface AdminNavbarProps {
 
 export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
   const location = useLocation();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    dispatch(logoutUser());
-    navigate("/admin-login");
+    dispatch(logoutUser("admin")).then(() => {
+      navigate("/admin-login");
+    });
   };
 
   const navItems: NavItem[] = [
     { icon: Home, label: "Home", path: "/admin-dashboard" },
     { icon: Users, label: "User Management", path: "/admin/users" },
-    { icon: Award, label: "Fixeify Pro Management", path: "/admin/pros" },
+    { icon: Award, label: "Fixeify Pro Management", path: "/admin/pro-management" }, // Updated path
     { icon: Grid, label: "Category Management", path: "/admin/categories" },
     { icon: Calendar, label: "Booking Management", path: "/admin/bookings" },
     { icon: HelpCircle, label: "Support and Dispute Management", path: "/admin/support" },
@@ -46,12 +47,9 @@ export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
         isOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
-      {/* Logo */}
       <div className="p-4 border-b border-gray-200">
         <h1 className="text-xl font-bold">Fixeify</h1>
       </div>
-
-      {/* Navigation */}
       <nav className="py-4">
         <ul className="space-y-1">
           {navItems.map((item) => (

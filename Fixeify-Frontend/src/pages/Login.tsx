@@ -1,26 +1,27 @@
-"use client";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // Add useEffect
 import { useDispatch } from "react-redux";
-import { setUser, setAccessToken } from "../store/authSlice";
+import { setAuth, UserRole } from "../store/authSlice";
 import { loginUser } from "../api/authApi";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom"; // Add useLocation
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
 import { loginSchema } from "../validationSchemas";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline"; 
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const LoginPage = () => {
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [formData, setFormData] = useState({ email: "", password: "" });
   const [userRole, setUserRole] = useState<"user" | "pro">("user");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string>("");
-  const [showPassword, setShowPassword] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation(); // Track current route
+
+  // Log route changes to detect redirects
+  useEffect(() => {
+    console.log("Current location:", location.pathname);
+  }, [location]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -33,47 +34,53 @@ const LoginPage = () => {
     e.preventDefault();
     setErrors({});
     setServerError("");
-  
+
     try {
       const validatedData = loginSchema.parse({ ...formData, role: userRole });
+      console.log("Attempting login with:", validatedData);
       const { accessToken, user } = await loginUser(validatedData.email, validatedData.password, validatedData.role);
-      dispatch(setAccessToken(accessToken));
-      dispatch(setUser({ name: user.name, email: user.email, role: user.role }));
-      if (user.role === "user") {
-        navigate("/home");
-      } else if (user.role === "pro") {
-        navigate("/pro-dashboard");
-      }
+      const mappedUser = {
+        ...user,
+        role: user.role === "user" ? UserRole.USER : UserRole.PRO,
+      };
+      dispatch(setAuth({ user: mappedUser, accessToken }));
+      console.log("Login successful, navigating to:", user.role === "user" ? "/home" : "/pro-dashboard");
+      if (user.role === "user") navigate("/home");
+      else if (user.role === "pro") navigate("/pro-dashboard");
     } catch (error) {
+      console.log("Login error:", error);
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          fieldErrors[err.path[0]] = err.message;
-        });
+        error.errors.forEach((err) => (fieldErrors[err.path[0]] = err.message));
         setErrors(fieldErrors);
-      } else if (error instanceof Error) {
-        const message = error.message;
-        if (message === "Email not registered") {
-          setServerError("The email you have entered is not registered. Please sign up.");
-        } else if (message === "Incorrect password") {
-          setServerError("Incorrect password");
-        } else if (message === "Invalid role for this user") {
-          setServerError(`This email is not registered as a ${userRole} account.`);
-        } else if (message === "Your account is banned. Please contact support.") {
-          setServerError(message); 
-        } else if (message === "Session expired. Please log in again.") {
-          setServerError(message);
-        } else if (message.includes("FixeifyPro authentication not implemented")) {
-          setServerError("Pro login is not available yet");
-        } else {
-          setServerError("Login failed. Please try again.");
-        }
       } else {
-        setServerError("An unexpected error occurred");
+        const err = error as any;
+        if (err.response) {
+          const status = err.response.status;
+          const message = err.response.data?.message || "Login failed";
+          console.log(`API Error - Status: ${status}, Message: ${message}`);
+
+          switch (status) {
+            case 404:
+              setServerError("Email not registered. Please sign up.");
+              break;
+            case 401:
+              setServerError("Incorrect password. Please try again.");
+              break;
+            case 403:
+              setServerError("Your account has been banned. Please contact our support team.");
+              break;
+            default:
+              setServerError(message || "Login failed. Please try again.");
+          }
+        } else {
+          setServerError("Unable to connect to the server. Please try again later.");
+        }
+        console.log("Error state set, serverError:", serverError); // Log after setting
       }
     }
   };
-  
+
   return (
     <div className="flex min-h-screen dark:bg-gray-900">
       <div className="hidden md:block md:w-1/2 bg-gray-100 relative dark:bg-gray-800">
@@ -145,11 +152,7 @@ const LoginPage = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200"
                 >
-                  {showPassword ? (
-                    <EyeSlashIcon className="h-5 w-5" />
-                  ) : (
-                    <EyeIcon className="h-5 w-5" />
-                  )}
+                  {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                 </button>
               </div>
               {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}

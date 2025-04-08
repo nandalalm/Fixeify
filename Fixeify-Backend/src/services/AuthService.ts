@@ -1,180 +1,231 @@
 import bcrypt from "bcryptjs";
+import { injectable, inject } from "inversify";
+import { TYPES } from "../types";
 import { IUserRepository } from "../repositories/IUserRepository";
 import { IAdminRepository } from "../repositories/IAdminRepository";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwtUtils";
-import { IUser } from "../models/UserModel";
-import { IAdmin } from "../models/AdminModel";
-import { UserResponse } from "../dtos/userDtos";
-import { injectable, inject } from "inversify";
-import { TYPES } from "../types";
+import { IUser } from "../models/userModel";
+import { IAdmin } from "../models/adminModel";
+import { UserResponse } from "../dtos/response/userDtos";
 import { createClient } from "redis";
 import nodemailer from "nodemailer";
+import { UserRole } from "../enums/roleEnum";
+import { getOtpEmailTemplate } from "../utils/emailTemplates";
+import { IAuthService } from "./IAuthService";
+import { HttpError } from "../middleware/errorMiddleware";
+import logger from "../config/logger";
+import { mapUserDtoToModel } from "../utils/mappers";
+import { MESSAGES } from "../constants/messages";
+import jwt from "jsonwebtoken";
 
 @injectable()
-export class AuthService {
-  private redisClient = createClient({
+export class AuthService implements IAuthService {
+  private _redisClient = createClient({
     url: process.env.REDIS_URL || "redis://localhost:6379",
     socket: {
       keepAlive: 10000,
       reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
     },
   });
-  private transporter = nodemailer.createTransport({
+  private _transporter = nodemailer.createTransport({
     service: "gmail",
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
   });
 
   constructor(
-    @inject(TYPES.IUserRepository) private userRepository: IUserRepository,
-    @inject(TYPES.IAdminRepository) private adminRepository: IAdminRepository
+    @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
+    @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
   ) {
-    this.redisClient.connect().catch((err) => {
-      console.error("Failed to connect to Redis:", err);
-    });
-    this.redisClient.on("error", (err) => console.error("Redis error:", err));
+    this._redisClient.connect().catch((err) => logger.error("Failed to connect to Redis:", err));
+    this._redisClient.on("error", (err) => logger.error("Redis error:", err));
   }
 
   async sendOtp(email: string): Promise<void> {
-    const existingUser = await this.userRepository.findUserByEmail(email);
-    if (existingUser) {
-      throw new Error("Email already registered");
-    }
-    const existingAdmin = await this.adminRepository.findAdminByEmail(email);
-    if (existingAdmin) {
-      throw new Error("Email already registered");
-    }
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    await this.redisClient.setEx(`otp:${email}`, 60, otp);
+    const existingUser = await this._userRepository.findUserByEmail(email);
+    if (existingUser) throw new HttpError(400, MESSAGES.EMAIL_PASSWORD_ROLE_REQUIRED);
+    const existingAdmin = await this._adminRepository.findAdminByEmail(email);
+    if (existingAdmin) throw new HttpError(400, MESSAGES.EMAIL_PASSWORD_ROLE_REQUIRED);
 
-    const htmlEmail = `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Your OTP Code</title>
-        <style>
-          body { margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4; }
-          .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden; }
-          .header { background-color: #00205B; padding: 20px; text-align: center; }
-          .header img { max-width: 150px; }
-          .content { padding: 30px; text-align: center; }
-          .otp { font-size: 36px; font-weight: bold; color: #00205B; margin: 20px 0; letter-spacing: 5px; }
-          .footer { background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-          </div>
-          <div class="content">
-            <h1>Welcome to Fixeify!</h1>
-            <p>Your One-Time Password (OTP) is ready. Use it to verify your email:</p>
-            <div class="otp">${otp}</div>
-            <p>This OTP expires in <strong>1 minute</strong>. Please use it soon!</p>
-          </div>
-          <div class="footer">
-            <p>© 2025 Fixeify. All rights reserved.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    await this._redisClient.setEx(`otp:${email}`, 60, otp);
 
     try {
-      await this.transporter.sendMail({
+      await this._transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: email,
         subject: "Your OTP Code",
-        html: htmlEmail,
+        html: getOtpEmailTemplate(otp),
       });
     } catch (error) {
-      console.error("Failed to send OTP email:", error);
-      throw new Error("Failed to send OTP email: " + (error instanceof Error ? error.message : "Unknown error"));
+      logger.error("Failed to send OTP email:", error);
+      throw new HttpError(500, MESSAGES.SERVER_ERROR);
     }
   }
 
   async verifyOtp(email: string, otp: string): Promise<boolean> {
-    const storedOtp = await this.redisClient.get(`otp:${email}`);
+    const storedOtp = await this._redisClient.get(`otp:${email}`);
     if (storedOtp && storedOtp === otp) {
-      await this.redisClient.setEx(`verified:${email}`, 3600, "true");
-      await this.redisClient.del(`otp:${email}`);
+      await this._redisClient.setEx(`verified:${email}`, 3600, "true");
+      await this._redisClient.del(`otp:${email}`);
       return true;
     }
     return false;
   }
 
   async isEmailVerified(email: string): Promise<boolean> {
-    const verified = await this.redisClient.get(`verified:${email}`);
+    const verified = await this._redisClient.get(`verified:${email}`);
     return verified === "true";
   }
 
-  async register(name: string, email: string, password: string, role: "user" | "admin"): Promise<IUser | IAdmin> {
+  async register(name: string, email: string, password: string, role: UserRole): Promise<IUser | IAdmin> {
     const hashedPassword = await bcrypt.hash(password, 10);
-    if (role === "user") {
-      const user = await this.userRepository.createUser({
-        name,
-        email,
-        password: hashedPassword,
-      });
-      return user;
-    } else if (role === "admin") {
-      const admin = await this.adminRepository.createAdmin({
-        name,
-        email,
-        password: hashedPassword,
-      });
-      return admin;
+    const userData = mapUserDtoToModel({ name, email, password: hashedPassword });
+    if (role === UserRole.USER) {
+      return this._userRepository.createUser(userData);
+    } else if (role === UserRole.ADMIN) {
+      return this._adminRepository.createAdmin(userData);
     } else {
-      throw new Error("Invalid role");
+      throw new HttpError(400, MESSAGES.ACCESS_DENIED);
     }
   }
 
   async login(
     email: string,
     password: string,
-    role: "user" | "pro" | "admin"
+    role: UserRole
   ): Promise<{
     accessToken: string;
     refreshToken: string;
     user: UserResponse;
   }> {
-    if (!role) throw new Error("Role is required");
     let user: IUser | IAdmin | null = null;
 
-    if (role === "user") {
-      user = await this.userRepository.findUserByEmail(email);
-    } else if (role === "pro") {
-      throw new Error("FixeifyPro authentication not implemented yet");
-    } else if (role === "admin") {
-      user = await this.adminRepository.findAdminByEmail(email);
+    if (role === UserRole.USER) {
+      user = await this._userRepository.findUserByEmail(email);
+    } else if (role === UserRole.PRO) {
+      throw new HttpError(501, MESSAGES.SERVER_ERROR);
+    } else if (role === UserRole.ADMIN) {
+      user = await this._adminRepository.findAdminByEmail(email);
     } else {
-      throw new Error("Invalid role");
+      throw new HttpError(400, MESSAGES.ACCESS_DENIED);
     }
 
-    if (!user || !(await bcrypt.compare(password, user.password))) {
-      throw new Error("Invalid credentials");
+    if (!user) {
+      throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+    }
+
+    if (!(await bcrypt.compare(password, user.password))) {
+      throw new HttpError(401, MESSAGES.INCORRECT_PASSWORD);
     }
 
     if ("isBanned" in user && user.isBanned) {
-      throw new Error("Your account is banned. Please contact support.");
+      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
     }
 
     const accessToken = generateAccessToken(user.id);
     const refreshToken = generateRefreshToken(user.id);
-    return { accessToken, refreshToken, user: new UserResponse(user.name, user.email, role) };
+
+    await this._redisClient.setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
+
+    return {
+      accessToken,
+      refreshToken,
+      user:
+        role === UserRole.ADMIN
+          ? new UserResponse(user.id, user.name, user.email, role, null, null, null, false)
+          : new UserResponse(
+              user.id,
+              user.name,
+              user.email,
+              role,
+              (user as IUser).photo ?? null,
+              (user as IUser).phoneNo ?? null,
+              (user as IUser).address ?? null,
+              (user as IUser).isBanned
+            ),
+    };
   }
 
   async refreshAccessToken(refreshToken: string): Promise<string> {
     const secret = process.env.REFRESH_TOKEN_SECRET;
-    if (!secret) throw new Error("REFRESH_TOKEN_SECRET not set");
-    const decoded = require("jsonwebtoken").verify(refreshToken, secret) as { userId: string };
-    let user: IUser | IAdmin | null = null;
-    user = await this.userRepository.findUserByEmail(decoded.userId);
-    if (!user) {
-      user = await this.adminRepository.findAdminByEmail(decoded.userId);
+    if (!secret) throw new HttpError(500, MESSAGES.SERVER_ERROR);
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, secret) as { userId: string };
+    } catch (err) {
+      console.error("Token verification failed:", err);
+      throw new HttpError(401, MESSAGES.INVALID_TOKEN);
     }
-    if (!user) throw new Error("Invalid refresh token");
+
+    const storedToken = await this._redisClient.get(`refresh:${decoded.userId}`);
+    if (storedToken !== refreshToken) {
+      throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+    }
+
+    let user: IUser | IAdmin | null = await this._userRepository.findUserById(decoded.userId);
+    if (!user) user = await this._adminRepository.findAdminById(decoded.userId);
+    if (!user) throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+
+    if ("isBanned" in user && user.isBanned) {
+      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+    }
+
     return generateAccessToken(user.id);
+  }
+
+  async getUserById(userId: string): Promise<UserResponse> {
+    let user: IUser | IAdmin | null = await this._userRepository.findUserById(userId);
+    let role: UserRole = UserRole.USER;
+
+    if (!user) {
+      user = await this._adminRepository.findAdminById(userId);
+      role = UserRole.ADMIN;
+    }
+
+    if (!user) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+
+    if ("isBanned" in user && user.isBanned) {
+      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+    }
+
+    return role === UserRole.ADMIN
+      ? new UserResponse(user.id, user.name, user.email, role, null, null, null, false)
+      : new UserResponse(
+          user.id,
+          user.name,
+          user.email,
+          role,
+          (user as IUser).photo ?? null,
+          (user as IUser).phoneNo ?? null,
+          (user as IUser).address ?? null,
+          (user as IUser).isBanned
+        );
+  }
+
+  async logout(refreshToken: string, role: UserRole): Promise<void> {
+    const secret = process.env.REFRESH_TOKEN_SECRET;
+    if (!secret) throw new HttpError(500, MESSAGES.SERVER_ERROR);
+
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, secret) as { userId: string };
+    } catch (err) {
+      throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+    }
+
+    let user: IUser | IAdmin | null = null;
+    if (role === UserRole.USER) {
+      user = await this._userRepository.findUserById(decoded.userId);
+    } else if (role === UserRole.ADMIN) {
+      user = await this._adminRepository.findAdminById(decoded.userId);
+    } else {
+      throw new HttpError(400, MESSAGES.ACCESS_DENIED);
+    }
+
+    if (!user) {
+      throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+    }
+
+    await this._redisClient.del(`refresh:${decoded.userId}`);
   }
 }

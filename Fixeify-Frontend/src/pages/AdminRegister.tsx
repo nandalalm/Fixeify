@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { setUser, setAccessToken } from "../store/authSlice";
+import { setAuth, UserRole } from "../store/authSlice"; // Import setAuth and UserRole
 import { registerUser } from "../api/authApi";
 import { useNavigate } from "react-router-dom";
 
@@ -32,8 +32,12 @@ const AdminRegister = () => {
         formData.password,
         "admin"
       );
-      dispatch(setAccessToken(accessToken));
-      dispatch(setUser({ name: user.name, email: user.email, role: user.role }));
+      // Map the string role to UserRole enum
+      const mappedUser = {
+        ...user,
+        role: user.role === "user" ? UserRole.USER : user.role === "pro" ? UserRole.PRO : UserRole.ADMIN,
+      };
+      dispatch(setAuth({ user: mappedUser, accessToken }));
       navigate("/admin-dashboard");
     } catch (error) {
       if (error instanceof Error) {

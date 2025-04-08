@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSelector, useDispatch } from "react-redux";
-import { RootState } from "../store/store";
+import { RootState, AppDispatch } from "../store/store";
 import { logoutUser } from "../store/authSlice";
-import { Sun, Moon } from "lucide-react"; 
+import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 const Navbar = () => {
@@ -14,7 +14,7 @@ const Navbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const { theme, toggleTheme } = useTheme();
 
@@ -27,8 +27,12 @@ const Navbar = () => {
   }, []);
 
   const handleLogout = () => {
-    dispatch(logoutUser());
-    navigate("/login");
+    const role = user?.role === "admin" ? "admin" : "user";
+    dispatch(logoutUser(role)).then(() => {
+      navigate("/login");
+      setIsDropdownOpen(false);
+      setIsMenuOpen(false);
+    });
   };
 
   return (
@@ -61,6 +65,13 @@ const Navbar = () => {
           <Link to="#help" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
             Help
           </Link>
+
+          <button
+            onClick={() => navigate("/become-pro")}
+            className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+          >
+            Become a Fixeify Pro
+          </button>
 
           {accessToken ? (
             <div className="relative">
@@ -118,7 +129,6 @@ const Navbar = () => {
               Login
             </button>
           )}
-
         </nav>
 
         <div className="md:hidden flex items-center gap-4">
@@ -165,6 +175,12 @@ const Navbar = () => {
               <Link to="#help" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
                 Help
               </Link>
+              <button
+                onClick={() => navigate("/become-pro")}
+                className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+              >
+                Become a Fixeify Pro
+              </button>
               {accessToken ? (
                 <>
                   <Link to="/profile" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">

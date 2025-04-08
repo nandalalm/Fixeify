@@ -1,14 +1,12 @@
-"use client";
-
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { setUser, setAccessToken } from "../store/authSlice";
+import { setAuth, UserRole } from "../store/authSlice"; // Import UserRole
 import { registerUser, sendOtp, verifyOtp } from "../api/authApi";
 import { Link, useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { z } from "zod";
 import { registerSchema, baseRegisterSchema } from "../validationSchemas";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline"; 
+import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -25,8 +23,8 @@ const Register = () => {
   const [timeLeft, setTimeLeft] = useState(60);
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isResendingOtp, setIsResendingOtp] = useState(false);
-  const [showPassword, setShowPassword] = useState(false); 
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -42,25 +40,12 @@ const Register = () => {
     try {
       const { email } = baseRegisterSchema.pick({ email: true }).parse({ email: formData.email });
       setIsSendingOtp(true);
-      console.log("Sending OTP request for email:", email);
-      const response = await sendOtp(email);
-      console.log("OTP response:", response);
+      await sendOtp(email);
       setOtpSent(true);
       setTimeLeft(60);
     } catch (error) {
-      console.error("Error in handleSendOtp:", error);
-      if (error instanceof z.ZodError) {
-        setErrors({ email: error.errors[0].message });
-      } else if (error instanceof Error) {
-        const message = error.message;
-        if (message.includes("Email already registered")) {
-          setServerError("This email is already registered");
-        } else if (message.includes("Failed to send OTP email")) {
-          setServerError("Failed to send OTP. Please try again.");
-        } else {
-          setServerError("An error occurred while sending OTP: " + message);
-        }
-      }
+      if (error instanceof z.ZodError) setErrors({ email: error.errors[0].message });
+      else if (error instanceof Error) setServerError(error.message);
     } finally {
       setIsSendingOtp(false);
     }
@@ -74,25 +59,12 @@ const Register = () => {
         email: formData.email,
         otp: formData.otp,
       });
-      if (!otp) {
-        setErrors({ otp: "OTP is required" });
-        return;
-      }
+      if (!otp) throw new Error("OTP is required");
       const result = await verifyOtp(email, otp);
-      if (result.message === "OTP verified") {
-        setOtpVerified(true);
-      }
+      if (result.message === "OTP verified") setOtpVerified(true);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        setErrors({ otp: error.errors[0].message });
-      } else if (error instanceof Error) {
-        const message = error.message;
-        if (message.includes("Invalid or expired OTP")) {
-          setServerError("Invalid or expired OTP");
-        } else {
-          setServerError("OTP verification failed");
-        }
-      }
+      if (error instanceof z.ZodError) setErrors({ otp: error.errors[0].message });
+      else if (error instanceof Error) setServerError(error.message);
     }
   };
 
@@ -103,36 +75,26 @@ const Register = () => {
 
     try {
       const validatedData = registerSchema.parse(formData);
-      if (!otpVerified) {
-        setServerError("Please verify your email with OTP");
-        return;
-      }
+      if (!otpVerified) throw new Error("Please verify your email with OTP");
       const { accessToken, user } = await registerUser(
         validatedData.name,
         validatedData.email,
         validatedData.password,
         "user"
       );
-      dispatch(setAccessToken(accessToken));
-      dispatch(setUser({ name: user.name, email: user.email, role: user.role }));
+      // Map the string role to UserRole enum
+      const mappedUser = {
+        ...user,
+        role: user.role === "user" ? UserRole.USER : user.role === "pro" ? UserRole.PRO : UserRole.ADMIN,
+      };
+      dispatch(setAuth({ user: mappedUser, accessToken }));
       navigate("/home");
     } catch (error) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
-        error.errors.forEach((err) => {
-          fieldErrors[err.path[0]] = err.message;
-        });
+        error.errors.forEach((err) => (fieldErrors[err.path[0]] = err.message));
         setErrors(fieldErrors);
-      } else if (error instanceof Error) {
-        const message = error.message;
-        if (message.includes("Email not verified")) {
-          setServerError("Email not verified");
-        } else if (message.includes("Email already registered")) {
-          setServerError("This email is already registered");
-        } else {
-          setServerError("Registration failed. Please try again.");
-        }
-      }
+      } else if (error instanceof Error) setServerError(error.message);
     }
   };
 
@@ -150,9 +112,7 @@ const Register = () => {
       newOtp[index] = value;
       setFormData((prev) => ({ ...prev, otp: newOtp.join("") }));
       setErrors((prev) => ({ ...prev, otp: "" }));
-      if (value && index < 5) {
-        document.getElementById(`otp-${index + 1}`)?.focus();
-      }
+      if (value && index < 5) document.getElementById(`otp-${index + 1}`)?.focus();
     }
   };
 
@@ -311,11 +271,7 @@ const Register = () => {
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200"
                     >
-                      {showPassword ? (
-                        <EyeSlashIcon className="h-5 w-5" />
-                      ) : (
-                        <EyeIcon className="h-5 w-5" />
-                      )}
+                      {showPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                     </button>
                   </div>
                   {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
@@ -341,11 +297,7 @@ const Register = () => {
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors duration-200"
                     >
-                      {showConfirmPassword ? (
-                        <EyeSlashIcon className="h-5 w-5" />
-                      ) : (
-                        <EyeIcon className="h-5 w-5" />
-                      )}
+                      {showConfirmPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                     </button>
                   </div>
                   {errors.confirmPassword && (

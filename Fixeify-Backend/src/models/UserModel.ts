@@ -10,7 +10,6 @@ export interface IUser extends Document {
   isBanned: boolean;
   createdAt: Date;
   updatedAt: Date;
-  refreshToken?: string; 
 }
 
 const userSchema = new Schema<IUser>(
@@ -22,11 +21,8 @@ const userSchema = new Schema<IUser>(
     phoneNo: { type: String, default: null },
     address: { type: String, default: null },
     isBanned: { type: Boolean, default: false },
-    refreshToken: { type: String, default: null }, // Optional
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 export default mongoose.model<IUser>("User", userSchema);
