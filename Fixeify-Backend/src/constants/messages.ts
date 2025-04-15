@@ -12,4 +12,5 @@ export const MESSAGES = {
   EMAIL_PASSWORD_ROLE_REQUIRED: "Email, password, and role are required",
   NO_REFRESH_TOKEN: "No refresh token provided",
   INCORRECT_PASSWORD:"Incorrect password. Please try again.",
+  INVALID_ROLE: "Invalid role selected",
 };

@@ -18,6 +18,7 @@ import FixeifyProForm from "./pages/FixeifyProForm";
 import SuccessPage from "./components/SuccessPage";
 import AdminProManagement from "./pages/AdminProManagement";
 import ProProfileView from "./components/ProProfileView";
+import PublicRoute from "./components/PublicRoute"; // Import PublicRoute
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -26,7 +27,7 @@ function App() {
   useEffect(() => {
     const manuallySet = localStorage.getItem("isAuthenticatedManuallySet");
     console.log("App mounted, manuallySet:", manuallySet, "Local storage:", localStorage);
-  
+
     if (!manuallySet) {
       console.log("No manual auth, clearing state...");
       dispatch(logoutUserSync());
@@ -54,22 +55,29 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/admin-register" element={<AdminRegister />} />
-        <Route path="/admin-login" element={<AdminLogin />} />
+        {/* Public routes wrapped with PublicRoute */}
+        <Route element={<PublicRoute />}>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/admin-register" element={<AdminRegister />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
+        </Route>
+
         <Route path="/become-pro" element={<FixeifyProForm />} />
         <Route path="/success" element={<SuccessPage />} />
+        <Route path="/" element={<Home />} />
+
+        {/* Private routes for users and pros */}
         <Route element={<PrivateRoute />}>
           <Route path="/home" element={<Home />} />
           <Route path="/pro-dashboard" element={<ProDashboard />} />
         </Route>
+        {/* Admin private routes */}
         <Route element={<AdminPrivateRoute />}>
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/pro-management" element={<AdminProManagement />} />
-          <Route path="/pro-profile/:id" element={<ProProfileView/>} /> {/* New route */}
+          <Route path="/pro-profile/:id" element={<ProProfileView />} />
         </Route>
       </Routes>
     </Router>

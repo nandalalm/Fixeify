@@ -1,19 +1,42 @@
 import { UserRole } from "../../enums/roleEnum";
 
 export class UserResponse {
-  constructor(
-    public id: string,
-    public name: string,
-    public email: string,
-    public role: UserRole,
-    public photo: string | null,
-    public phoneNo: string | null,
-    public address: string | null,
-    public isBanned: boolean
-  ) {
-    this.photo = photo ?? null;
-    this.phoneNo = phoneNo ?? null;
-    this.address = address ?? null;
+  public id: string;
+  public name: string;
+  public email: string;
+  public role: UserRole;
+  public photo: string | null;
+  public phoneNo: string | null;
+  public address: string | null;
+  public isBanned: boolean;
+
+  constructor({
+    id,
+    name,
+    email,
+    role,
+    photo = null,
+    phoneNo = null,
+    address = null,
+    isBanned,
+  }: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    photo?: string | null;
+    phoneNo?: string | null;
+    address?: string | null;
+    isBanned: boolean;
+  }) {
+    this.id = id;
+    this.name = name;
+    this.email = email;
+    this.role = role;
+    this.photo = photo;
+    this.phoneNo = phoneNo;
+    this.address = address;
+    this.isBanned = isBanned;
   }
 }
 

@@ -3,7 +3,7 @@ import { store } from "../store/store";
 import { refreshToken, setAccessToken } from "../store/authSlice";
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL, 
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   withCredentials: true,
 });
 
@@ -33,7 +33,8 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       console.log("401 detected, attempting token refresh for:", originalRequest.url);
       try {
-        const { accessToken } = await store.dispatch(refreshToken()).unwrap();
+        const result = await store.dispatch(refreshToken()).unwrap(); // Use unwrap to get the payload
+        const { accessToken } = result; // TypeScript now knows this is RefreshTokenResponse
         console.log("Token refresh successful, new token:", accessToken);
         store.dispatch(setAccessToken(accessToken));
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
@@ -41,7 +42,7 @@ api.interceptors.response.use(
       } catch (err) {
         console.error("Token refresh failed:", err);
         store.dispatch({ type: "auth/logoutUserSync" });
-        window.location.href = "/login";
+        window.location.href = "/";
         return Promise.reject(err);
       }
     }

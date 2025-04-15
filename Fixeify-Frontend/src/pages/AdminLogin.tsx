@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from "react"; // Add useEffect
+import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { setAuth, UserRole } from "../store/authSlice";
 import { loginUser } from "../api/authApi";
-import { useNavigate, useLocation } from "react-router-dom"; // Add useLocation
+import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
@@ -23,7 +23,7 @@ const AdminLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const location = useLocation(); // Track current route
+  const location = useLocation();
 
   // Log route changes to detect redirects
   useEffect(() => {
@@ -88,13 +88,53 @@ const AdminLogin = () => {
         } else {
           setServerError("Unable to connect to the server. Please try again later.");
         }
-        console.log("Error state set, serverError:", serverError); // Log after setting
+        console.log("Error state set, serverError:", serverError);
       }
     }
   };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="force-light-mode flex min-h-screen">
+      {/* Force light mode wrapper */}
+      <style>
+        {`
+          .force-light-mode {
+            background-color: #ffffff !important;
+            color: #000000 !important;
+          }
+          .force-light-mode .bg-gray-100 {
+            background-color: #f7fafc !important;
+          }
+          .force-light-mode .text-gray-900 {
+            color: #1a202c !important;
+          }
+          .force-light-mode .text-gray-600 {
+            color: #4a5568 !important;
+          }
+          .force-light-mode .text-gray-700 {
+            color: #2d3748 !important;
+          }
+          .force-light-mode .border-gray-300 {
+            border-color: #e2e8f0 !important;
+          }
+          .force-light-mode .focus:ring-blue-500 {
+            --tw-ring-color: #3b82f6 !important;
+          }
+          .force-light-mode .bg-[#00205B] {
+            background-color: #00205B !important;
+          }
+          .force-light-mode .hover\\:bg-[#003087]:hover {
+            background-color: #003087 !important;
+          }
+          .force-light-mode .text-red-500 {
+            color: #ef4444 !important;
+          }
+          .force-light-mode .text-white {
+            color: #ffffff !important;
+          }
+        `}
+      </style>
+
       <div className="hidden md:block md:w-1/2 bg-gray-100 relative">
         <img
           src="/loginPic.png?height=800&width=600"

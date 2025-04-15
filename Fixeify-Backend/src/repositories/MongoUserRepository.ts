@@ -41,22 +41,23 @@ export class MongoUserRepository extends BaseRepository<IUser> implements IUserR
     return this._model.countDocuments().exec();
   }
 
-  async updateBanStatus(userId: string, isBanned: boolean): Promise<UserResponse | null> {
-    const user = await this._model.findByIdAndUpdate(userId, { isBanned }, { new: true }).exec();
-    if (!user) return null;
-    return this.mapToUserResponse(user);
-  }
+ async updateBanStatus(userId: string, isBanned: boolean): Promise<UserResponse | null> {
+  const user = await this._model.findByIdAndUpdate(userId, { isBanned }, { new: true }).exec();
+  if (!user) return null;
+  return this.mapToUserResponse(user);
+}
 
-  private mapToUserResponse(user: IUser): UserResponse {
-    return new UserResponse(
-      user.id,
-      user.name,
-      user.email,
-      UserRole.USER,
-      user.photo ?? null,
-      user.phoneNo ?? null,
-      user.address ?? null,
-      user.isBanned
-    );
-  }
+private mapToUserResponse(user: IUser): UserResponse {
+  return new UserResponse({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: UserRole.USER,
+    photo: user.photo ?? null,
+    phoneNo: user.phoneNo ?? null,
+    address: user.address ?? null,
+    isBanned: user.isBanned,
+  });
+}
+
 }

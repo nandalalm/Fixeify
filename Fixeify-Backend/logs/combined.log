@@ -1119,3 +1119,119 @@
 {"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-08T09:40:22.176Z"}
 {"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-08T09:40:42.172Z"}
 {"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-08T09:40:43.178Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-08T10:38:02.369Z"}
+{"level":"error","message":"[Error] 401: No refresh token provided","timestamp":"2025-04-08T10:38:02.382Z"}
+{"level":"error","message":"[Error] 404: User not found","timestamp":"2025-04-08T10:38:18.152Z"}
+{"level":"error","message":"[Error] 403: Your account is banned. Please contact support.","timestamp":"2025-04-08T10:39:52.750Z"}
+{"level":"error","message":"[Error] 403: Your account is banned. Please contact support.","timestamp":"2025-04-08T10:40:30.720Z"}
+{"level":"error","message":"[Error] 403: Your account is banned. Please contact support.","timestamp":"2025-04-08T10:40:30.723Z"}
+{"level":"error","message":"[Error] 500: Pro not found","timestamp":"2025-04-09T11:52:43.590Z"}
+{"level":"error","message":"[Error] 500: Pro not found","timestamp":"2025-04-09T11:52:52.186Z"}
+{"level":"error","message":"[Error] 500: Pro not found","timestamp":"2025-04-09T11:52:52.190Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-10T05:30:22.379Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-10T05:30:22.384Z"}
+{"level":"error","message":"[Error] 501: Something went wrong!","timestamp":"2025-04-10T05:50:54.882Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T09:33:09.195Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T09:33:10.188Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T09:33:13.186Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"ApprovedPro\"","timestamp":"2025-04-10T10:10:24.111Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"ApprovedPro\"","timestamp":"2025-04-10T10:10:24.116Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"PendingPro\"","timestamp":"2025-04-10T10:10:24.121Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"PendingPro\"","timestamp":"2025-04-10T10:10:24.125Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"ApprovedPro\"","timestamp":"2025-04-10T10:11:07.143Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"ApprovedPro\"","timestamp":"2025-04-10T10:11:07.149Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"PendingPro\"","timestamp":"2025-04-10T10:11:07.153Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"PendingPro\"","timestamp":"2025-04-10T10:11:07.157Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"ApprovedPro\"","timestamp":"2025-04-10T10:11:10.703Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"ApprovedPro\"","timestamp":"2025-04-10T10:11:10.708Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"PendingPro\"","timestamp":"2025-04-10T10:11:10.712Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"PendingPro\"","timestamp":"2025-04-10T10:11:10.715Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"ApprovedPro\"","timestamp":"2025-04-10T10:21:48.311Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"ApprovedPro\"","timestamp":"2025-04-10T10:21:48.319Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"PendingPro\"","timestamp":"2025-04-10T10:21:48.325Z"}
+{"level":"error","message":"[Error] 500: Cast to ObjectId failed for value \"undefined\" (type string) at path \"_id\" for model \"PendingPro\"","timestamp":"2025-04-10T10:21:48.330Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:26:27.742Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:26:27.749Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:35:22.446Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:35:22.454Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T10:43:16.183Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T10:43:30.175Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T10:43:30.178Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T10:43:30.184Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T10:43:30.187Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T10:43:31.874Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-10T10:43:31.877Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:43:35.976Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:43:35.981Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:43:59.936Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:43:59.941Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:44:38.880Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:44:38.886Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:44:58.519Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:44:58.524Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:46:20.046Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:46:20.051Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:51:58.150Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T10:51:58.156Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T11:31:11.992Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T11:31:12.000Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T11:41:21.317Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T11:41:21.324Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T11:41:51.185Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-10T11:41:51.190Z"}
+{"level":"error","message":"[Error] 500: Pro not found","timestamp":"2025-04-10T11:42:03.629Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-12T04:06:03.907Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-12T04:06:03.911Z"}
+{"level":"error","message":"[Error] 404: User not found","timestamp":"2025-04-12T09:11:27.845Z"}
+{"level":"error","message":"[Error] 404: User not found","timestamp":"2025-04-12T09:11:36.503Z"}
+{"level":"error","message":"[Error] 404: User not found","timestamp":"2025-04-12T09:11:59.090Z"}
+{"level":"error","message":"[Error] 403: Your account is banned. Please contact support.","timestamp":"2025-04-12T09:19:16.248Z"}
+{"level":"error","message":"[Error] 403: Your account is banned. Please contact support.","timestamp":"2025-04-12T09:19:16.250Z"}
+{"level":"error","message":"[Error] 403: Your account is banned. Please contact support.","timestamp":"2025-04-12T09:25:27.566Z"}
+{"level":"error","message":"[Error] 403: Your account is banned. Please contact support.","timestamp":"2025-04-12T09:25:27.568Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-12T10:08:18.259Z"}
+{"level":"error","message":"[Error] 401: No refresh token provided","timestamp":"2025-04-12T10:08:18.274Z"}
+{"level":"error","message":"[Error] 400: Invalid role selected","timestamp":"2025-04-12T11:46:50.951Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-14T01:26:42.743Z"}
+{"level":"error","message":"[Error] 401: No refresh token provided","timestamp":"2025-04-14T01:26:42.776Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T01:34:19.438Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T01:34:19.450Z"}
+{"level":"error","message":"[Error] 500: Pro not found","timestamp":"2025-04-14T01:35:11.332Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T01:41:59.075Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T01:41:59.093Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:09:56.159Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:09:56.175Z"}
+{"level":"error","message":"[Error] 500: Pro not found","timestamp":"2025-04-14T02:10:02.091Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:24:52.282Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:24:52.297Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:36:36.061Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:36:43.679Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:36:43.685Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:36:50.987Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:36:50.995Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:51:07.879Z"}
+{"level":"error","message":"[Error] 500: Approved pro not found","timestamp":"2025-04-14T02:51:07.885Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-14T04:16:10.726Z"}
+{"level":"error","message":"[Error] 400: Invalid role selected","timestamp":"2025-04-14T04:39:59.633Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-14T05:06:34.206Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-14T05:06:34.209Z"}
+{"level":"error","message":"[Error] 401: Access Denied","timestamp":"2025-04-14T05:25:02.731Z"}
+{"level":"error","message":"[Error] 401: Access Denied","timestamp":"2025-04-14T05:25:02.735Z"}
+{"level":"error","message":"[Error] 400: Invalid role selected","timestamp":"2025-04-14T05:27:10.967Z"}
+{"level":"error","message":"[Error] 400: Valid role (user or admin) is required","timestamp":"2025-04-14T05:29:46.968Z"}
+{"level":"error","message":"[Error] 400: Valid role (user or admin) is required","timestamp":"2025-04-14T05:30:23.802Z"}
+{"level":"error","message":"[Error] 400: Invalid role selected","timestamp":"2025-04-14T05:50:27.165Z"}
+{"level":"error","message":"[Error] 400: Valid role (user or admin) is required","timestamp":"2025-04-14T05:53:50.511Z"}
+{"level":"error","message":"[Error] 403: Your account is banned. Please contact support.","timestamp":"2025-04-15T06:47:10.227Z"}
+{"level":"error","message":"[Error] 400: Valid role (user or admin) is required","timestamp":"2025-04-15T06:50:53.350Z"}
+{"level":"error","message":"[Error] 400: Invalid role selected","timestamp":"2025-04-15T06:54:44.082Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-15T07:00:19.158Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-15T07:00:19.164Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-15T07:00:22.473Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-15T07:00:23.180Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-15T08:47:21.960Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-15T08:47:21.964Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-15T09:15:49.940Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-15T09:15:49.943Z"}
+{"level":"error","message":"[Error] 400: Valid role (user or admin) is required","timestamp":"2025-04-15T09:18:15.537Z"}
+{"level":"error","message":"[Error] 400: Valid role (user or admin) is required","timestamp":"2025-04-15T09:21:17.362Z"}

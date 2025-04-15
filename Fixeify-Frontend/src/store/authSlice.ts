@@ -7,7 +7,7 @@ export enum UserRole {
   ADMIN = "admin",
 }
 
-export interface User { // Added export
+export interface User {
   id: string;
   name: string;
   email: string;
@@ -34,9 +34,15 @@ const initialState: AuthState = {
   error: null,
 };
 
-export const refreshToken = createAsyncThunk(
+// Define the return type for the refreshToken thunk
+export interface RefreshTokenResponse {
+  accessToken: string;
+  user: User;
+}
+
+export const refreshToken = createAsyncThunk<RefreshTokenResponse, void, { rejectValue: string }>(
   "auth/refreshToken",
-  async (_, { rejectWithValue }) => {
+  async (_, { rejectWithValue, dispatch }) => {
     try {
       const refreshResponse = await api.post("/auth/refresh-token", {}, { withCredentials: true });
       const accessToken = refreshResponse.data.accessToken;
@@ -54,6 +60,7 @@ export const refreshToken = createAsyncThunk(
         return rejectWithValue("User is banned");
       }
 
+      dispatch(setAccessToken(accessToken)); // Update access token immediately
       return { accessToken, user };
     } catch (err: any) {
       console.error("Refresh error details:", {
@@ -69,7 +76,7 @@ export const refreshToken = createAsyncThunk(
 
 export const logoutUser = createAsyncThunk(
   "auth/logoutUser",
-  async (role: "user" | "admin", { rejectWithValue }) => {
+  async (role: "user" | "admin" | "pro", { rejectWithValue }) => {
     try {
       await api.post("/auth/logout", { role }, { withCredentials: true });
       return role;

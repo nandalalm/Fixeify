@@ -5,7 +5,11 @@ import { IProRepository } from "../repositories/IProRepository";
 import { UserResponse } from "../dtos/response/userDtos";
 import { IAdminService } from "./IAdminService";
 import { UserRole } from "../enums/roleEnum";
-import { IPendingPro, PendingProDocument } from "../models/pendingProModel";
+import { IPendingPro } from "../models/pendingProModel";
+import { ProResponse } from "../dtos/response/proDtos";
+import nodemailer from "nodemailer";
+import bcrypt from "bcryptjs";
+import { getApprovalEmailTemplate, getRejectionEmailTemplate } from "../utils/emailTemplates";
 
 @injectable()
 export class AdminService implements IAdminService {
@@ -21,7 +25,15 @@ export class AdminService implements IAdminService {
       this._userRepository.getTotalUsersCount(),
     ]);
     return {
-      users: users.map((user) => new UserResponse(user.id, user.name, user.email, UserRole.USER, null, null, null, user.isBanned)),
+      users: users.map((user) =>
+        new UserResponse({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: UserRole.USER,
+          isBanned: user.isBanned,
+        })
+      ),
       total,
     };
   }
@@ -29,7 +41,39 @@ export class AdminService implements IAdminService {
   async banUser(userId: string, isBanned: boolean): Promise<UserResponse | null> {
     const updatedUser = await this._userRepository.updateBanStatus(userId, isBanned);
     if (!updatedUser) return null;
-    return new UserResponse(updatedUser.id, updatedUser.name, updatedUser.email, UserRole.USER, null, null, null, updatedUser.isBanned);
+    return new UserResponse({
+      id: updatedUser.id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      role: UserRole.USER,
+      isBanned: updatedUser.isBanned,
+    });
+  }
+
+  async banPro(proId: string, isBanned: boolean): Promise<ProResponse | null> {
+    const updatedPro = await this._proRepository.updateBanStatus(proId, isBanned);
+    if (!updatedPro) return null;
+    return new ProResponse({
+      _id: updatedPro._id.toString(),
+      firstName: updatedPro.firstName,
+      role: UserRole.PRO,
+      lastName: updatedPro.lastName,
+      email: updatedPro.email,
+      phoneNumber: updatedPro.phoneNumber,
+      serviceType: updatedPro.serviceType,
+      customService: updatedPro.customService,
+      skills: updatedPro.skills,
+      location: updatedPro.location,
+      profilePhoto: updatedPro.profilePhoto,
+      idProof: updatedPro.idProof,
+      accountHolderName: updatedPro.accountHolderName,
+      accountNumber: updatedPro.accountNumber,
+      bankName: updatedPro.bankName,
+      availability: updatedPro.availability,
+      workingHours: updatedPro.workingHours,
+      isBanned: updatedPro.isBanned,
+      about: updatedPro.about,
+    });
   }
 
   async getPendingPros(page: number, limit: number): Promise<{ pros: IPendingPro[]; total: number }> {
@@ -38,7 +82,6 @@ export class AdminService implements IAdminService {
       this._proRepository.getPendingProsWithPagination(skip, limit),
       this._proRepository.getTotalPendingProsCount(),
     ]);
-    // Convert PendingProDocument[] to IPendingPro[]
     return { pros: pros.map((doc) => doc.toObject() as IPendingPro), total };
   }
 
@@ -47,7 +90,161 @@ export class AdminService implements IAdminService {
     if (!proDoc) {
       throw new Error("Pro not found");
     }
-    // Convert Mongoose document to plain object matching IPendingPro
     return proDoc.toObject() as IPendingPro;
+  }
+
+  async approvePro(id: string, about: string | null): Promise<void> {
+    const { plainPassword, hashedPassword } = await this.generatePassword();
+    const { email, firstName, lastName } = await this._proRepository.approvePro(id, hashedPassword, about || "");
+    console.log(`approve email: ${email}`);
+    await this.sendApprovalEmail(email, `${firstName} ${lastName}`, plainPassword);
+  }
+
+  async rejectPro(id: string, reason: string): Promise<void> {
+    const pendingPro = await this.getPendingProById(id);
+    console.log(`reject email: ${pendingPro.email}`);
+    await this._proRepository.rejectPro(id);
+    await this.sendRejectionEmail(pendingPro.email, reason);
+  }
+
+  async getApprovedPros(page: number, limit: number): Promise<{ pros: ProResponse[]; total: number }> {
+    const skip = (page - 1) * limit;
+    const [pros, total] = await Promise.all([
+      this._proRepository.getApprovedProsWithPagination(skip, limit),
+      this._proRepository.getTotalApprovedProsCount(),
+    ]);
+    return {
+      pros: pros.map(
+        (doc) =>
+          new ProResponse({
+            _id: doc._id.toString(),
+            firstName: doc.firstName,
+            role: UserRole.PRO,
+            lastName: doc.lastName,
+            email: doc.email,
+            phoneNumber: doc.phoneNumber,
+            serviceType: doc.serviceType,
+            customService: doc.customService,
+            skills: doc.skills,
+            location: doc.location,
+            profilePhoto: doc.profilePhoto,
+            idProof: doc.idProof,
+            accountHolderName: doc.accountHolderName,
+            accountNumber: doc.accountNumber,
+            bankName: doc.bankName,
+            availability: doc.availability,
+            workingHours: doc.workingHours,
+            isBanned: doc.isBanned,
+            about: doc.about,
+          })
+      ),
+      total,
+    };
+  }
+
+  async getApprovedProById(id: string): Promise<ProResponse> {
+    const proDoc = await this._proRepository.findApprovedProById(id);
+    if (!proDoc) {
+      throw new Error("Approved pro not found");
+    }
+    return new ProResponse({
+      _id: proDoc._id.toString(),
+      firstName: proDoc.firstName,
+      role: UserRole.PRO,
+      lastName: proDoc.lastName,
+      email: proDoc.email,
+      phoneNumber: proDoc.phoneNumber,
+      serviceType: proDoc.serviceType,
+      customService: proDoc.customService,
+      skills: proDoc.skills,
+      location: proDoc.location,
+      profilePhoto: proDoc.profilePhoto,
+      idProof: proDoc.idProof,
+      accountHolderName: proDoc.accountHolderName,
+      accountNumber: proDoc.accountNumber,
+      bankName: proDoc.bankName,
+      availability: proDoc.availability,
+      workingHours: proDoc.workingHours,
+      isBanned: proDoc.isBanned,
+      about: proDoc.about,
+    });
+  }
+
+  private async generatePassword(): Promise<{ plainPassword: string; hashedPassword: string }> {
+    const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const lowercase = "abcdefghijklmnopqrstuvwxyz";
+    const numbers = "0123456789";
+    const special = "!@#$%^&*()";
+    const all = uppercase + lowercase + numbers + special;
+    const minLength = 10;
+
+    let password = "";
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += special[Math.floor(Math.random() * special.length)];
+
+    while (password.length < minLength) {
+      password += all[Math.floor(Math.random() * all.length)];
+    }
+
+    password = password
+      .split("")
+      .sort(() => Math.random() - 0.5)
+      .join("");
+
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    return { plainPassword: password, hashedPassword };
+  }
+
+  private async sendApprovalEmail(email: string, username: string, password: string): Promise<void> {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Welcome to Fixeify - Approved for Duty",
+      html: getApprovalEmailTemplate(email, password),
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`Approval email sent to ${email}`);
+    } catch (error) {
+      console.error(`Failed to send approval email to ${email}:`, error);
+      throw new Error("Failed to send approval email");
+    }
+  }
+
+  private async sendRejectionEmail(email: string, reason: string): Promise<void> {
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Fixeify - Request Rejected",
+      html: getRejectionEmailTemplate(reason),
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+      console.log(`Rejection email sent to ${email}`);
+    } catch (error) {
+      console.error(`Failed to send rejection email to ${email}:`, error);
+      throw new Error("Failed to send rejection email");
+    }
   }
 }

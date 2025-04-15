@@ -29,7 +29,7 @@ const Navbar = () => {
   const handleLogout = () => {
     const role = user?.role === "admin" ? "admin" : "user";
     dispatch(logoutUser(role)).then(() => {
-      navigate("/login");
+      navigate("/");
       setIsDropdownOpen(false);
       setIsMenuOpen(false);
     });

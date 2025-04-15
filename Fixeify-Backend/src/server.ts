@@ -15,7 +15,7 @@ import { TYPES } from "./types";
 import { AuthController } from "./controllers/authController";
 import { AdminController } from "./controllers/adminController";
 import { ProController } from "./controllers/proController";
-import { AuthService } from "./services/authService";
+import { AuthService } from "./services/AuthService";
 import { AdminService } from "./services/AdminService";
 import { ProService } from "./services/ProService";
 import { IUserRepository } from "./repositories/IUserRepository";
@@ -78,5 +78,5 @@ dbConnector
   })
   .catch((err) => {
     console.error("Failed to connect to database:", err);
-    process.exit(1); 
+    process.exit(1);
   });

@@ -1,21 +1,22 @@
 import { type FC, useState, useEffect } from "react";
 import { AdminNavbar } from "../components/AdminNavbar";
-import { Menu, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Menu, Search, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../store/store";
-import { useNavigate } from "react-router-dom";
-import { fetchPendingPros, PendingPro } from "../api/adminApi";
+import { useNavigate, useLocation } from "react-router-dom";
+import { fetchPendingPros, PendingPro, fetchApprovedPros, IApprovedPro } from "../api/adminApi";
 
 const AdminProManagement: FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [pros, setPros] = useState<PendingPro[]>([]);
+  const [pros, setPros] = useState<(PendingPro | IApprovedPro)[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [activeTab, setActiveTab] = useState<"pending" | "approved">("pending"); // Default to pending
+  const [activeTab, setActiveTab] = useState<"approved" | "pending">("approved");
   const limit = 10;
 
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
@@ -24,32 +25,75 @@ const AdminProManagement: FC = () => {
       return;
     }
 
+    const tabFromState = location.state?.tab as "approved" | "pending" | undefined;
+    if (tabFromState && location.state?.fromNavigation) {
+      console.log("Setting tab from navigation state:", tabFromState);
+      setActiveTab(tabFromState);
+      setCurrentPage(1);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+
     const fetchPros = async () => {
       try {
-        const { pros, total } = await fetchPendingPros(currentPage, limit); // Only fetch pending for now
-        console.log("Fetched pending pros:", { pros, total });
-        setPros(pros);
-        setTotalPages(Math.ceil(total / limit));
-        console.log("State updated - pros:", pros, "totalPages:", Math.ceil(total / limit));
+        console.log("Fetching pros for tab:", activeTab, "page:", currentPage);
+        let data: { pros: PendingPro[] | IApprovedPro[]; total: number } | undefined;
+        if (activeTab === "pending") {
+          data = await fetchPendingPros(currentPage, limit);
+          console.log("Fetched pending pros:", { pros: data.pros, total: data.total });
+        } else if (activeTab === "approved") {
+          data = await fetchApprovedPros(currentPage, limit);
+          console.log("Fetched approved pros:", { pros: data.pros, total: data.total });
+        }
+
+        if (data) {
+          setPros(data.pros);
+          setTotalPages(Math.ceil(data.total / limit));
+          console.log("State updated - pros:", data.pros);
+        } else {
+          setPros([]);
+          setTotalPages(0);
+          console.warn("No data received, resetting to empty state.");
+        }
       } catch (error) {
-        console.error("Failed to fetch pending pros:", error);
+        console.error(`Failed to fetch ${activeTab} pros:`, error);
+        setPros([]);
+        setTotalPages(0);
       }
     };
     fetchPros();
-  }, [user?.id, navigate, currentPage, activeTab]); // activeTab included to re-fetch when switched
+  }, [user?.id, navigate, currentPage, activeTab]);
 
   if (!user || user.role !== "admin") return null;
 
-  const filteredPros = pros.filter(
-    (pro) =>
-      pro.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pro.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      pro.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredPros = pros.filter((pro) => {
+    if ("createdAt" in pro) {
+      return (
+        pro.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pro.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pro.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    } else {
+      return (
+        pro.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pro.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pro.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+  });
 
   const handleViewProfile = (proId: string) => {
-    console.log("Navigating to profile for ID:", proId); // Debug log
-    navigate(`/pro-profile/${proId}`);
+    console.log("Navigating to profile with ID:", proId);
+    if (!proId) {
+      console.error("Invalid proId:", proId);
+      return;
+    }
+    navigate(`/pro-profile/${proId}`, { state: { fromPending: activeTab === "pending" } });
+  };
+
+  const handleTabChange = (tab: "approved" | "pending") => {
+    console.log("Switching to tab:", tab);
+    setActiveTab(tab);
+    setCurrentPage(1);
   };
 
   return (
@@ -64,22 +108,27 @@ const AdminProManagement: FC = () => {
           </button>
           <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
         </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium text-gray-700">{user.name}</span>
+        <div className="flex items-center space-x-4">
+          <button className="relative p-1 text-gray-700 rounded-md hover:bg-gray-100">
+            <Bell className="h-5 w-5" />
+            <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
+              1
+            </span>
+          </button>
+          <div className="flex items-center">
+            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user.name}</span>
+          </div>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         <AdminNavbar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
         <main
-          className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${
-            sidebarOpen ? "ml-64" : "ml-0"
-          }`}
+          className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-0"}`}
         >
           <div className="max-w-7xl mx-auto">
             <h2 className="text-2xl font-semibold text-gray-800 mb-6">Fixeify Pro Management</h2>
 
-            {/* Search Bar */}
             <div className="relative mb-6">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="h-5 w-5 text-gray-400" />
@@ -93,36 +142,33 @@ const AdminProManagement: FC = () => {
               />
             </div>
 
-            {/* Tab Navigation */}
             <div className="mb-6">
               <div className="border-b border-gray-200">
                 <nav className="flex space-x-8" aria-label="Tabs">
                   <button
-                    onClick={() => setActiveTab("pending")}
+                    onClick={() => handleTabChange("approved")}
+                    className={`py-2 px-4 text-sm font-medium ${
+                      activeTab === "approved"
+                        ? "border-b-2 border-blue-500 text-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    Approved Pros
+                  </button>
+                  <button
+                    onClick={() => handleTabChange("pending")}
                     className={`py-2 px-4 text-sm font-medium ${
                       activeTab === "pending"
                         ? "border-b-2 border-blue-500 text-blue-600"
                         : "text-gray-500 hover:text-gray-700"
                     }`}
                   >
-                    Approval Pending Users
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("approved")}
-                    className={`py-2 px-4 text-sm font-medium ${
-                      activeTab === "approved"
-                        ? "border-b-2 border-blue-500 text-blue-600"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                    disabled // Disable until implemented
-                  >
-                    Approved Pros
+                    Approval Pending Pros
                   </button>
                 </nav>
               </div>
             </div>
 
-            {/* Pros List */}
             <div className="bg-white shadow-sm rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -149,7 +195,7 @@ const AdminProManagement: FC = () => {
                     {filteredPros.length === 0 ? (
                       <tr>
                         <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                          No pending pros found.
+                          No {activeTab === "pending" ? "pending" : "approved"} pros found.
                         </td>
                       </tr>
                     ) : (
@@ -171,7 +217,7 @@ const AdminProManagement: FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pro.email}</td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                             <button
-                              onClick={() => handleViewProfile(pro._id)} // Add onClick handler
+                              onClick={() => handleViewProfile(pro._id)}
                               className="bg-blue-100 text-blue-800 px-4 py-1 rounded-md text-sm hover:bg-blue-200 transition-colors"
                             >
                               View

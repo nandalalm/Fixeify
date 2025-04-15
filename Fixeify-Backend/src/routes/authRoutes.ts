@@ -3,10 +3,13 @@ import { Container } from "inversify";
 import { TYPES } from "../types";
 import { AuthController } from "../controllers/authController";
 import { authenticateToken } from "../middleware/authMiddleware";
+import cookieParser from "cookie-parser";
 
 export default function createAuthRoutes(container: Container): Router {
   const router = express.Router();
   const authController = container.get<AuthController>(TYPES.AuthController);
+
+  router.use(cookieParser());
 
   router.post("/send-otp", authController.sendOtp.bind(authController));
   router.post("/verify-otp", authController.verifyOtp.bind(authController));
