@@ -34,7 +34,6 @@ const initialState: AuthState = {
   error: null,
 };
 
-// Define the return type for the refreshToken thunk
 export interface RefreshTokenResponse {
   accessToken: string;
   user: User;
@@ -60,7 +59,7 @@ export const refreshToken = createAsyncThunk<RefreshTokenResponse, void, { rejec
         return rejectWithValue("User is banned");
       }
 
-      dispatch(setAccessToken(accessToken)); // Update access token immediately
+      dispatch(setAccessToken(accessToken)); 
       return { accessToken, user };
     } catch (err: any) {
       console.error("Refresh error details:", {

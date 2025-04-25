@@ -1,8 +1,17 @@
 import { UserRole } from "../../enums/roleEnum";
 
-// dtos/response/proDtos.ts
+export interface ILocation {
+  address: string;
+  city: string;
+  state: string;
+  coordinates: {
+    type: "Point";
+    coordinates: [number, number]; // [longitude, latitude]
+  };
+}
+
 export class ProResponse {
-  public _id: string; // Change id to _id to match Mongoose
+  public _id: string;
   public firstName: string;
   public role: UserRole;
   public lastName: string;
@@ -11,7 +20,7 @@ export class ProResponse {
   public serviceType: string;
   public customService: string | null;
   public skills: string[];
-  public location: string;
+  public location: ILocation;
   public profilePhoto: string;
   public idProof: string[];
   public accountHolderName: string;
@@ -29,9 +38,10 @@ export class ProResponse {
   public workingHours: string;
   public isBanned: boolean;
   public about: string | null;
+  public isBooked: boolean;
 
   constructor({
-    _id, // Use _id instead of id
+    _id,
     firstName,
     role,
     lastName,
@@ -50,6 +60,7 @@ export class ProResponse {
     workingHours,
     isBanned,
     about = null,
+    isBooked,
   }: {
     _id: string;
     firstName: string;
@@ -60,7 +71,7 @@ export class ProResponse {
     serviceType: string;
     customService?: string | null;
     skills: string[];
-    location: string;
+    location: ILocation;
     profilePhoto: string;
     idProof: string[];
     accountHolderName: string;
@@ -78,6 +89,7 @@ export class ProResponse {
     workingHours: string;
     isBanned: boolean;
     about?: string | null;
+    isBooked: boolean;
   }) {
     this._id = _id;
     this.firstName = firstName;
@@ -98,5 +110,6 @@ export class ProResponse {
     this.workingHours = workingHours;
     this.isBanned = isBanned;
     this.about = about;
+    this.isBooked = isBooked;
   }
 }

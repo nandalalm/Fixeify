@@ -28,7 +28,7 @@ export const getOtpEmailTemplate = (otp: string): string => `
   </html>
 `;
 
-export const getApprovalEmailTemplate = (email: string, password: string): string => `
+export const getApprovalEmailTemplate = (email: string, name:string, password: string): string => `
   <!DOCTYPE html>
   <html lang="en">
   <head>
@@ -47,7 +47,7 @@ export const getApprovalEmailTemplate = (email: string, password: string): strin
     <div class="container">
       <div class="content">
         <h1>Welcome to Fixeify!</h1>
-        <p>Congratulations! You have been cleared for duty.</p>
+        <p>Congratulations ${name}! You have been cleared for duty.</p>
         <p>Your login credentials are:</p>
         <div class="credentials">
           <p><strong>Username:</strong> ${email}</p>

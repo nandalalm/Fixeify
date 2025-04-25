@@ -481,7 +481,7 @@ const ProProfileView: FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         {pro.idProof.map((proof, index) => (
                           <div key={index} className="border rounded-lg overflow-hidden">
-                            <img src={proof} alt={`ID Proof ${index + 1}`} className="w-full h-64 object-cover" />
+                            <img src={proof} alt={`ID Proof ${index + 1}`} className="w-full h-full object-cover" />
                           </div>
                         ))}
                       </div>
@@ -549,7 +549,7 @@ const ProProfileView: FC = () => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <ContactRow label="Phone Number" value={"+91 " + pro.phoneNumber} />
-                          <ContactRow label="Location" value={pro.location} />
+                          <ContactRow label="Location" value={pro.location.address} />
                           <ContactRow label="Email" value={pro.email} />
                         </div>
                       </div>

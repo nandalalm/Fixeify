@@ -33,8 +33,8 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       console.log("401 detected, attempting token refresh for:", originalRequest.url);
       try {
-        const result = await store.dispatch(refreshToken()).unwrap(); // Use unwrap to get the payload
-        const { accessToken } = result; // TypeScript now knows this is RefreshTokenResponse
+        const result = await store.dispatch(refreshToken()).unwrap(); 
+        const { accessToken } = result; 
         console.log("Token refresh successful, new token:", accessToken);
         store.dispatch(setAccessToken(accessToken));
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;

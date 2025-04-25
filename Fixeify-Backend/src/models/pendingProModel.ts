@@ -1,5 +1,15 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export interface ILocation {
+  address: string;
+  city: string;
+  state: string;
+  coordinates: {
+    type: "Point";
+    coordinates: [number, number]; // [longitude, latitude]
+  };
+}
+
 export interface IPendingPro {
   firstName: string;
   lastName: string;
@@ -8,7 +18,7 @@ export interface IPendingPro {
   serviceType: string;
   customService?: string;
   skills: string[];
-  location: string;
+  location: ILocation;
   profilePhoto: string;
   idProof: string[];
   accountHolderName: string;
@@ -24,10 +34,34 @@ export interface IPendingPro {
     sunday: boolean;
   };
   workingHours: string;
-  createdAt: Date;
+  createdAt?: Date;
 }
 
-export interface PendingProDocument extends IPendingPro, Document {}
+export interface PendingProDocument extends IPendingPro, Document {
+  _id: mongoose.Types.ObjectId;
+}
+
+const locationSchema = new Schema<ILocation>(
+  {
+    address: { type: String, required: true },
+    city: { type: String, required: true },
+    state: { type: String, required: true },
+    coordinates: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        required: true,
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        required: true,
+      },
+    },
+  },
+  { _id: false }
+);
+
+locationSchema.index({ coordinates: "2dsphere" });
 
 const pendingProSchema = new Schema<PendingProDocument>(
   {
@@ -38,7 +72,7 @@ const pendingProSchema = new Schema<PendingProDocument>(
     serviceType: { type: String, required: true },
     customService: { type: String },
     skills: { type: [String], required: true },
-    location: { type: String, required: true },
+    location: { type: locationSchema, required: true },
     profilePhoto: { type: String, required: true },
     idProof: { type: [String], required: true },
     accountHolderName: { type: String, required: true },
@@ -56,9 +90,8 @@ const pendingProSchema = new Schema<PendingProDocument>(
     workingHours: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
   },
-  { timestamps: false }
+  { timestamps: true }
 );
 
 export const PendingProModel = mongoose.model<PendingProDocument>("PendingPro", pendingProSchema);
-
 export default PendingProModel;

@@ -163,9 +163,6 @@ export class AuthService implements IAuthService {
           : `${(user as ApprovedProDocument).firstName || ""} ${(user as ApprovedProDocument).lastName || ""}`.trim(),
       email: user.email,
       role: actualRole,
-      photo: "photo" in user ? user.photo ?? null : null,
-      phoneNo: "phoneNo" in user ? user.phoneNo ?? null : (user as ApprovedProDocument).phoneNumber ?? null,
-      address: "address" in user ? user.address ?? null : (user as ApprovedProDocument).location ?? null,
       isBanned: "isBanned" in user ? user.isBanned : false,
     });
 
@@ -247,9 +244,6 @@ export class AuthService implements IAuthService {
           : `${(user as ApprovedProDocument).firstName || ""} ${(user as ApprovedProDocument).lastName || ""}`.trim(),
       email: user.email,
       role,
-      photo: "photo" in user ? user.photo ?? null : null,
-      phoneNo: "phoneNo" in user ? user.phoneNo ?? null : (user as ApprovedProDocument).phoneNumber ?? null,
-      address: "address" in user ? user.address ?? null : (user as ApprovedProDocument).location ?? null,
       isBanned: "isBanned" in user ? user.isBanned : false,
     });
   }

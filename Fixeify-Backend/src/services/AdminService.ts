@@ -63,7 +63,12 @@ export class AdminService implements IAdminService {
       serviceType: updatedPro.serviceType,
       customService: updatedPro.customService,
       skills: updatedPro.skills,
-      location: updatedPro.location,
+      location: {
+        address: updatedPro.location.address,
+        city: updatedPro.location.city,
+        state: updatedPro.location.state,
+        coordinates: updatedPro.location.coordinates,
+      },
       profilePhoto: updatedPro.profilePhoto,
       idProof: updatedPro.idProof,
       accountHolderName: updatedPro.accountHolderName,
@@ -73,6 +78,7 @@ export class AdminService implements IAdminService {
       workingHours: updatedPro.workingHours,
       isBanned: updatedPro.isBanned,
       about: updatedPro.about,
+      isBooked: updatedPro.isBooked,
     });
   }
 
@@ -126,7 +132,12 @@ export class AdminService implements IAdminService {
             serviceType: doc.serviceType,
             customService: doc.customService,
             skills: doc.skills,
-            location: doc.location,
+            location: {
+              address: doc.location.address,
+              city: doc.location.city,
+              state: doc.location.state,
+              coordinates: doc.location.coordinates,
+            },
             profilePhoto: doc.profilePhoto,
             idProof: doc.idProof,
             accountHolderName: doc.accountHolderName,
@@ -136,6 +147,7 @@ export class AdminService implements IAdminService {
             workingHours: doc.workingHours,
             isBanned: doc.isBanned,
             about: doc.about,
+            isBooked: doc.isBooked,
           })
       ),
       total,
@@ -157,7 +169,12 @@ export class AdminService implements IAdminService {
       serviceType: proDoc.serviceType,
       customService: proDoc.customService,
       skills: proDoc.skills,
-      location: proDoc.location,
+      location: {
+        address: proDoc.location.address,
+        city: proDoc.location.city,
+        state: proDoc.location.state,
+        coordinates: proDoc.location.coordinates,
+      },
       profilePhoto: proDoc.profilePhoto,
       idProof: proDoc.idProof,
       accountHolderName: proDoc.accountHolderName,
@@ -167,6 +184,7 @@ export class AdminService implements IAdminService {
       workingHours: proDoc.workingHours,
       isBanned: proDoc.isBanned,
       about: proDoc.about,
+      isBooked: proDoc.isBooked,
     });
   }
 
@@ -198,7 +216,7 @@ export class AdminService implements IAdminService {
     return { plainPassword: password, hashedPassword };
   }
 
-  private async sendApprovalEmail(email: string, username: string, password: string): Promise<void> {
+  private async sendApprovalEmail(email: string, name: string, password: string): Promise<void> {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -211,7 +229,7 @@ export class AdminService implements IAdminService {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Welcome to Fixeify - Approved for Duty",
-      html: getApprovalEmailTemplate(email, password),
+      html: getApprovalEmailTemplate(email,name, password),
     };
 
     try {

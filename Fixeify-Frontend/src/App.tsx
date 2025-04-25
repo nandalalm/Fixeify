@@ -18,7 +18,7 @@ import FixeifyProForm from "./pages/FixeifyProForm";
 import SuccessPage from "./components/SuccessPage";
 import AdminProManagement from "./pages/AdminProManagement";
 import ProProfileView from "./components/ProProfileView";
-import PublicRoute from "./components/PublicRoute"; // Import PublicRoute
+import PublicRoute from "./components/PublicRoute"; 
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -55,7 +55,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public routes wrapped with PublicRoute */}
+        {/* Public routes */}
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -67,7 +67,7 @@ function App() {
         <Route path="/success" element={<SuccessPage />} />
         <Route path="/" element={<Home />} />
 
-        {/* Private routes for users and pros */}
+        {/* Private routes  */}
         <Route element={<PrivateRoute />}>
           <Route path="/home" element={<Home />} />
           <Route path="/pro-dashboard" element={<ProDashboard />} />

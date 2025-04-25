@@ -10,6 +10,16 @@ interface User {
   photo?: string | null;
 }
 
+interface LocationData {
+  address: string;
+  city: string;
+  state: string;
+  coordinates: {
+    type: "Point";
+    coordinates: [number, number]; // [longitude, latitude]
+  };
+}
+
 export interface PendingPro {
   _id: string;
   firstName: string;
@@ -19,7 +29,7 @@ export interface PendingPro {
   serviceType: string;
   customService?: string;
   skills: string[];
-  location: string;
+  location: LocationData;
   profilePhoto: string;
   idProof: string[];
   accountHolderName: string;
@@ -47,7 +57,7 @@ export interface IApprovedPro {
   serviceType: string;
   customService?: string | null;
   skills: string[];
-  location: string;
+  location: LocationData;
   profilePhoto: string;
   idProof: string[];
   accountHolderName: string;

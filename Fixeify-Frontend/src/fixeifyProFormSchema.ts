@@ -15,7 +15,6 @@ export const lastNameSchema = z
 
 export const emailSchema = z.string().email("Invalid email address").trim();
 
-// New schemas for FixeifyProForm
 const phoneNumberSchema = z
   .string()
   .length(10, "Phone Number must be exactly 10 digits")
@@ -49,12 +48,36 @@ const customSkillSchema = z
   .trim()
   .optional();
 
-const locationSchema = z
-  .string()
-  .regex(/^[\w\s.,-]+$/, "Location can only contain letters, numbers, spaces, commas, periods, and hyphens")
-  .min(10, "Location must be at least 10 characters long")
-  .trim()
-  .optional();
+const locationSchema = z.object({
+  address: z
+    .string()
+    .regex(/^[\w\s.,-]+$/, "Address can only contain letters, numbers, spaces, commas, periods, and hyphens")
+    .trim(),
+  city: z
+    .string()
+    .regex(/^[\w\s.,-]+$/, "City can only contain letters, numbers, spaces, commas, periods, and hyphens")
+    .trim()
+    .min(1, "City is required"),
+  state: z
+    .string()
+    .regex(/^[\w\s.,-]+$/, "State can only contain letters, numbers, spaces, commas, periods, and hyphens")
+    .trim()
+    .min(1, "State is required"),
+  country: z
+    .string()
+    .regex(/^[\w\s.,-]+$/, "Country can only contain letters, numbers, spaces, commas, periods, and hyphens")
+    .trim()
+    .min(1, "Country is required"),
+  coordinates: z.object({
+    type: z.literal("Point"),
+    coordinates: z
+      .tuple([z.number(), z.number()])
+      .refine(
+        ([lng, lat]) => lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90,
+        "Invalid longitude or latitude"
+      ),
+  }),
+});
 
 const workingHoursSchema = z
   .string()
@@ -105,9 +128,11 @@ export const fixeifyProFormSchema = z.object({
   phoneNumber: phoneNumberSchema,
   serviceType: z.string().min(1, "Service type is required"),
   customService: customServiceSchema,
-  skills: z.array(z.string()).nonempty("At least one skill is required"),
+  skills: z.array(z.string()).nonempty("Please select at least one skill"),
   customSkill: customSkillSchema,
-  location: locationSchema,
+  location: locationSchema.nullable().refine((val) => val !== null, {
+    message: "Please provide your location",
+  }),
   profilePhoto: profilePhotoSchema,
   idProof: idProofSchema,
   accountHolderName: nameSchema.optional().or(z.literal("")),

@@ -1,6 +1,6 @@
 import api from "./axios";
 // @ts-ignore
-import { User, UserRole } from "../store/authSlice"; // Now works with exports
+import { User, UserRole } from "../store/authSlice"; 
 
 interface AuthResponse {
   accessToken: string;

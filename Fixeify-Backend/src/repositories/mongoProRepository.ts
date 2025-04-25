@@ -48,6 +48,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       ...pendingPro.toObject(),
       password,
       isBanned: false,
+      isBooked: false,
       about: about || null,
     };
 
@@ -105,7 +106,12 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       serviceType: pro.serviceType,
       customService: pro.customService ?? null,
       skills: pro.skills,
-      location: pro.location,
+      location: {
+        address: pro.location.address,
+        city: pro.location.city,
+        state: pro.location.state,
+        coordinates: pro.location.coordinates,
+      },
       profilePhoto: pro.profilePhoto,
       idProof: pro.idProof,
       accountHolderName: pro.accountHolderName,
@@ -115,6 +121,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       workingHours: pro.workingHours,
       isBanned: pro.isBanned,
       about: pro.about ?? null,
+      isBooked: pro.isBooked,
     });
   }
 }

@@ -1,16 +1,50 @@
 import mongoose, { Schema, Document } from "mongoose";
 import { IPendingPro } from "./pendingProModel";
 
-export interface IApprovedPro extends IPendingPro {
+export interface ILocation {
+  address: string;
+  city: string;
+  state: string;
+  coordinates: {
+    type: "Point";
+    coordinates: [number, number]; // [longitude, latitude]
+  };
+}
+
+export interface IApprovedPro extends Omit<IPendingPro, "location"> {
+  location: ILocation;
   isBanned: boolean;
   password: string;
-  about?: string | null; // Can be null, to be filled by pro later
+  about?: string | null;
+  isBooked: boolean;
 }
 
 export interface ApprovedProDocument extends IApprovedPro, Document {
-  _id: mongoose.Types.ObjectId; // 👈 Add this line to fix the typing
+  _id: mongoose.Types.ObjectId;
 }
 
+const locationSchema = new Schema<ILocation>(
+  {
+    address: { type: String, required: true },
+    city: { type: String, required: true },
+    state: { type: String, required: true },
+    coordinates: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        required: true,
+      },
+      coordinates: {
+        type: [Number], // [longitude, latitude]
+        required: true,
+      },
+    },
+  },
+  { _id: false }
+);
+
+// Create a 2dsphere index on the coordinates field for geospatial queries
+locationSchema.index({ coordinates: "2dsphere" });
 
 const approvedProSchema = new Schema<ApprovedProDocument>(
   {
@@ -21,7 +55,7 @@ const approvedProSchema = new Schema<ApprovedProDocument>(
     serviceType: { type: String, required: true },
     customService: { type: String },
     skills: { type: [String], required: true },
-    location: { type: String, required: true },
+    location: { type: locationSchema, required: true },
     profilePhoto: { type: String, required: true },
     idProof: { type: [String], required: true },
     accountHolderName: { type: String, required: true },
@@ -40,7 +74,8 @@ const approvedProSchema = new Schema<ApprovedProDocument>(
     createdAt: { type: Date, default: Date.now },
     isBanned: { type: Boolean, default: false },
     password: { type: String, required: true },
-    about: { type: String, default: null}, 
+    about: { type: String, default: null },
+    isBooked: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
