@@ -1,4 +1,3 @@
-// services/authService.ts
 import bcrypt from "bcryptjs";
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
@@ -47,11 +46,11 @@ export class AuthService implements IAuthService {
 
   async sendOtp(email: string): Promise<void> {
     const existingUser = await this._userRepository.findUserByEmail(email);
-    if (existingUser) throw new HttpError(400, MESSAGES.EMAIL_PASSWORD_ROLE_REQUIRED);
+    if (existingUser) throw new HttpError(400, MESSAGES.EMAIL_ALREADY_REGISTERED);
     const existingAdmin = await this._adminRepository.findAdminByEmail(email);
-    if (existingAdmin) throw new HttpError(400, MESSAGES.EMAIL_PASSWORD_ROLE_REQUIRED);
+    if (existingAdmin) throw new HttpError(400, MESSAGES.EMAIL_ALREADY_REGISTERED);
     const existingPro = await this._proRepository.findApprovedProByEmail(email);
-    if (existingPro) throw new HttpError(400, MESSAGES.EMAIL_PASSWORD_ROLE_REQUIRED);
+    if (existingPro) throw new HttpError(400, MESSAGES.EMAIL_ALREADY_REGISTERED);
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     await this._redisClient.setEx(`otp:${email}`, 60, otp);
@@ -65,7 +64,7 @@ export class AuthService implements IAuthService {
       });
     } catch (error) {
       logger.error("Failed to send OTP email:", error);
-      throw new HttpError(500, MESSAGES.SERVER_ERROR);
+      throw new HttpError(500, "Failed to send OTP email");
     }
   }
 
@@ -76,7 +75,7 @@ export class AuthService implements IAuthService {
       await this._redisClient.del(`otp:${email}`);
       return true;
     }
-    return false;
+    throw new HttpError(400, MESSAGES.INVALID_OTP);
   }
 
   async isEmailVerified(email: string): Promise<boolean> {
@@ -107,35 +106,44 @@ export class AuthService implements IAuthService {
     user: UserResponse;
   }> {
     let user: IUser | IAdmin | ApprovedProDocument | null = null;
-    let actualRole: UserRole;
 
-    // Check all possible account types
-    const userRecord = await this._userRepository.findUserByEmail(email);
-    const adminRecord = await this._adminRepository.findAdminByEmail(email);
-    const proRecord = await this._proRepository.findApprovedProByEmail(email);
-
-    if (userRecord) {
-      user = userRecord;
-      actualRole = UserRole.USER;
-    } else if (adminRecord) {
-      user = adminRecord;
-      actualRole = UserRole.ADMIN;
-    } else if (proRecord) {
-      user = proRecord;
-      actualRole = UserRole.PRO;
-    } else {
-      throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+    // Query based on selected role
+    if (role === UserRole.USER) {
+      user = await this._userRepository.findUserByEmail(email);
+    } else if (role === UserRole.PRO) {
+      user = await this._proRepository.findApprovedProByEmail(email);
+    } else if (role === UserRole.ADMIN) {
+      user = await this._adminRepository.findAdminByEmail(email);
     }
 
-    // Verify role match
-    if (role !== actualRole) {
-      throw new HttpError(400, MESSAGES.INVALID_ROLE);
+    if (!user) {
+      // Check other roles for email and password match
+      let otherUser: IUser | IAdmin | ApprovedProDocument | null = null;
+      if (role !== UserRole.USER) {
+        otherUser = await this._userRepository.findUserByEmail(email);
+        if (otherUser && (await bcrypt.compare(password, otherUser.password))) {
+          throw new HttpError(400, MESSAGES.INVALID_ROLE);
+        }
+      }
+      if (role !== UserRole.PRO) {
+        otherUser = await this._proRepository.findApprovedProByEmail(email);
+        if (otherUser && (await bcrypt.compare(password, otherUser.password))) {
+          throw new HttpError(400, MESSAGES.INVALID_ROLE);
+        }
+      }
+      if (role !== UserRole.ADMIN) {
+        otherUser = await this._adminRepository.findAdminByEmail(email);
+        if (otherUser && (await bcrypt.compare(password, otherUser.password))) {
+          throw new HttpError(400, MESSAGES.INVALID_ROLE);
+        }
+      }
+      throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
     }
 
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new HttpError(401, MESSAGES.INCORRECT_PASSWORD);
+      throw new HttpError(422, MESSAGES.INCORRECT_PASSWORD); 
     }
 
     // Check if banned
@@ -162,7 +170,7 @@ export class AuthService implements IAuthService {
           ? user.name
           : `${(user as ApprovedProDocument).firstName || ""} ${(user as ApprovedProDocument).lastName || ""}`.trim(),
       email: user.email,
-      role: actualRole,
+      role,
       isBanned: "isBanned" in user ? user.isBanned : false,
     });
 
@@ -280,5 +288,15 @@ export class AuthService implements IAuthService {
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
     });
+  }
+
+  async checkBanStatus(userId: string): Promise<{ isBanned: boolean }> {
+    let user: IUser | ApprovedProDocument | null = await this._userRepository.findUserById(userId);
+    if (!user) {
+      user = await this._proRepository.findApprovedProById(userId);
+    }
+    if (!user) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+
+    return { isBanned: user.isBanned || false };
   }
 }

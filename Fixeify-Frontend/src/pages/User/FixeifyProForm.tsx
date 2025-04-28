@@ -4,10 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import api from "../api/axios";
-import Navbar from "../components/Navbar";
-import Footer from "../components/Footer";
-import { fixeifyProFormSchema } from "../fixeifyProFormSchema";
+import api from "../../api/axios";
+import Navbar from "../../components/User/Navbar";
+import Footer from "../../components/User/Footer";
+import { fixeifyProFormSchema } from "../../fixeifyProFormSchema";
 import { z } from "zod";
 import { LocateFixed } from "lucide-react";
 

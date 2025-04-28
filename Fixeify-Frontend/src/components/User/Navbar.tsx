@@ -4,15 +4,17 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSelector, useDispatch } from "react-redux";
-import { RootState, AppDispatch } from "../store/store";
-import { logoutUser } from "../store/authSlice";
+import { RootState, AppDispatch } from "../../store/store";
+import { logoutUser } from "../../store/authSlice";
 import { Sun, Moon } from "lucide-react";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../../context/ThemeContext";
+import { ConfirmationModal } from "../Admin/ConfirmationModal"; // Import the reusable modal
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false); // State for logout modal
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
@@ -29,10 +31,23 @@ const Navbar = () => {
   const handleLogout = () => {
     const role = user?.role === "admin" ? "admin" : "user";
     dispatch(logoutUser(role)).then(() => {
-      navigate("/");
+      navigate("/home");
       setIsDropdownOpen(false);
       setIsMenuOpen(false);
     });
+  };
+
+  const handleLogoutClick = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleLogoutConfirm = () => {
+    handleLogout();
+    setShowLogoutModal(false);
+  };
+
+  const handleLogoutCancel = () => {
+    setShowLogoutModal(false);
   };
 
   return (
@@ -76,7 +91,7 @@ const Navbar = () => {
           {accessToken ? (
             <div className="relative">
               <button
-                className="border border-[#032B44] rounded-md text-[#032B44] text-sm font-medium px-4 py-1.5 flex items-center gap-2 dark:border-gray-600 dark:text-gray-300"
+                className="border border-[#032B44] rounded-md text-[#032B44] hover:bg-[#032B44] hover:text-white text-sm font-medium px-4 py-1.5 flex items-center gap-2 dark:border-gray-600 dark:text-gray-300"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
                 {user?.name}
@@ -106,14 +121,14 @@ const Navbar = () => {
                     className="absolute right-0 mt-2 w-40 bg-white shadow-lg rounded-md border dark:bg-gray-800 dark:border-gray-700"
                   >
                     <Link
-                      to=""
+                      to="/profile"
                       className="block px-4 py-2 text-sm hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                       Profile
                     </Link>
                     <button
-                      onClick={handleLogout}
-                      className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      onClick={handleLogoutClick} // Trigger modal instead of direct logout
+                      className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
                     >
                       Logout
                     </button>
@@ -177,18 +192,21 @@ const Navbar = () => {
               </Link>
               <button
                 onClick={() => navigate("/become-pro")}
-                className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+                className="bg-[#032B44] rounded-md text-white hover:bg-[#054869] text-sm font-medium   px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
               >
                 Become a Fixeify Pro
               </button>
               {accessToken ? (
                 <>
-                  <Link to="/profile" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
-                    Profile
-                  </Link>
                   <button
-                    onClick={handleLogout}
-                    className="text-sm text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                    onClick={() => navigate("/profile")}
+                    className="bg-[#032B44] rounded-md text-white hover:bg-[#054869] text-sm font-medium  px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+                  >
+                    Profile
+                  </button>
+                  <button
+                    onClick={handleLogoutClick} // Trigger modal instead of direct logout
+                    className="bg-[#de2c2c] rounded-md text-white text-sm font-medium  px-4 py-1.5 transition-colors dark:bg-gray-300 dark:border-gray-300 dark:!text-[#de2c2c] dark:hover:bg-gray-500 dark:hover:!text-white"
                   >
                     Logout
                   </button>
@@ -205,6 +223,14 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <ConfirmationModal
+        isOpen={showLogoutModal}
+        onConfirm={handleLogoutConfirm}
+        onCancel={handleLogoutCancel}
+        action="logout"
+        isProcessing={false}
+      />
     </motion.header>
   );
 };

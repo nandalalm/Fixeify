@@ -21,5 +21,7 @@ export default function createAuthRoutes(container: Container): Router {
   router.get("/me", authenticateToken, authController.getMe.bind(authController));
   router.post("/logout", authenticateToken, authController.logout.bind(authController));
 
+  router.get("/check-ban/:userId", authenticateToken, authController.checkBanStatus.bind(authController));
+
   return router;
 }

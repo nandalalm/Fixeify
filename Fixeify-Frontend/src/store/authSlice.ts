@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../api/axios";
+import { RootState } from "../store/store"; // Updated import
 
 export enum UserRole {
   USER = "user",
@@ -73,6 +74,32 @@ export const refreshToken = createAsyncThunk<RefreshTokenResponse, void, { rejec
   }
 );
 
+// New thunk to check ban status
+export const checkBanStatus = createAsyncThunk<void, void, { rejectValue: string }>(
+  "auth/checkBanStatus",
+  async (_, { rejectWithValue, dispatch, getState }) => {
+    try {
+      const state = getState() as RootState;
+      const user = state.auth.user;
+      if (!user || user.role === "admin") return; // Skip for admins
+
+      const response = await api.get(`/auth/check-ban/${user.id}`, {
+        headers: { Authorization: `Bearer ${state.auth.accessToken}` },
+        withCredentials: true,
+      });
+
+      if (response.data.isBanned) {
+        dispatch(logoutUserSync());
+        return rejectWithValue("User is banned");
+      }
+    } catch (err: any) {
+      console.error("Ban status check failed:", err);
+      dispatch(logoutUserSync()); // Log out on error to be safe
+      return rejectWithValue(err.response?.data?.message || "Failed to check ban status");
+    }
+  }
+);
+
 export const logoutUser = createAsyncThunk(
   "auth/logoutUser",
   async (role: "user" | "admin" | "pro", { rejectWithValue }) => {
@@ -138,6 +165,16 @@ const authSlice = createSlice({
         state.error = action.payload as string;
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("isAuthenticatedManuallySet");
+      })
+      .addCase(checkBanStatus.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(checkBanStatus.fulfilled, (state) => {
+        state.status = "succeeded";
+      })
+      .addCase(checkBanStatus.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload as string;
       })
       .addCase(logoutUser.pending, (state) => {
         state.status = "loading";

@@ -1,9 +1,9 @@
 import { type FC, useState, useEffect } from "react";
-import { AdminNavbar } from "../components/AdminNavbar";
+import { AdminNavbar } from "../../components/Admin/AdminNavbar";
 import { Menu, Search, ChevronLeft, ChevronRight, Bell } from "lucide-react";
-import { fetchUsers, toggleBanUser } from "../api/adminApi";
+import { fetchUsers, toggleBanUser } from "../../api/adminApi";
 import { useSelector } from "react-redux";
-import { RootState } from "../store/store";
+import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
 
 interface User {

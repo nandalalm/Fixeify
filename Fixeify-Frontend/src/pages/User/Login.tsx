@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from "react"; // Add useEffect
+import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { setAuth, UserRole } from "../store/authSlice";
-import { loginUser } from "../api/authApi";
-import { useNavigate, Link, useLocation } from "react-router-dom"; // Add useLocation
+import { setAuth, UserRole } from "../../store/authSlice";
+import { loginUser } from "../../api/authApi";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
-import { loginSchema } from "../validationSchemas";
+import { loginSchema } from "../../validationSchemas";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const LoginPage = () => {
@@ -16,12 +16,14 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const location = useLocation(); // Track current route
+  const location = useLocation();
 
-  // Log route changes to detect redirects
   useEffect(() => {
-    console.log("Current location:", location.pathname);
-  }, [location]);
+    console.log("LoginPage location:", location.pathname);
+    // Ensure state is cleared on mount to prevent stale authentication
+    dispatch({ type: "auth/clearError" });
+    dispatch({ type: "auth/logoutUserSync" });
+  }, [location, dispatch]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -38,45 +40,72 @@ const LoginPage = () => {
     try {
       const validatedData = loginSchema.parse({ ...formData, role: userRole });
       console.log("Attempting login with:", validatedData);
-      const { accessToken, user } = await loginUser(validatedData.email, validatedData.password, validatedData.role);
+      const { accessToken, user } = await loginUser(
+        validatedData.email,
+        validatedData.password,
+        validatedData.role
+      );
       const mappedUser = {
         ...user,
-        role: user.role === "user" ? UserRole.USER : UserRole.PRO,
+        role: user.role === "user" ? UserRole.USER : user.role === "pro" ? UserRole.PRO : UserRole.ADMIN,
       };
       dispatch(setAuth({ user: mappedUser, accessToken }));
-      console.log("Login successful, navigating to:", user.role === "user" ? "/home" : "/pro-dashboard");
-      if (user.role === "user") navigate("/home");
-      else if (user.role === "pro") navigate("/pro-dashboard");
+      console.log("Login successful, user role:", user.role);
+      if (user.role === "user") {
+        console.log("Navigating to /home");
+        navigate("/home", { replace: true });
+      } else if (user.role === "pro") {
+        console.log("Navigating to /pro-dashboard");
+        navigate("/pro-dashboard", { replace: true });
+      } else if (user.role === "admin") {
+        console.log("Navigating to /admin-dashboard");
+        navigate("/admin-dashboard", { replace: true });
+      }
     } catch (error) {
-      console.log("Login error:", error);
+      console.error("Login error:", error);
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
         error.errors.forEach((err) => (fieldErrors[err.path[0]] = err.message));
         setErrors(fieldErrors);
-      } else {
+      } else if (error instanceof Error) {
         const err = error as any;
-        if (err.response) {
-          const status = err.response.status;
-          const message = err.response.data?.message || "Login failed";
+        if (err.response?.status || err.status) {
+          const status = err.response?.status || err.status;
+          const message = err.response?.data?.message || err.message || "Login failed";
           console.log(`API Error - Status: ${status}, Message: ${message}`);
 
           switch (status) {
-            case 404:
-              setServerError("Email not registered. Please sign up.");
+            case 400:
+              if (message === "Invalid role selected") {
+                setServerError("Invalid role selected. Please choose the correct role.");
+              } else {
+                setServerError(message);
+              }
+              dispatch({ type: "auth/logoutUserSync" });
               break;
-            case 401:
+            case 422:
               setServerError("Incorrect password. Please try again.");
+              dispatch({ type: "auth/logoutUserSync" });
               break;
             case 403:
               setServerError("Your account has been banned. Please contact our support team.");
+              dispatch({ type: "auth/logoutUserSync" });
+              break;
+            case 404:
+              setServerError("Email not registered. Please sign up.");
+              dispatch({ type: "auth/logoutUserSync" });
               break;
             default:
               setServerError(message || "Login failed. Please try again.");
+              dispatch({ type: "auth/logoutUserSync" });
           }
         } else {
           setServerError("Unable to connect to the server. Please try again later.");
+          dispatch({ type: "auth/logoutUserSync" });
         }
-        console.log("Error state set, serverError:", serverError); // Log after setting
+      } else {
+        setServerError("An unexpected error occurred. Please try again.");
+        dispatch({ type: "auth/logoutUserSync" });
       }
     }
   };
@@ -169,7 +198,7 @@ const LoginPage = () => {
 
           <div className="mt-4 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              Don’t Have An Account?{" "}
+              Don't Have An Account?{" "}
               <Link to="/register" className="text-blue-600 hover:underline dark:text-blue-400">
                 Sign Up Now
               </Link>

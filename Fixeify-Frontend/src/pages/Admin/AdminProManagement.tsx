@@ -1,10 +1,10 @@
 import { type FC, useState, useEffect } from "react";
-import { AdminNavbar } from "../components/AdminNavbar";
+import { AdminNavbar } from "../../components/Admin/AdminNavbar";
 import { Menu, Search, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import { useSelector } from "react-redux";
-import { RootState } from "../store/store";
+import { RootState } from "../../store/store";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchPendingPros, PendingPro, fetchApprovedPros, IApprovedPro } from "../api/adminApi";
+import { fetchPendingPros, PendingPro, fetchApprovedPros, IApprovedPro } from "../../api/adminApi";
 
 const AdminProManagement: FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);

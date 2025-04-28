@@ -77,6 +77,10 @@ export interface IApprovedPro {
   about?: string | null;
 }
 
+interface BanStatusResponse {
+  isBanned: boolean;
+}
+
 export const fetchUsers = async (page: number = 1, limit: number = 10): Promise<{ users: User[]; total: number }> => {
   const response = await api.get("/admin", {
     params: { page, limit },
@@ -130,6 +134,13 @@ export const fetchApprovedPros = async (page: number = 1, limit: number = 10): P
 
 export const fetchApprovedProById = async (id: string): Promise<IApprovedPro> => {
   const response = await api.get(`/admin/approved-pros/${id}`, {
+    withCredentials: true,
+  });
+  return response.data;
+};
+
+export const checkBanStatus = async (userId: string): Promise<BanStatusResponse> => {
+  const response = await api.get(`/auth/check-ban/${userId}`, {
     withCredentials: true,
   });
   return response.data;

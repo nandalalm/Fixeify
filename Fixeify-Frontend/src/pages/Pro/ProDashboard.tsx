@@ -1,8 +1,7 @@
 import { type FC, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
-import { RootState } from "../store/store";
-import { useNavigate } from "react-router-dom";
-import { ProNavbar } from "../components/ProNavbar";
+import { RootState } from "../../store/store";
+import { ProNavbar } from "../../components/Pro/ProNavbar";
 import { Menu, Car, Check, Timer, Bell } from "lucide-react";
 
 interface StatCardProps {
@@ -55,24 +54,16 @@ const TimelineItem: FC<TimelineItemProps> = ({ icon, title, time, isCompleted = 
 const ProDashboard: FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true); // Open by default, like AdminDashboard
   const [greeting, setGreeting] = useState("");
-  const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
-    if (!user || user.role !== "pro") {
-      navigate("/login");
-      return;
-    }
-
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("Good morning");
     else if (hour < 18) setGreeting("Good afternoon");
     else setGreeting("Good evening");
-    console.log();
-    
-  }, [user, navigate]);
+  }, []);
 
-  if (!user || user.role !== "pro") {
+  if (!user ) {
     return null;
   }
 

@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { setAuth, UserRole } from "../store/authSlice";
-import { loginUser } from "../api/authApi";
+import { setAuth, UserRole } from "../../store/authSlice";
+import { loginUser } from "../../api/authApi";
 import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
@@ -25,10 +25,12 @@ const AdminLogin = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Log route changes to detect redirects
+  // Log route changes and clear auth state on mount
   useEffect(() => {
     console.log("Current location:", location.pathname);
-  }, [location]);
+    dispatch({ type: "auth/clearError" });
+    dispatch({ type: "auth/logoutUserSync" });
+  }, [location, dispatch]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -52,7 +54,7 @@ const AdminLogin = () => {
       };
       dispatch(setAuth({ user: mappedUser, accessToken }));
       console.log("Admin login successful, navigating to: /admin-dashboard");
-      navigate("/admin-dashboard");
+      navigate("/admin-dashboard", { replace: true });
     } catch (error) {
       console.log("Admin login error:", error);
       if (error instanceof z.ZodError) {
@@ -63,30 +65,41 @@ const AdminLogin = () => {
         setErrors(fieldErrors);
       } else {
         const err = error as any;
-        if (err.response) {
-          const status = err.response.status;
-          const message = err.response.data?.message || "Login failed";
+        if (err.response?.status || err.status) {
+          const status = err.response?.status || err.status;
+          const message = err.response?.data?.message || err.message || "Login failed";
           console.log(`API Error - Status: ${status}, Message: ${message}`);
 
           switch (status) {
-            case 404:
-              setServerError("The email you entered is not registered as an admin. Please sign up.");
-              break;
-            case 401:
-              setServerError("Incorrect password. Please try again.");
-              break;
             case 400:
               if (message === "Access Denied") {
                 setServerError("This email is not registered as an admin account.");
+              } else if (message === "Invalid role selected") {
+                setServerError("This email is registered under a different role.");
               } else {
                 setServerError(message);
               }
+              dispatch({ type: "auth/logoutUserSync" });
+              break;
+            case 422:
+              setServerError("Incorrect password. Please try again.");
+              dispatch({ type: "auth/logoutUserSync" });
+              break;
+            case 403:
+              setServerError("Your account has been banned. Please contact our support team.");
+              dispatch({ type: "auth/logoutUserSync" });
+              break;
+            case 404:
+              setServerError("The email you entered is not registered as an admin. Please sign up.");
+              dispatch({ type: "auth/logoutUserSync" });
               break;
             default:
               setServerError("Login failed. Please try again.");
+              dispatch({ type: "auth/logoutUserSync" });
           }
         } else {
           setServerError("Unable to connect to the server. Please try again later.");
+          dispatch({ type: "auth/logoutUserSync" });
         }
         console.log("Error state set, serverError:", serverError);
       }
@@ -117,7 +130,7 @@ const AdminLogin = () => {
           .force-light-mode .border-gray-300 {
             border-color: #e2e8f0 !important;
           }
-          .force-light-mode .focus:ring-blue-500 {
+          .force-light-mode .focus\\:ring-blue-500:focus {
             --tw-ring-color: #3b82f6 !important;
           }
           .force-light-mode .bg-[#00205B] {

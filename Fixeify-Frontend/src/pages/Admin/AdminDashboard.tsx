@@ -1,11 +1,10 @@
 "use client";
 
 import { type FC, useState, useEffect } from "react";
-import { AdminNavbar } from "../components/AdminNavbar";
+import { AdminNavbar } from "../../components/Admin/AdminNavbar";
 import { Menu, Bell } from "lucide-react";
 import { useSelector,  } from "react-redux";
-import { RootState, } from "../store/store";
-import { useNavigate } from "react-router-dom";
+import { RootState, } from "../../store/store";
 
 interface StatCardProps {
   title?: string;
@@ -28,21 +27,17 @@ const StatCard: FC<StatCardProps> = ({ title, value, subtitle }) => {
 const AdminDashboard: FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true); 
   const [greeting, setGreeting] = useState("");
-  const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
-    if (!user || user.role !== "admin") {
-      navigate("/admin-login");
-    }
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("Good morning");
     else if (hour < 18) setGreeting("Good afternoon");
     else setGreeting("Good evening");
-  }, [user, navigate]);
+  }, []);
 
 
-  if (!user || user.role !== "admin") {
+  if (!user) {
     return null;
   }
 

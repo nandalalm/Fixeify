@@ -2,9 +2,15 @@ import { z } from "zod";
 
 export const nameSchema = z
   .string()
-  .min(4, "Name must be at least 4 characters long")
+  .min(4, "First name must be at least 4 characters long")
   .regex(/^[A-Za-z\s]+$/, "Name can only contain letters and spaces")
   .trim();
+
+export const optionalNameSchema = z
+  .string()
+  .regex(/^[A-Za-z\s]*$/, "Name can only contain letters and spaces")
+  .trim()
+  .optional();
 
 export const emailSchema = z.string().email("Invalid email address").trim();
 
@@ -22,20 +28,22 @@ export const loginPasswordSchema = z.string().min(1, "Password is required").tri
 export const otpSchema = z.string().regex(/^\d{6}$/, "OTP must be a 6-digit number");
 
 export const baseRegisterSchema = z.object({
-  name: nameSchema,
+  firstName: nameSchema,
+  lastName: optionalNameSchema,
   email: emailSchema,
   password: signupPasswordSchema,
   confirmPassword: signupPasswordSchema,
   otp: otpSchema.optional(),
 });
 
-export const registerSchema = baseRegisterSchema.refine(
-  (data) => data.password === data.confirmPassword,
-  {
+export const registerSchema = baseRegisterSchema
+  .extend({
+    name: z.string().min(4, "Full name must be at least 4 characters long"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
     path: ["confirmPassword"],
-  }
-);
+  });
 
 export const loginSchema = z.object({
   email: emailSchema,

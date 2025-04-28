@@ -1,7 +1,7 @@
 import { Navigate, Outlet } from "react-router-dom";
 import { useSelector } from "react-redux";
-import { RootState } from "../store/store";
-import Loading from "./Loading";
+import { RootState } from "../../store/store";
+import Loading from "../Loader/Loading";
 
 const AdminPrivateRoute = () => {
   const { user, accessToken, status } = useSelector((state: RootState) => state.auth);

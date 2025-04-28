@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import { useDispatch } from "react-redux";
-import { setAuth, UserRole } from "../store/authSlice"; // Import setAuth and UserRole
-import { registerUser } from "../api/authApi";
+import { setAuth, UserRole } from "../../store/authSlice"; // Import setAuth and UserRole
+import { registerUser } from "../../api/authApi";
 import { useNavigate } from "react-router-dom";
 
 const AdminRegister = () => {

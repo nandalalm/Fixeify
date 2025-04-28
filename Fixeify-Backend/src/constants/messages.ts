@@ -13,4 +13,5 @@ export const MESSAGES = {
   NO_REFRESH_TOKEN: "No refresh token provided",
   INCORRECT_PASSWORD:"Incorrect password. Please try again.",
   INVALID_ROLE: "Invalid role selected",
+  EMAIL_ALREADY_REGISTERED:"Email already registered",
 };

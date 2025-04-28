@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
-import { setAuth, UserRole } from "../store/authSlice"; // Import UserRole
-import { registerUser, sendOtp, verifyOtp } from "../api/authApi";
+import { setAuth, UserRole } from "../../store/authSlice";
+import { registerUser, sendOtp, verifyOtp } from "../../api/authApi";
 import { Link, useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { z } from "zod";
-import { registerSchema, baseRegisterSchema } from "../validationSchemas";
+import { registerSchema, baseRegisterSchema } from "../../validationSchemas";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const Register = () => {
   const [formData, setFormData] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
     confirmPassword: "",
@@ -44,8 +45,15 @@ const Register = () => {
       setOtpSent(true);
       setTimeLeft(60);
     } catch (error) {
-      if (error instanceof z.ZodError) setErrors({ email: error.errors[0].message });
-      else if (error instanceof Error) setServerError(error.message);
+      if (error instanceof z.ZodError) {
+        setErrors({ email: error.errors[0].message });
+      } else if (error instanceof Error) {
+        if (error.message.includes("already registered")) {
+          setServerError("This email is already registered. Please use a different email or login.");
+        } else {
+          setServerError("Failed to send OTP. Please try again.");
+        }
+      }
     } finally {
       setIsSendingOtp(false);
     }
@@ -61,10 +69,19 @@ const Register = () => {
       });
       if (!otp) throw new Error("OTP is required");
       const result = await verifyOtp(email, otp);
-      if (result.message === "OTP verified") setOtpVerified(true);
+      if (result.message === "OTP verified") {
+        setOtpVerified(true);
+      }
     } catch (error) {
-      if (error instanceof z.ZodError) setErrors({ otp: error.errors[0].message });
-      else if (error instanceof Error) setServerError(error.message);
+      if (error instanceof z.ZodError) {
+        setErrors({ otp: error.errors[0].message });
+      } else if (error instanceof Error) {
+        if (error.message.includes("Invalid or expired OTP")) {
+          setServerError("Invalid or expired OTP. Please try again.");
+        } else {
+          setServerError("Invalid or expired OTP. Please try again.");
+        }
+      }
     }
   };
 
@@ -74,7 +91,10 @@ const Register = () => {
     setServerError("");
 
     try {
-      const validatedData = registerSchema.parse(formData);
+      const validatedData = registerSchema.parse({
+        ...formData,
+        name: `${formData.firstName} ${formData.lastName || ''}`.trim(),
+      });
       if (!otpVerified) throw new Error("Please verify your email with OTP");
       const { accessToken, user } = await registerUser(
         validatedData.name,
@@ -82,7 +102,6 @@ const Register = () => {
         validatedData.password,
         "user"
       );
-      // Map the string role to UserRole enum
       const mappedUser = {
         ...user,
         role: user.role === "user" ? UserRole.USER : user.role === "pro" ? UserRole.PRO : UserRole.ADMIN,
@@ -92,9 +111,21 @@ const Register = () => {
     } catch (error) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
-        error.errors.forEach((err) => (fieldErrors[err.path[0]] = err.message));
+        error.errors.forEach((err) => {
+          if (err.path[0] === "name") {
+            fieldErrors.firstName = "First name must be at least 4 characters long";
+          } else {
+            fieldErrors[err.path[0]] = err.message;
+          }
+        });
         setErrors(fieldErrors);
-      } else if (error instanceof Error) setServerError(error.message);
+      } else if (error instanceof Error) {
+        if (error.message.includes("already registered")) {
+          setServerError("This email is already registered. Please use a different email or login.");
+        } else {
+          setServerError(error.message);
+        }
+      }
     }
   };
 
@@ -140,23 +171,6 @@ const Register = () => {
           </p>
           <form onSubmit={handleSubmit}>
             {serverError && <p className="text-red-500 text-sm mb-4">{serverError}</p>}
-            <div className="mb-4">
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
-                Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Enter your name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
-                required
-              />
-              {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
-            </div>
-
             <div className="mb-4">
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
                 Email
@@ -252,6 +266,39 @@ const Register = () => {
             {otpVerified && (
               <>
                 <div className="mb-4">
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
+                    First Name
+                  </label>
+                  <input
+                    type="text"
+                    id="firstName"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    placeholder="Enter your first name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                    required
+                  />
+                  {errors.firstName && <p className="text-red-500 text-sm mt-1">{errors.firstName}</p>}
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
+                    Last Name (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                    placeholder="Enter your last name"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-400"
+                  />
+                  {errors.lastName && <p className="text-red-500 text-sm mt-1">{errors.lastName}</p>}
+                </div>
+
+                <div className="mb-4">
                   <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
                     Password
                   </label>
@@ -308,7 +355,7 @@ const Register = () => {
                 <button
                   type="submit"
                   className="w-full bg-[#00205B] text-white py-2 px-4 rounded-md hover:bg-blue-800 transition duration-300 dark:bg-gray-700 dark:!text-white dark:hover:bg-gray-600"
-                  disabled={!formData.name || !formData.email || !formData.password || !formData.confirmPassword}
+                  disabled={!formData.firstName || !formData.email || !formData.password || !formData.confirmPassword}
                 >
                   Sign Up
                 </button>

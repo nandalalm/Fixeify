@@ -10,13 +10,25 @@ import { ProResponse } from "../dtos/response/proDtos";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import { getApprovalEmailTemplate, getRejectionEmailTemplate } from "../utils/emailTemplates";
+import { createClient } from "redis";
 
 @injectable()
 export class AdminService implements IAdminService {
+  private _redisClient = createClient({
+    url: process.env.REDIS_URL || "redis://localhost:6379",
+    socket: {
+      keepAlive: 10000,
+      reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
+    },
+  });
+
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
     @inject(TYPES.IProRepository) private _proRepository: IProRepository
-  ) {}
+  ) {
+    this._redisClient.connect().catch((err) => console.error("Failed to connect to Redis:", err));
+    this._redisClient.on("error", (err) => console.error("Redis error:", err));
+  }
 
   async getUsers(page: number, limit: number): Promise<{ users: UserResponse[]; total: number }> {
     const skip = (page - 1) * limit;
@@ -41,6 +53,12 @@ export class AdminService implements IAdminService {
   async banUser(userId: string, isBanned: boolean): Promise<UserResponse | null> {
     const updatedUser = await this._userRepository.updateBanStatus(userId, isBanned);
     if (!updatedUser) return null;
+
+    // Invalidate the user's session by deleting their refresh token
+    if (isBanned) {
+      await this._redisClient.del(`refresh:${userId}`);
+    }
+
     return new UserResponse({
       id: updatedUser.id,
       name: updatedUser.name,
@@ -53,6 +71,12 @@ export class AdminService implements IAdminService {
   async banPro(proId: string, isBanned: boolean): Promise<ProResponse | null> {
     const updatedPro = await this._proRepository.updateBanStatus(proId, isBanned);
     if (!updatedPro) return null;
+
+    // Invalidate the pro's session by deleting their refresh token
+    if (isBanned) {
+      await this._redisClient.del(`refresh:${proId}`);
+    }
+
     return new ProResponse({
       _id: updatedPro._id.toString(),
       firstName: updatedPro.firstName,
@@ -229,7 +253,7 @@ export class AdminService implements IAdminService {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Welcome to Fixeify - Approved for Duty",
-      html: getApprovalEmailTemplate(email,name, password),
+      html: getApprovalEmailTemplate(email, name, password),
     };
 
     try {

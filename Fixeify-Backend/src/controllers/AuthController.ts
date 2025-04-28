@@ -111,4 +111,15 @@ export class AuthController {
       next(error);
     }
   }
+
+   async checkBanStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.params.userId;
+      if (!userId) throw new HttpError(400, "User ID is required");
+      const result = await this._authService.checkBanStatus(userId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
