@@ -1,6 +1,6 @@
 import { PendingProDocument } from "../models/pendingProModel";
 import { ApprovedProDocument } from "../models/approvedProModel";
-import { ProResponse } from "../dtos/response/proDtos";
+import { ProResponse, ProProfileResponse } from "../dtos/response/proDtos";
 
 export interface IProRepository {
   createPendingPro(proData: Partial<PendingProDocument>): Promise<PendingProDocument>;
@@ -15,5 +15,8 @@ export interface IProRepository {
   findApprovedProById(id: string): Promise<ApprovedProDocument | null>;
   getTotalApprovedProsCount(): Promise<number>;
   findApprovedProByIdAsResponse(id: string): Promise<ProResponse | null>;
+  findApprovedProByIdAsProfile(id: string): Promise<ProProfileResponse | null>;
   updateBanStatus(proId: string, isBanned: boolean): Promise<ApprovedProDocument | null>;
+  deletePendingPro(id: string): Promise<void>;
+  updateApprovedPro(id: string, data: Partial<ApprovedProDocument>): Promise<ApprovedProDocument | null>;
 }

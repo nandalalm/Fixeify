@@ -1,11 +1,21 @@
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../api/axios";
-import { RootState } from "../store/store"; // Updated import
+import { RootState } from "../store/store";
 
 export enum UserRole {
   USER = "user",
   PRO = "pro",
   ADMIN = "admin",
+}
+
+export interface ILocation {
+  address: string;
+  city: string;
+  state: string;
+  coordinates: {
+    type: "Point";
+    coordinates: [number, number]; // [longitude, latitude]
+  };
 }
 
 export interface User {
@@ -15,7 +25,7 @@ export interface User {
   role: UserRole;
   isBanned?: boolean;
   phoneNo?: string | null;
-  address?: string | null;
+  address?: ILocation | null;
   photo?: string | null;
 }
 
@@ -60,7 +70,7 @@ export const refreshToken = createAsyncThunk<RefreshTokenResponse, void, { rejec
         return rejectWithValue("User is banned");
       }
 
-      dispatch(setAccessToken(accessToken)); 
+      dispatch(setAccessToken(accessToken));
       return { accessToken, user };
     } catch (err: any) {
       console.error("Refresh error details:", {
@@ -74,14 +84,13 @@ export const refreshToken = createAsyncThunk<RefreshTokenResponse, void, { rejec
   }
 );
 
-// New thunk to check ban status
 export const checkBanStatus = createAsyncThunk<void, void, { rejectValue: string }>(
   "auth/checkBanStatus",
   async (_, { rejectWithValue, dispatch, getState }) => {
     try {
       const state = getState() as RootState;
       const user = state.auth.user;
-      if (!user || user.role === "admin") return; // Skip for admins
+      if (!user || user.role === "admin") return;
 
       const response = await api.get(`/auth/check-ban/${user.id}`, {
         headers: { Authorization: `Bearer ${state.auth.accessToken}` },
@@ -94,7 +103,7 @@ export const checkBanStatus = createAsyncThunk<void, void, { rejectValue: string
       }
     } catch (err: any) {
       console.error("Ban status check failed:", err);
-      dispatch(logoutUserSync()); // Log out on error to be safe
+      dispatch(logoutUserSync());
       return rejectWithValue(err.response?.data?.message || "Failed to check ban status");
     }
   }
@@ -124,6 +133,9 @@ const authSlice = createSlice({
       state.status = "succeeded";
       localStorage.setItem("isAuthenticated", "true");
       localStorage.setItem("isAuthenticatedManuallySet", "true");
+    },
+    updateUser: (state, action: PayloadAction<User>) => {
+      state.user = action.payload;
     },
     logoutUserSync: (state) => {
       state.user = null;
@@ -199,5 +211,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setAuth, logoutUserSync, setError, clearError, setAccessToken } = authSlice.actions;
+export const { setAuth, updateUser, logoutUserSync, setError, clearError, setAccessToken } = authSlice.actions;
 export default authSlice.reducer;

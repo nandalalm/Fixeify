@@ -113,3 +113,47 @@ export class ProResponse {
     this.isBooked = isBooked;
   }
 }
+
+export class ProProfileResponse {
+  public _id: string;
+  public firstName: string;
+  public lastName: string;
+  public email: string;
+  public phoneNumber: string;
+  public location: ILocation;
+  public profilePhoto: string;
+  public about: string | null;
+  public isBanned: boolean;
+
+  constructor({
+    _id,
+    firstName,
+    lastName,
+    email,
+    phoneNumber,
+    location,
+    profilePhoto,
+    about = null,
+    isBanned,
+  }: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneNumber: string;
+    location: ILocation;
+    profilePhoto: string;
+    about?: string | null;
+    isBanned: boolean;
+  }) {
+    this._id = _id;
+    this.firstName = firstName;
+    this.lastName = lastName;
+    this.email = email;
+    this.phoneNumber = phoneNumber;
+    this.location = location;
+    this.profilePhoto = profilePhoto;
+    this.about = about;
+    this.isBanned = isBanned;
+  }
+}

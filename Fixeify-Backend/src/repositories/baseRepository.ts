@@ -14,4 +14,12 @@ export abstract class BaseRepository<T> {
   async findById(id: string): Promise<T | null> {
     return this._model.findById(id).exec();
   }
+
+  async delete(id: string): Promise<void> {
+    await this._model.findByIdAndDelete(id).exec();
+  }
+
+  async update(id: string, data: Partial<T>): Promise<T | null> {
+    return this._model.findByIdAndUpdate(id, data, { new: true }).exec();
+  }
 }

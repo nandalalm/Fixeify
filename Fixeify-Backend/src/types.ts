@@ -7,6 +7,8 @@ export const TYPES = {
   AuthController: Symbol.for("AuthController"),
   AdminController: Symbol.for("AdminController"),
   ProController: Symbol.for("ProController"),
-  IAdminService: Symbol.for("IAdminService"), // Add this
-  IProService: Symbol.for("IProService"), // Add this
+  IAdminService: Symbol.for("IAdminService"),
+  IProService: Symbol.for("IProService"),
+  IUserService: Symbol.for("IUserService"), // Add this
+  UserController: Symbol.for("UserController"), // Add this
 };

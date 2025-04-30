@@ -5,13 +5,24 @@ import { fetchUsers, toggleBanUser } from "../../api/adminApi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
+import { ConfirmationModal } from "../../components/Admin/ConfirmationModal";
 
-interface User {
+export interface ILocation {
+  address: string;
+  city: string;
+  state: string;
+  coordinates: {
+    type: "Point";
+    coordinates: [number, number]; // [longitude, latitude]
+  };
+}
+
+export interface User {
   id: string;
   name: string;
   email: string;
   phoneNo?: string | null;
-  address?: string | null;
+  address?: ILocation | null;
   isBanned: boolean;
   photo?: string | null;
 }
@@ -22,6 +33,9 @@ const UserManagement: FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const limit = 10;
 
   const navigate = useNavigate();
@@ -29,7 +43,7 @@ const UserManagement: FC = () => {
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
-      navigate("/admin-login"); // Redirect to admin login, not user login
+      navigate("/admin-login");
     } else {
       const getUsers = async () => {
         try {
@@ -44,15 +58,31 @@ const UserManagement: FC = () => {
     }
   }, [user, navigate, currentPage]);
 
-  const handleToggleBan = async (userId: string, isBanned: boolean) => {
+  const handleToggleBan = async () => {
+    if (!selectedUser) return;
+    setIsProcessing(true);
     try {
-      const updatedUser = await toggleBanUser(userId, !isBanned);
+      const updatedUser = await toggleBanUser(selectedUser.id, !selectedUser.isBanned);
       setUsers((prevUsers) =>
-        prevUsers.map((user) => (user.id === userId ? { ...user, isBanned: updatedUser.isBanned } : user))
+        prevUsers.map((user) => (user.id === selectedUser.id ? { ...user, isBanned: updatedUser.isBanned } : user))
       );
+      setIsModalOpen(false);
     } catch (error) {
       console.error("Failed to toggle ban status:", error);
+    } finally {
+      setIsProcessing(false);
+      setSelectedUser(null);
     }
+  };
+
+  const openModal = (user: User) => {
+    setSelectedUser(user);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedUser(null);
   };
 
   if (!user || user.role !== "admin") return null;
@@ -61,7 +91,7 @@ const UserManagement: FC = () => {
     (user) =>
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (user.address || "").toLowerCase().includes(searchQuery.toLowerCase())
+      (user.address?.address || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -146,7 +176,9 @@ const UserManagement: FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.phoneNo || "N/A"}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.address || "N/A"}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {user.address ? `${user.address.address}, ${user.address.city}, ${user.address.state}` : "N/A"}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -158,7 +190,7 @@ const UserManagement: FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
-                            onClick={() => handleToggleBan(user.id, user.isBanned)}
+                            onClick={() => openModal(user)}
                             className="bg-blue-900 text-white px-4 py-1 rounded-md text-sm hover:bg-blue-800 transition-colors"
                           >
                             {user.isBanned ? "Unban" : "Ban"}
@@ -194,6 +226,16 @@ const UserManagement: FC = () => {
           </div>
         </main>
       </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={isModalOpen}
+        onConfirm={handleToggleBan}
+        onCancel={closeModal}
+        action={selectedUser?.isBanned ? "unban" : "ban"}
+        entityType="user"
+        isProcessing={isProcessing}
+      />
     </div>
   );
 };

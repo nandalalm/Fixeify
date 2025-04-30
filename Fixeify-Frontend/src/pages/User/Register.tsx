@@ -5,7 +5,7 @@ import { registerUser, sendOtp, verifyOtp } from "../../api/authApi";
 import { Link, useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { z } from "zod";
-import { registerSchema, baseRegisterSchema } from "../../validationSchemas";
+import { registerSchema, baseRegisterSchema } from "../../Validation/validationSchemas";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const Register = () => {

@@ -5,7 +5,7 @@ import { loginUser } from "../../api/authApi";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
-import { loginSchema } from "../../validationSchemas";
+import { loginSchema } from "../../Validation/validationSchemas";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 
 const LoginPage = () => {

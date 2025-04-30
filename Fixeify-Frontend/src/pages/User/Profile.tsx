@@ -2,41 +2,45 @@ import { useState, useEffect } from "react";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
 import ProfileInfo from "../../components/User/ProfileInfo";
-import { User, GitPullRequestDraft, Bell, IndianRupee, ChevronLeft, ChevronRight, ListCollapse, LogOut } from "lucide-react";
+import EditProfile from "../../components/User/EditProfile";
+import ChangePassword from "../../components/User/ChangePassword";
+import { User, GitPullRequestDraft, Bell, IndianRupee, ChevronLeft, ChevronRight, ListCollapse, LogOut, X } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
-import { ConfirmationModal } from "../../components/Admin/ConfirmationModal"; // Adjust path as needed
+import { ConfirmationModal } from "../../components/Admin/ConfirmationModal";
 import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState("Profile Info");
   const [isSidebarShrunk, setIsSidebarShrunk] = useState(false);
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true); // Will be overridden by screen size
-  const [isSmallScreen, setIsSmallScreen] = useState(false); // For 601px
-  const [isExtraSmallScreen, setIsExtraSmallScreen] = useState(false); // For 500px
-  const [isToggleActive, setIsToggleActive] = useState(false); // Track toggle button click state
-  const [showLogoutModal, setShowLogoutModal] = useState(false); // State for logout modal
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [isExtraSmallScreen, setIsExtraSmallScreen] = useState(false);
+  const [isToggleActive, setIsToggleActive] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(() => sessionStorage.getItem("isEditing") === "true");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
-  const navigate = useNavigate(); // Added navigate for redirection
+  const navigate = useNavigate();
 
-  // Handle screen size detection and sidebar state persistence
   useEffect(() => {
     const handleResize = () => {
       const width = window.innerWidth;
-      setIsSmallScreen(width <= 601);
-      setIsExtraSmallScreen(width <= 500);
-      // Default to closed sidebar at ≤500px
-      if (width <= 500) {
-        setIsSidebarVisible(false);
+      setIsExtraSmallScreen(width <= 600);
+      if (width <= 600) {
+        setIsSidebarVisible(false); // Hide sidebar by default on extra-small screens
+        setIsToggleActive(false); // Reset toggle active state
+        setIsSidebarShrunk(true); // Shrink sidebar by default on extra-small screens
+      } else {
+        setIsSidebarVisible(true); // Show sidebar on larger screens
+        setIsToggleActive(false); // Reset toggle active state
       }
     };
 
     handleResize();
     window.addEventListener("resize", handleResize);
 
-    // Load persisted sidebar state
     const savedState = localStorage.getItem("isSidebarShrunk");
     if (savedState !== null) {
       setIsSidebarShrunk(JSON.parse(savedState));
@@ -45,22 +49,14 @@ const Profile = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Automatically shrink sidebar at 601px and below
-  useEffect(() => {
-    if (isSmallScreen) {
-      setIsSidebarShrunk(true);
-    }
-  }, [isSmallScreen]);
-
-  // Persist sidebar state
   useEffect(() => {
     localStorage.setItem("isSidebarShrunk", JSON.stringify(isSidebarShrunk));
-  }, [isSidebarShrunk]);
+    sessionStorage.setItem("isEditing", isEditing.toString());
+  }, [isSidebarShrunk, isEditing]);
 
-  // Toggle sidebar visibility for 500px and below
   const toggleSidebarVisibility = () => {
     setIsSidebarVisible(!isSidebarVisible);
-    setIsToggleActive(!isSidebarVisible); // Update toggle active state based on visibility
+    setIsToggleActive(!isSidebarVisible);
   };
 
   const toggleSidebar = () => {
@@ -102,35 +98,37 @@ const Profile = () => {
     },
     { name: "Payment Section", icon: <IndianRupee className="w-5 h-5" /> },
     { name: "Notifications & Alerts", icon: <Bell className="w-5 h-5" /> },
-    { name: "Logout", icon: <LogOut className="w-5 h-5 text-red-600" /> }, // Added Logout tab with red icon
+    { name: "Logout", icon: <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" /> },
   ];
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
       <div className="relative flex flex-row w-full flex-1">
-        {/* Toggle Button for 500px and below */}
         {isExtraSmallScreen && (
           <button
             onClick={toggleSidebarVisibility}
-            className={`absolute top-2 left-4 z-40 p-3 rounded-md transition-colors ${
+            className={`absolute top-2 left-[18px] z-50 p-3 rounded-md transition-colors ${
               isToggleActive ? "ring-2 ring-blue-600 dark:ring-gray-50 shadow-md" : ""
             } text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600`}
           >
-            <ListCollapse className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            {isSidebarVisible ? (
+              <X className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            ) : (
+              <ListCollapse className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+            )}
           </button>
         )}
 
-        {/* Sidebar */}
         <div
           className={`${
             isExtraSmallScreen
-              ? `absolute top-0 left-0 z-40 h-full transition-opacity duration-300 ${
-                  isSidebarVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+              ? `absolute top-0 left-0 z-40 h-full transition-transform duration-300 ${
+                  isSidebarVisible ? "translate-x-0" : "-translate-x-full"
                 }`
               : "relative"
-          } w-${isSidebarShrunk ? "20" : "70"} bg-white dark:bg-gray-800 shadow-sm transition-all duration-300 md:w-${
-            isSidebarShrunk ? "20" : "70"
+          } ${isSidebarShrunk ? "w-20" : "w-70"} bg-white dark:bg-gray-800 shadow-sm transition-all duration-300 ${
+            isSidebarShrunk ? "md:w-20" : "md:w-70"
           }`}
         >
           <nav className={`p-4 ${isExtraSmallScreen ? "pt-16" : ""}`}>
@@ -143,6 +141,10 @@ const Profile = () => {
                         handleLogoutClick();
                       } else {
                         setActiveTab(tab.name);
+                        if (tab.name === "Profile Info") {
+                          setIsEditing(false);
+                          setIsChangingPassword(false);
+                        }
                       }
                     }}
                     title={isSidebarShrunk ? tab.name : ""}
@@ -154,7 +156,7 @@ const Profile = () => {
                   >
                     <span className={`${isSidebarShrunk ? "mx-auto" : "mr-3"}`}>{tab.icon}</span>
                     {tab.name === "Logout" ? (
-                      <span className={`font-medium ${isSidebarShrunk ? "hidden" : "block"} text-red-600`}>
+                      <span className={`font-medium ${isSidebarShrunk ? "hidden" : "block"} text-red-600 dark:text-red-400`}>
                         {tab.name}
                       </span>
                     ) : (
@@ -165,7 +167,7 @@ const Profile = () => {
               ))}
             </ul>
           </nav>
-          {(isExtraSmallScreen && isSidebarVisible) || !isExtraSmallScreen ? (
+          {isSidebarVisible && (
             <button
               onClick={toggleSidebar}
               className="absolute top-1/2 -right-4 transform -translate-y-1/2 p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
@@ -176,12 +178,24 @@ const Profile = () => {
                 <ChevronLeft className="w-6 h-6 text-blue-600 dark:text-white" />
               )}
             </button>
-          ) : null}
+          )}
         </div>
 
-        {/* Main Content */}
         <div className={`flex-1 transition-all duration-300 ${isExtraSmallScreen ? "pt-0" : ""}`}>
-          {activeTab === "Profile Info" && <ProfileInfo />}
+          {activeTab === "Profile Info" && (
+            <div>
+              {isEditing ? (
+                <EditProfile onCancel={() => { setIsEditing(false); sessionStorage.setItem("isEditing", "false"); }} />
+              ) : isChangingPassword ? (
+                <ChangePassword onCancel={() => { setIsChangingPassword(false); }} />
+              ) : (
+                <ProfileInfo
+                  onEdit={() => { setIsEditing(true); sessionStorage.setItem("isEditing", "true"); }}
+                  onChangePassword={() => { setIsChangingPassword(true); }}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
       <Footer />

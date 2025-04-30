@@ -172,6 +172,9 @@ export class AuthService implements IAuthService {
       email: user.email,
       role,
       isBanned: "isBanned" in user ? user.isBanned : false,
+      phoneNo: "phoneNo" in user ? user.phoneNo : null,
+      address: "address" in user ? user.address : null,
+      photo: "photo" in user ? user.photo : null,
     });
 
     return {
@@ -253,6 +256,9 @@ export class AuthService implements IAuthService {
       email: user.email,
       role,
       isBanned: "isBanned" in user ? user.isBanned : false,
+      phoneNo: "phoneNo" in user ? user.phoneNo : null,
+      address: "address" in user ? user.address : null,
+      photo: "photo" in user ? user.photo : null,
     });
   }
 

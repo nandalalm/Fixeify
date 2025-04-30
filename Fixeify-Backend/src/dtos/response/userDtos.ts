@@ -5,9 +5,14 @@ export class UserResponse {
   public name: string;
   public email: string;
   public role: UserRole;
-  public photo: string | null;
-  public phoneNo: string | null;
-  public address: string | null;
+  public photo?: string | null;
+  public phoneNo?: string | null;
+  public address?: {
+    address: string;
+    city: string;
+    state: string;
+    coordinates: { type: "Point"; coordinates: [number, number] };
+  } | null;
   public isBanned: boolean;
 
   constructor({
@@ -26,7 +31,7 @@ export class UserResponse {
     role: UserRole;
     photo?: string | null;
     phoneNo?: string | null;
-    address?: string | null;
+    address?: { address: string; city: string; state: string; coordinates: { type: "Point"; coordinates: [number, number] } } | null;
     isBanned: boolean;
   }) {
     this.id = id;

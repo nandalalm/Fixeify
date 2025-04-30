@@ -7,7 +7,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import api from "../../api/axios";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
-import { fixeifyProFormSchema } from "../../fixeifyProFormSchema";
+import { fixeifyProFormSchema } from "../../Validation/fixeifyProFormSchema";
 import { z } from "zod";
 import { LocateFixed } from "lucide-react";
 

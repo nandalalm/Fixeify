@@ -3,7 +3,7 @@ import { BaseRepository } from "./baseRepository";
 import { PendingProModel, PendingProDocument } from "../models/pendingProModel";
 import { ApprovedProModel, ApprovedProDocument } from "../models/approvedProModel";
 import { IProRepository } from "./IProRepository";
-import { ProResponse } from "../dtos/response/proDtos";
+import { ProResponse, ProProfileResponse } from "../dtos/response/proDtos";
 import { UserRole } from "../enums/roleEnum";
 
 @injectable()
@@ -53,7 +53,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     };
 
     const approvedPro = await ApprovedProModel.create(approvedProData);
-    await PendingProModel.findByIdAndDelete(id);
+    await this.delete(id);
 
     return {
       email: approvedPro.email,
@@ -65,7 +65,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
   async rejectPro(id: string): Promise<void> {
     const pendingPro = await this.findById(id);
     if (!pendingPro) throw new Error("Pending pro not found");
-    await PendingProModel.findByIdAndDelete(id);
+    await this.delete(id);
   }
 
   async getApprovedProsWithPagination(skip: number, limit: number): Promise<ProResponse[]> {
@@ -86,13 +86,32 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     return pro ? this.mapToProResponse(pro) : null;
   }
 
+  async findApprovedProByIdAsProfile(id: string): Promise<ProProfileResponse | null> {
+    const pro = await ApprovedProModel.findById(id, {
+      _id: 1,
+      firstName: 1,
+      lastName: 1,
+      email: 1,
+      phoneNumber: 1,
+      location: 1,
+      profilePhoto: 1,
+      about: 1,
+      isBanned: 1,
+    }).exec();
+    return pro ? this.mapToProProfileResponse(pro) : null;
+  }
+
   async updateBanStatus(proId: string, isBanned: boolean): Promise<ApprovedProDocument | null> {
-    const updatedPro = await ApprovedProModel.findByIdAndUpdate(
-      proId,
-      { isBanned },
-      { new: true }
-    ).exec();
+    const updatedPro = await ApprovedProModel.findByIdAndUpdate(proId, { isBanned }, { new: true }).exec();
     return updatedPro;
+  }
+
+  async deletePendingPro(id: string): Promise<void> {
+    await this.delete(id);
+  }
+
+  async updateApprovedPro(id: string, data: Partial<ApprovedProDocument>): Promise<ApprovedProDocument | null> {
+    return ApprovedProModel.findByIdAndUpdate(id, data, { new: true }).exec();
   }
 
   private mapToProResponse(pro: ApprovedProDocument): ProResponse {
@@ -122,6 +141,25 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       isBanned: pro.isBanned,
       about: pro.about ?? null,
       isBooked: pro.isBooked,
+    });
+  }
+
+  private mapToProProfileResponse(pro: ApprovedProDocument): ProProfileResponse {
+    return new ProProfileResponse({
+      _id: pro._id.toString(),
+      firstName: pro.firstName,
+      lastName: pro.lastName,
+      email: pro.email,
+      phoneNumber: pro.phoneNumber,
+      location: {
+        address: pro.location.address,
+        city: pro.location.city,
+        state: pro.location.state,
+        coordinates: pro.location.coordinates,
+      },
+      profilePhoto: pro.profilePhoto,
+      about: pro.about ?? null,
+      isBanned: pro.isBanned,
     });
   }
 }

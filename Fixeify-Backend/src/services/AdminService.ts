@@ -44,6 +44,9 @@ export class AdminService implements IAdminService {
           email: user.email,
           role: UserRole.USER,
           isBanned: user.isBanned,
+          phoneNo: user.phoneNo ?? null,
+          address: user.address ?? null,
+          photo: user.photo ?? null,
         })
       ),
       total,
@@ -65,6 +68,9 @@ export class AdminService implements IAdminService {
       email: updatedUser.email,
       role: UserRole.USER,
       isBanned: updatedUser.isBanned,
+      phoneNo: updatedUser.phoneNo ?? null,
+      address: updatedUser.address ?? null,
+      photo: updatedUser.photo ?? null,
     });
   }
 

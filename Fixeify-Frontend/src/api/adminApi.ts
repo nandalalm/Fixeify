@@ -1,11 +1,21 @@
 import api from "./axios";
 
-interface User {
+export interface ILocation {
+  address: string;
+  city: string;
+  state: string;
+  coordinates: {
+    type: "Point";
+    coordinates: [number, number]; // [longitude, latitude]
+  };
+}
+
+export interface User {
   id: string;
   name: string;
   email: string;
   phoneNo?: string | null;
-  address?: string | null;
+  address?: ILocation | null;
   isBanned: boolean;
   photo?: string | null;
 }

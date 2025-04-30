@@ -27,6 +27,19 @@ export const loginPasswordSchema = z.string().min(1, "Password is required").tri
 
 export const otpSchema = z.string().regex(/^\d{6}$/, "OTP must be a 6-digit number");
 
+export const changePasswordSchema = z.object({
+  currentPassword: loginPasswordSchema,
+  newPassword: signupPasswordSchema,
+  confirmNewPassword: signupPasswordSchema,
+}).refine((data) => data.newPassword === data.confirmNewPassword, {
+  message: "New passwords do not match",
+  path: ["confirmNewPassword"],
+});
+
+export const verifyCurrentPasswordSchema = z.object({
+  currentPassword: loginPasswordSchema,
+});
+
 export const baseRegisterSchema = z.object({
   firstName: nameSchema,
   lastName: optionalNameSchema,

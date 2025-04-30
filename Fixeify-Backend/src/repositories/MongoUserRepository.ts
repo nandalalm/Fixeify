@@ -20,7 +20,7 @@ export class MongoUserRepository extends BaseRepository<IUser> implements IUserR
   }
 
   async findUserById(userId: string): Promise<IUser | null> {
-    return this.findById(userId); // Use BaseRepository's findById
+    return this.findById(userId);
   }
 
   async getAllUsers(): Promise<UserResponse[]> {
@@ -41,23 +41,34 @@ export class MongoUserRepository extends BaseRepository<IUser> implements IUserR
     return this._model.countDocuments().exec();
   }
 
- async updateBanStatus(userId: string, isBanned: boolean): Promise<UserResponse | null> {
-  const user = await this._model.findByIdAndUpdate(userId, { isBanned }, { new: true }).exec();
-  if (!user) return null;
-  return this.mapToUserResponse(user);
-}
+  async updateBanStatus(userId: string, isBanned: boolean): Promise<UserResponse | null> {
+    const user = await this.update(userId, { isBanned });
+    return user ? this.mapToUserResponse(user) : null;
+  }
 
-private mapToUserResponse(user: IUser): UserResponse {
-  return new UserResponse({
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: UserRole.USER,
-    photo: user.photo ?? null,
-    phoneNo: user.phoneNo ?? null,
-    address: user.address ?? null,
-    isBanned: user.isBanned,
-  });
-}
+  async deleteUser(userId: string): Promise<void> {
+    await this.delete(userId);
+  }
 
+  async updateUser(userId: string, data: Partial<IUser>): Promise<IUser | null> {
+    return this.update(userId, data);
+  }
+
+  private mapToUserResponse(user: IUser): UserResponse {
+    return new UserResponse({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: UserRole.USER,
+      photo: user.photo ?? null,
+      phoneNo: user.phoneNo ?? null,
+      address: user.address ? {
+        address: user.address.address,
+        city: user.address.city,
+        state: user.address.state,
+        coordinates: user.address.coordinates,
+      } : null,
+      isBanned: user.isBanned,
+    });
+  }
 }

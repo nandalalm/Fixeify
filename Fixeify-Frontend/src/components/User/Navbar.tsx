@@ -55,7 +55,7 @@ const Navbar = () => {
       initial={{ y: -50, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.2 }}
-      className={`sticky top-0 left-0 w-full z-50 transition-all duration-300 ${
+      className={`sticky top-0 left-0 w-full z-60 transition-all duration-300 ${
         isScrolled ? "shadow-md" : "shadow-none"
       } bg-white dark:bg-gray-900`}
     >
@@ -128,7 +128,7 @@ const Navbar = () => {
                     </Link>
                     <button
                       onClick={handleLogoutClick} // Trigger modal instead of direct logout
-                      className="block w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                      className="block w-full text-left px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-gray-100  dark:hover:bg-gray-700"
                     >
                       Logout
                     </button>

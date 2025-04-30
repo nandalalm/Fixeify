@@ -1352,3 +1352,75 @@
 {"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-28T15:01:10.829Z"}
 {"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-28T15:01:10.832Z"}
 {"level":"error","message":"[Error] 422: Incorrect password. Please try again.","timestamp":"2025-04-28T15:21:52.837Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-28T19:06:52.786Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-28T19:22:19.114Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-28T19:56:42.673Z"}
+{"level":"error","message":"[Error] 404: User not found","timestamp":"2025-04-29T06:04:43.851Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T08:25:38.108Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T08:25:43.059Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T08:25:43.062Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T08:25:43.067Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T08:25:43.070Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T08:55:57.114Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T09:19:25.112Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T09:19:32.311Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T09:19:32.314Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T09:19:32.316Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T09:19:32.318Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T10:06:20.576Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T10:06:20.582Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T10:06:29.591Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T10:06:29.594Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-29T11:49:10.975Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-29T11:49:11.098Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-29T11:49:17.395Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-29T11:49:17.492Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T11:58:19.804Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T11:58:30.028Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T11:58:55.167Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T11:59:03.224Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T11:59:56.218Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T12:00:00.145Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-29T12:00:31.738Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-29T12:00:31.839Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-29T12:00:38.051Z"}
+{"level":"error","message":"[Error] 401: Incorrect password. Please try again.","timestamp":"2025-04-29T12:00:38.148Z"}
+{"level":"error","message":"[Error] 422: Incorrect password. Please try again.","timestamp":"2025-04-29T12:01:13.191Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T12:02:29.795Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T12:02:59.357Z"}
+{"level":"error","message":"[Error] 422: Incorrect password. Please try again.","timestamp":"2025-04-29T12:16:10.714Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T12:16:37.106Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T12:18:26.575Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T12:18:32.636Z"}
+{"level":"error","message":"[Error] 422: Incorrect password. Please try again.","timestamp":"2025-04-29T12:22:58.998Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T14:38:25.947Z"}
+{"level":"error","message":"[Error] 422: Incorrect password. Please try again.","timestamp":"2025-04-29T14:44:32.254Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-29T14:45:15.723Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-29T14:45:15.724Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T15:39:54.448Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T15:39:54.453Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-29T18:27:36.521Z"}
+{"level":"error","message":"[Error] 401: Invalid Token","timestamp":"2025-04-29T18:27:36.533Z"}
+{"level":"error","message":"[Error] 403: Invalid Token","timestamp":"2025-04-29T19:25:10.685Z"}
+{"level":"error","message":"[Error] 400: Last Name is required","timestamp":"2025-04-29T20:42:47.186Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:51.307Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:51.311Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:53.883Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:53.898Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:53.926Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:53.933Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:58.900Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:58.908Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:58.928Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:46:58.932Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:47:00.589Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:47:00.596Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:47:00.616Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:47:00.620Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:47:36.065Z"}
+{"level":"error","message":"[Error] 404: Pro not found","timestamp":"2025-04-29T20:47:36.072Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-29T20:49:07.241Z"}
+{"level":"error","message":"[Error] 403: Access Denied","timestamp":"2025-04-30T02:01:40.688Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-30T02:07:22.726Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-30T02:08:03.571Z"}
+{"level":"error","message":"[Error] 400: Incorrect password. Please try again.","timestamp":"2025-04-30T02:08:10.750Z"}
