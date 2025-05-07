@@ -52,7 +52,7 @@ const TimelineItem: FC<TimelineItemProps> = ({ icon, title, time, isCompleted = 
 };
 
 const ProDashboard: FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true); // Open by default, like AdminDashboard
+  const [sidebarOpen, setSidebarOpen] = useState(true); 
   const [greeting, setGreeting] = useState("");
   const user = useSelector((state: RootState) => state.auth.user);
 
@@ -67,7 +67,6 @@ const ProDashboard: FC = () => {
     return null;
   }
 
-  // Static data (replace with API calls in a real app)
   const stats = [
     { title: "Total earnings", value: "$1,240", subtitle: "This month" },
     { title: "Completed jobs", value: "12", subtitle: "This month" },

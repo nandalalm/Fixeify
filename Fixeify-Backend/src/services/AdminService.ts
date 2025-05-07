@@ -2,15 +2,18 @@ import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
 import { IUserRepository } from "../repositories/IUserRepository";
 import { IProRepository } from "../repositories/IProRepository";
+import { ICategoryRepository } from "../repositories/ICategoryRepository";
 import { UserResponse } from "../dtos/response/userDtos";
 import { IAdminService } from "./IAdminService";
 import { UserRole } from "../enums/roleEnum";
-import { IPendingPro } from "../models/pendingProModel";
-import { ProResponse } from "../dtos/response/proDtos";
+import { PendingProDocument } from "../models/pendingProModel";
+import { ProResponse, PendingProResponse } from "../dtos/response/proDtos";
+import { CategoryResponse } from "../dtos/response/categoryDtos";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import { getApprovalEmailTemplate, getRejectionEmailTemplate } from "../utils/emailTemplates";
 import { createClient } from "redis";
+import { MESSAGES } from "../constants/messages";
 
 @injectable()
 export class AdminService implements IAdminService {
@@ -24,7 +27,8 @@ export class AdminService implements IAdminService {
 
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
-    @inject(TYPES.IProRepository) private _proRepository: IProRepository
+    @inject(TYPES.IProRepository) private _proRepository: IProRepository,
+    @inject(TYPES.ICategoryRepository) private _categoryRepository: ICategoryRepository
   ) {
     this._redisClient.connect().catch((err) => console.error("Failed to connect to Redis:", err));
     this._redisClient.on("error", (err) => console.error("Redis error:", err));
@@ -57,7 +61,6 @@ export class AdminService implements IAdminService {
     const updatedUser = await this._userRepository.updateBanStatus(userId, isBanned);
     if (!updatedUser) return null;
 
-    // Invalidate the user's session by deleting their refresh token
     if (isBanned) {
       await this._redisClient.del(`refresh:${userId}`);
     }
@@ -78,10 +81,12 @@ export class AdminService implements IAdminService {
     const updatedPro = await this._proRepository.updateBanStatus(proId, isBanned);
     if (!updatedPro) return null;
 
-    // Invalidate the pro's session by deleting their refresh token
     if (isBanned) {
       await this._redisClient.del(`refresh:${proId}`);
     }
+
+    const category = await this._categoryRepository.findCategoryById(updatedPro.categoryId.toString());
+    if (!category) throw new Error("Category not found");
 
     return new ProResponse({
       _id: updatedPro._id.toString(),
@@ -90,9 +95,12 @@ export class AdminService implements IAdminService {
       lastName: updatedPro.lastName,
       email: updatedPro.email,
       phoneNumber: updatedPro.phoneNumber,
-      serviceType: updatedPro.serviceType,
-      customService: updatedPro.customService,
-      skills: updatedPro.skills,
+      category: {
+        id: category.id,
+        name: category.name,
+        image: category.image || "",
+      },
+      customService: updatedPro.customService ?? null,
       location: {
         address: updatedPro.location.address,
         city: updatedPro.location.city,
@@ -104,30 +112,88 @@ export class AdminService implements IAdminService {
       accountHolderName: updatedPro.accountHolderName,
       accountNumber: updatedPro.accountNumber,
       bankName: updatedPro.bankName,
-      availability: updatedPro.availability,
-      workingHours: updatedPro.workingHours,
+      availability: {
+        monday: updatedPro.availability.monday || [],
+        tuesday: updatedPro.availability.tuesday || [],
+        wednesday: updatedPro.availability.wednesday || [],
+        thursday: updatedPro.availability.thursday || [],
+        friday: updatedPro.availability.friday || [],
+        saturday: updatedPro.availability.saturday || [],
+        sunday: updatedPro.availability.sunday || [],
+      },
       isBanned: updatedPro.isBanned,
-      about: updatedPro.about,
+      about: updatedPro.about ?? null,
       isBooked: updatedPro.isBooked,
+      isUnavailable: updatedPro.isUnavailable,
     });
   }
 
-  async getPendingPros(page: number, limit: number): Promise<{ pros: IPendingPro[]; total: number }> {
+  async getPendingPros(page: number, limit: number): Promise<{ pros: PendingProResponse[]; total: number }> {
     const skip = (page - 1) * limit;
-    const [pros, total] = await Promise.all([
-      this._proRepository.getPendingProsWithPagination(skip, limit),
-      this._proRepository.getTotalPendingProsCount(),
-    ]);
-    return { pros: pros.map((doc) => doc.toObject() as IPendingPro), total };
+    const pros = await this._proRepository.getPendingProsWithPagination(skip, limit);
+    const total = await this._proRepository.getTotalPendingProsCount();
+    return {
+      pros: await Promise.all(
+        pros.map(async (doc: PendingProDocument) => {
+          const category = await this._categoryRepository.findCategoryById(doc.categoryId.toString());
+          if (!category) throw new Error("Category not found");
+          return {
+            _id: doc._id.toString(),
+            firstName: doc.firstName,
+            lastName: doc.lastName,
+            email: doc.email,
+            phoneNumber: doc.phoneNumber,
+            category: {
+              id: category.id,
+              name: category.name,
+              image: category.image || "",
+            },
+            customService: doc.customService,
+            location: doc.location,
+            profilePhoto: doc.profilePhoto,
+            idProof: doc.idProof,
+            accountHolderName: doc.accountHolderName,
+            accountNumber: doc.accountNumber,
+            bankName: doc.bankName,
+            availability: doc.availability,
+            createdAt: doc.createdAt,
+          } as PendingProResponse;
+        })
+      ),
+      total,
+    };
   }
 
-  async getPendingProById(id: string): Promise<IPendingPro> {
+  async getPendingProById(id: string): Promise<PendingProResponse> {
     const proDoc = await this._proRepository.findById(id);
     if (!proDoc) {
       throw new Error("Pro not found");
     }
-    return proDoc.toObject() as IPendingPro;
+    const category = await this._categoryRepository.findCategoryById(proDoc.categoryId.toString());
+    if (!category) throw new Error("Category not found");
+    return {
+      _id: proDoc._id.toString(),
+      firstName: proDoc.firstName,
+      lastName: proDoc.lastName,
+      email: proDoc.email,
+      phoneNumber: proDoc.phoneNumber,
+      category: {
+        id: category.id,
+        name: category.name,
+        image: category.image || "",
+      },
+      customService: proDoc.customService,
+      location: proDoc.location,
+      profilePhoto: proDoc.profilePhoto,
+      idProof: proDoc.idProof,
+      accountHolderName: proDoc.accountHolderName,
+      accountNumber: proDoc.accountNumber,
+      bankName: proDoc.bankName,
+      availability: proDoc.availability,
+      createdAt: proDoc.createdAt,
+    } as PendingProResponse;
   }
+
 
   async approvePro(id: string, about: string | null): Promise<void> {
     const { plainPassword, hashedPassword } = await this.generatePassword();
@@ -149,73 +215,43 @@ export class AdminService implements IAdminService {
       this._proRepository.getApprovedProsWithPagination(skip, limit),
       this._proRepository.getTotalApprovedProsCount(),
     ]);
-    return {
-      pros: pros.map(
-        (doc) =>
-          new ProResponse({
-            _id: doc._id.toString(),
-            firstName: doc.firstName,
-            role: UserRole.PRO,
-            lastName: doc.lastName,
-            email: doc.email,
-            phoneNumber: doc.phoneNumber,
-            serviceType: doc.serviceType,
-            customService: doc.customService,
-            skills: doc.skills,
-            location: {
-              address: doc.location.address,
-              city: doc.location.city,
-              state: doc.location.state,
-              coordinates: doc.location.coordinates,
-            },
-            profilePhoto: doc.profilePhoto,
-            idProof: doc.idProof,
-            accountHolderName: doc.accountHolderName,
-            accountNumber: doc.accountNumber,
-            bankName: doc.bankName,
-            availability: doc.availability,
-            workingHours: doc.workingHours,
-            isBanned: doc.isBanned,
-            about: doc.about,
-            isBooked: doc.isBooked,
-          })
-      ),
-      total,
-    };
+    return { pros, total };
   }
 
   async getApprovedProById(id: string): Promise<ProResponse> {
-    const proDoc = await this._proRepository.findApprovedProById(id);
+    const proDoc = await this._proRepository.findApprovedProByIdAsResponse(id);
     if (!proDoc) {
       throw new Error("Approved pro not found");
     }
-    return new ProResponse({
-      _id: proDoc._id.toString(),
-      firstName: proDoc.firstName,
-      role: UserRole.PRO,
-      lastName: proDoc.lastName,
-      email: proDoc.email,
-      phoneNumber: proDoc.phoneNumber,
-      serviceType: proDoc.serviceType,
-      customService: proDoc.customService,
-      skills: proDoc.skills,
-      location: {
-        address: proDoc.location.address,
-        city: proDoc.location.city,
-        state: proDoc.location.state,
-        coordinates: proDoc.location.coordinates,
-      },
-      profilePhoto: proDoc.profilePhoto,
-      idProof: proDoc.idProof,
-      accountHolderName: proDoc.accountHolderName,
-      accountNumber: proDoc.accountNumber,
-      bankName: proDoc.bankName,
-      availability: proDoc.availability,
-      workingHours: proDoc.workingHours,
-      isBanned: proDoc.isBanned,
-      about: proDoc.about,
-      isBooked: proDoc.isBooked,
-    });
+    return proDoc;
+  }
+
+  async createCategory(name: string, image: string): Promise<CategoryResponse> {
+    const existingCategory = await this._categoryRepository.findCategoryByName(name);
+    if (existingCategory) {
+      throw new Error(MESSAGES.CATEGORY_NAME_EXISTS);
+    }
+    const categoryData = { name, image };
+    return this._categoryRepository.createCategory(categoryData);
+  }
+
+  async getCategories(page: number, limit: number): Promise<{ categories: CategoryResponse[]; total: number }> {
+    const skip = (page - 1) * limit;
+    const [categories, total] = await Promise.all([
+      this._categoryRepository.getCategoriesWithPagination(skip, limit),
+      this._categoryRepository.getTotalCategoriesCount(),
+    ]);
+    return { categories, total };
+  }
+
+  async updateCategory(categoryId: string, data: { name?: string; image?: string }): Promise<CategoryResponse | null> {
+    if (data.name) {
+      const existingCategory = await this._categoryRepository.findCategoryByName(data.name);
+      if (existingCategory && existingCategory.id !== categoryId) {
+        throw new Error(MESSAGES.CATEGORY_NAME_EXISTS);
+      }
+    }
+    return this._categoryRepository.updateCategory(categoryId, data);
   }
 
   private async generatePassword(): Promise<{ plainPassword: string; hashedPassword: string }> {

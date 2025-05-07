@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express"; 
+import { Request, Response, NextFunction } from "express";
 import { AuthService } from "../services/AuthService";
 import { LoginResponse } from "../dtos/response/userDtos";
 import { injectable, inject } from "inversify";
@@ -29,10 +29,10 @@ export class AuthController {
   async verifyOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email, otp } = req.body;
-      if (!email || !otp) throw new HttpError(400, "Email and OTP are required");
+      if (!email || !otp) throw new HttpError(400, MESSAGES.EMAIL_OTP_REQUIRED);
       const isValid = await this._authService.verifyOtp(email, otp);
       if (isValid) {
-        res.status(200).json({ message: "OTP verified" });
+        res.status(200).json({ message: MESSAGES.OTP_VERIFIED });
       } else {
         throw new HttpError(400, MESSAGES.INVALID_OTP);
       }
@@ -75,7 +75,7 @@ export class AuthController {
   async refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const refreshToken = req.cookies.refreshToken;
-      if (!refreshToken) throw new HttpError(401, "No refresh token provided");
+      if (!refreshToken) throw new HttpError(401, MESSAGES.NO_REFRESH_TOKEN);
       const accessToken = await this._authService.refreshAccessToken(req, res);
       res.status(200).json({ accessToken });
     } catch (error) {
@@ -87,7 +87,7 @@ export class AuthController {
   async getMe(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.userId;
-      if (!userId) throw new HttpError(401, "Unauthorized");
+      if (!userId) throw new HttpError(401, MESSAGES.UNAUTHORIZED);
       const user = await this._authService.getUserById(userId);
       res.status(200).json(user);
     } catch (error) {
@@ -100,24 +100,48 @@ export class AuthController {
       const { role } = req.body;
       const refreshToken = req.cookies.refreshToken;
       if (!refreshToken) {
-        throw new HttpError(401, "No refresh token provided");
+        throw new HttpError(401, MESSAGES.NO_REFRESH_TOKEN);
       }
       if (!role || ![UserRole.USER, UserRole.ADMIN, UserRole.PRO].includes(role)) {
-        throw new HttpError(400, "Valid role (user or admin) is required");
+        throw new HttpError(400, MESSAGES.VALID_ROLE_REQUIRED);
       }
       await this._authService.logout(refreshToken, role, res);
-      res.status(200).json({ message: "Logged out successfully" });
+      res.status(200).json({ message: MESSAGES.LOGGED_OUT });
     } catch (error) {
       next(error);
     }
   }
 
-   async checkBanStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  async checkBanStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.params.userId;
-      if (!userId) throw new HttpError(400, "User ID is required");
+      if (!userId) throw new HttpError(400, MESSAGES.USERID_REQUIRED);
       const result = await this._authService.checkBanStatus(userId);
       res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email } = req.body;
+      if (!email) throw new HttpError(400, MESSAGES.EMAIL_REQUIRED);
+      await this._authService.requestPasswordReset(email);
+      res.status(200).json({ message: "Password reset link sent to your email" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId, token, newPassword } = req.body;
+      if (!userId || !token || !newPassword) {
+        throw new HttpError(400, "User ID, token, and new password are required");
+      }
+      await this._authService.resetPassword(userId, token, newPassword);
+      res.status(200).json({ message: "Password reset successfully" });
     } catch (error) {
       next(error);
     }

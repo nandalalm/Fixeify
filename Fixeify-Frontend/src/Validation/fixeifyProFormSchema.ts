@@ -41,18 +41,7 @@ const customServiceSchema = z
   .trim()
   .optional();
 
-const customSkillSchema = z
-  .string()
-  .regex(/^[A-Za-z\s]+$/, "Custom Skill must contain only letters and spaces")
-  .min(4, "Must be at least 4 characters long")
-  .trim()
-  .optional();
-
 const locationSchema = z.object({
-  address: z
-    .string()
-    .regex(/^[\w\s.,-]+$/, "Address can only contain letters, numbers, spaces, commas, periods, and hyphens")
-    .trim(),
   city: z
     .string()
     .regex(/^[\w\s.,-]+$/, "City can only contain letters, numbers, spaces, commas, periods, and hyphens")
@@ -79,12 +68,6 @@ const locationSchema = z.object({
   }),
 });
 
-const workingHoursSchema = z
-  .string()
-  .regex(/^[\w\s.,-]+$/, "Working Hours can only contain letters, numbers, spaces, commas, periods, and hyphens")
-  .trim()
-  .optional();
-
 const imageFileSchema = z
   .instanceof(File)
   .refine((file) => file.type.startsWith("image/"), "Only images are allowed");
@@ -99,26 +82,32 @@ const idProofSchema = z
   .nonempty("At least one ID proof image is required")
   .refine((files) => files.every((file) => file.type.startsWith("image/")), "Only images are allowed");
 
+const timeSlotSchema = z.object({
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "Start time must be in HH:mm format (00:00-23:59)"),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "End time must be in HH:mm format (00:00-23:59)"),
+}).refine(
+  ({ startTime, endTime }) => {
+    const startMinutes = parseInt(startTime.split(":")[0]) * 60 + parseInt(startTime.split(":")[1]);
+    const endMinutes = parseInt(endTime.split(":")[0]) * 60 + parseInt(endTime.split(":")[1]);
+    return endMinutes > startMinutes;
+  },
+  { message: "End time must be after start time" }
+);
+
 const availabilitySchema = z
   .object({
-    monday: z.boolean(),
-    tuesday: z.boolean(),
-    wednesday: z.boolean(),
-    thursday: z.boolean(),
-    friday: z.boolean(),
-    saturday: z.boolean(),
-    sunday: z.boolean(),
+    monday: z.array(timeSlotSchema).optional(),
+    tuesday: z.array(timeSlotSchema).optional(),
+    wednesday: z.array(timeSlotSchema).optional(),
+    thursday: z.array(timeSlotSchema).optional(),
+    friday: z.array(timeSlotSchema).optional(),
+    saturday: z.array(timeSlotSchema).optional(),
+    sunday: z.array(timeSlotSchema).optional(),
   })
   .refine(
     (data) =>
-      data.monday ||
-      data.tuesday ||
-      data.wednesday ||
-      data.thursday ||
-      data.friday ||
-      data.saturday ||
-      data.sunday,
-    "Please select at least one available day"
+      Object.values(data).some((slots) => Array.isArray(slots) && slots.length > 0),
+    "Please select at least one day with valid time slots"
   );
 
 export const fixeifyProFormSchema = z.object({
@@ -126,10 +115,8 @@ export const fixeifyProFormSchema = z.object({
   lastName: lastNameSchema,
   email: emailSchema,
   phoneNumber: phoneNumberSchema,
-  serviceType: z.string().min(1, "Service type is required"),
+  categoryId: z.string().min(1, "Category is required"),
   customService: customServiceSchema,
-  skills: z.array(z.string()).nonempty("Please select at least one skill"),
-  customSkill: customSkillSchema,
   location: locationSchema.nullable().refine((val) => val !== null, {
     message: "Please provide your location",
   }),
@@ -138,6 +125,5 @@ export const fixeifyProFormSchema = z.object({
   accountHolderName: nameSchema.optional().or(z.literal("")),
   accountNumber: accountNumberSchema,
   bankName: bankNameSchema,
-  workingHours: workingHoursSchema,
   availability: availabilitySchema,
 });

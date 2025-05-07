@@ -8,15 +8,18 @@ export default function createAdminRoutes(container: Container): Router {
   const router = express.Router();
   const adminController = container.get<AdminController>(TYPES.AdminController);
 
-  router.get("/", authenticateToken, adminController.getUsers.bind(adminController));
-  router.put("/users/:userId/ban", authenticateToken, adminController.banUser.bind(adminController));
-  router.put("/approved-pros/:proId/ban", authenticateToken, adminController.banPro.bind(adminController));
-  router.get("/pending-pros", authenticateToken, adminController.getPendingPros.bind(adminController));
-  router.get("/pending-pros/:id", authenticateToken, adminController.getPendingProById.bind(adminController));
-  router.post("/pending-pros/:id/approve", authenticateToken, adminController.approvePro.bind(adminController));
-  router.post("/pending-pros/:id/reject", authenticateToken, adminController.rejectPro.bind(adminController));
-  router.get("/approved-pros", authenticateToken, adminController.getApprovedPros.bind(adminController));
-  router.get("/approved-pros/:id", authenticateToken, adminController.getApprovedProById.bind(adminController));
+  router.get("/fetchUsers", authenticateToken, adminController.getUsers.bind(adminController));
+  router.put("/banUsers/:userId", authenticateToken, adminController.banUser.bind(adminController));
+  router.put("/banApproved-pros/:proId", authenticateToken, adminController.banPro.bind(adminController));
+  router.get("/fetchPending-pros", authenticateToken, adminController.getPendingPros.bind(adminController));
+  router.get("/fetchPending-pro/:id", authenticateToken, adminController.getPendingProById.bind(adminController));
+  router.post("/approvePending-pros/:id", authenticateToken, adminController.approvePro.bind(adminController));
+  router.post("/rejectPending-pros/:id", authenticateToken, adminController.rejectPro.bind(adminController));
+  router.get("/fetchApproved-pros", authenticateToken, adminController.getApprovedPros.bind(adminController));
+  router.get("/fetchApproved-pro/:id", authenticateToken, adminController.getApprovedProById.bind(adminController));
+  router.post("/addCategories", authenticateToken, adminController.createCategory.bind(adminController));
+  router.get("/fetchCategories", authenticateToken, adminController.getCategories.bind(adminController));
+  router.put("/updateCategories/:categoryId", authenticateToken, adminController.updateCategory.bind(adminController));
 
   return router;
 }

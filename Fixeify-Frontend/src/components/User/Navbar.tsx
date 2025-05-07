@@ -8,13 +8,13 @@ import { RootState, AppDispatch } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
 import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
-import { ConfirmationModal } from "../Admin/ConfirmationModal"; // Import the reusable modal
+import { ConfirmationModal } from "../Admin/ConfirmationModal"; 
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false); // State for logout modal
+  const [showLogoutModal, setShowLogoutModal] = useState(false); 
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { user, accessToken } = useSelector((state: RootState) => state.auth);

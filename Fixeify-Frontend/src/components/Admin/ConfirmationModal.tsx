@@ -4,12 +4,13 @@ interface ConfirmationModalProps {
   isOpen: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  action: "approve" | "reject" | "ban" | "unban" | "logout" | null;
-  entityType?: "pro" | "user"; // New prop to distinguish between pro and user
+  action: "approve" | "reject" | "ban" | "unban" | "logout" | "saveSlot" | "dontSaveSlot" | "addCategory" | "dontAddCategory" | "updateCategory" | "dontUpdateCategory" | null;
+  entityType?: "pro" | "user";
   reason?: string;
   setReason?: (reason: string) => void;
   customReason?: string;
   setCustomReason?: (reason: string) => void;
+  customTitle?: string;
   error?: string | null;
   isProcessing?: boolean;
 }
@@ -19,11 +20,12 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
   onConfirm,
   onCancel,
   action,
-  entityType = "pro", // Default to "pro" for backward compatibility
+  entityType = "pro",
   reason,
   setReason,
   customReason,
   setCustomReason,
+  customTitle,
   error,
   isProcessing,
 }) => {
@@ -45,13 +47,26 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           {action === "ban" && `Ban ${entityType === "pro" ? "Pro" : "User"}`}
           {action === "unban" && `Unban ${entityType === "pro" ? "Pro" : "User"}`}
           {action === "logout" && "Confirm Logout"}
+          {action === "saveSlot" && "Confirm Slot Changes"}
+          {action === "dontSaveSlot" && "Discard Slot Changes"}
+          {action === "addCategory" && "Confirm Add Category"}
+          {action === "dontAddCategory" && "Discard Add Category"}
+          {action === "updateCategory" && "Confirm Update Category"}
+          {action === "dontUpdateCategory" && "Discard Update Category"}
+          {action === null && (customTitle || "Confirm Action")}
         </h3>
         <p className={`mb-4 ${action === "logout" ? "dark:text-white" : ""}`}>
-          {action === "approve" && `Are you sure you want to approve this ${entityType === "pro" ? "pro" : "user"}?`}
-          {action === "reject" && "Please select a reason for rejection:"}
+          {action === null && customReason ? customReason : action === "approve" && `Are you sure you want to approve this ${entityType === "pro" ? "pro" : "user"}?`}
+          {action === "reject" && `Please select a reason for rejection:`}
           {action === "ban" && `Are you sure you want to ban this ${entityType === "pro" ? "pro" : "user"}?`}
           {action === "unban" && `Are you sure you want to unban this ${entityType === "pro" ? "pro" : "user"}?`}
           {action === "logout" && "Are you sure you want to log out?"}
+          {action === "saveSlot" && "Are you sure you want to save your slot changes?"}
+          {action === "dontSaveSlot" && "Are you sure you want to discard your slot changes?"}
+          {action === "addCategory" && "Are you sure you want to add this category?"}
+          {action === "dontAddCategory" && "Are you sure you want to discard adding this category?"}
+          {action === "updateCategory" && "Are you sure you want to update this category?"}
+          {action === "dontUpdateCategory" && "Are you sure you want to discard updating this category?"}
         </p>
         {action === "reject" && setReason && setCustomReason && (
           <div className="mb-4">

@@ -3,12 +3,14 @@ export const TYPES = {
   IUserRepository: Symbol.for("IUserRepository"),
   IAdminRepository: Symbol.for("IAdminRepository"),
   IProRepository: Symbol.for("IProRepository"),
+  IBookingRepository: Symbol.for("IBookingRepository"),
   AuthService: Symbol.for("AuthService"),
   AuthController: Symbol.for("AuthController"),
   AdminController: Symbol.for("AdminController"),
   ProController: Symbol.for("ProController"),
   IAdminService: Symbol.for("IAdminService"),
   IProService: Symbol.for("IProService"),
-  IUserService: Symbol.for("IUserService"), // Add this
-  UserController: Symbol.for("UserController"), // Add this
+  IUserService: Symbol.for("IUserService"),
+  UserController: Symbol.for("UserController"),
+  ICategoryRepository: Symbol.for("ICategoryRepository"),
 };

@@ -19,4 +19,5 @@ export interface IProRepository {
   updateBanStatus(proId: string, isBanned: boolean): Promise<ApprovedProDocument | null>;
   deletePendingPro(id: string): Promise<void>;
   updateApprovedPro(id: string, data: Partial<ApprovedProDocument>): Promise<ApprovedProDocument | null>;
+  findNearbyPros(categoryId: string, longitude: number, latitude: number): Promise<ProResponse[]>;
 }

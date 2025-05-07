@@ -6,7 +6,7 @@ export interface ILocation {
   state: string;
   coordinates: {
     type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
+    coordinates: [number, number];
   };
 }
 
@@ -29,7 +29,7 @@ const locationSchema = new Schema<ILocation>(
     state: { type: String, required: true },
     coordinates: {
       type: { type: String, enum: ["Point"], required: true },
-      coordinates: { type: [Number], required: true }, // [longitude, latitude]
+      coordinates: { type: [Number], required: true },
     },
   },
   { _id: false }

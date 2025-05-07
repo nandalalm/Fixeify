@@ -18,6 +18,6 @@ export class MongoAdminRepository extends BaseRepository<IAdmin> implements IAdm
   }
 
   async findAdminById(adminId: string): Promise<IAdmin | null> {
-    return this.findById(adminId); // Use BaseRepository's findById
+    return this.findById(adminId); 
   }
 }

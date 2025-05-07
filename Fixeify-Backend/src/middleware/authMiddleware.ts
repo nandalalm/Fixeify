@@ -3,8 +3,8 @@ import jwt from "jsonwebtoken";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "./errorMiddleware";
 
-interface AuthRequest extends Request {
-  userId?: string; 
+export interface AuthRequest extends Request {
+  userId?: string;
 }
 
 export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -20,9 +20,8 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     const secret = process.env.ACCESS_TOKEN_SECRET;
     if (!secret) throw new HttpError(500, "Server configuration error: ACCESS_TOKEN_SECRET not set");
 
-    
     const decoded = jwt.verify(token, secret) as { userId: string };
-    req.userId = decoded.userId; 
+    req.userId = decoded.userId;
     next();
   } catch (err) {
     next(err instanceof HttpError ? err : new HttpError(403, MESSAGES.INVALID_TOKEN));

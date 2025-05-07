@@ -3,11 +3,13 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { useNavigate } from "react-router-dom";
 import { LocateFixed } from "lucide-react";
-import { getProProfile, ProProfile, updateProProfile } from "../../api/proApi";
+import { getProProfile, updateProProfile } from "../../api/proApi";
+import { ProProfile } from "../../interfaces/proInterface";
 import { updateUser } from "../../store/authSlice";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { z } from "zod";
 import { editProProfileSchema } from "../../Validation/editProProfileSchema";
+import { LocationData, EditProProfileFormData } from "../../interfaces/proInterface";
 
 const s3Client = new S3Client({
   region: import.meta.env.VITE_AWS_REGION,
@@ -16,27 +18,6 @@ const s3Client = new S3Client({
     secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
   },
 });
-
-interface LocationData {
-  address: string;
-  city: string;
-  state: string;
-  coordinates: {
-    type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
-  };
-}
-
-interface EditProProfileFormData {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
-  location: LocationData;
-  profilePhoto: string;
-  about: string | null;
-}
 
 interface EditProProfileProps {
   onCancel: () => void;
@@ -597,7 +578,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
                 />
                 <label
                   htmlFor="profilePhotoInput"
-                  className="mt-2 inline-block px-4 py-2 bg-blue-500 text-white rounded-md cursor-pointer hover:bg-blue-600"
+                  className="mt-2 inline-block px-4 py-2 bg-[#032B44] text-white rounded-md cursor-pointer hover:bg-[#054869]"
                 >
                   Choose an image to upload
                 </label>

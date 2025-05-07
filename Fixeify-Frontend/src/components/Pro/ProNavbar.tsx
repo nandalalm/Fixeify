@@ -1,12 +1,12 @@
 import type { FC } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Briefcase, DollarSign, User, MessageSquare, Star, LogOut } from "lucide-react";
+import { Home, Briefcase, DollarSign, User, MessageSquare, Star, Calendar1, LogOut } from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
 import { useState } from "react";
-import { ConfirmationModal } from "../Admin/ConfirmationModal"; // Adjust path as needed
+import { ConfirmationModal } from "../Admin/ConfirmationModal"; 
 
 interface NavItem {
   icon: FC<LucideProps>;
@@ -23,7 +23,7 @@ interface ProNavbarProps {
 export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
-  const [showLogoutModal, setShowLogoutModal] = useState(false); // State for logout modal
+  const [showLogoutModal, setShowLogoutModal] = useState(false); 
 
   const handleLogout = () => {
     dispatch(logoutUser("pro")).then(() => {
@@ -45,12 +45,13 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
   };
 
   const navItems: NavItem[] = [
-    { icon: Home, label: "Home", path: "/pro-dashboard" },
+    { icon: Home, label: "Dashboard", path: "/pro-dashboard" },
     { icon: Briefcase, label: "Jobs", path: "/pro/jobs" },
     { icon: DollarSign, label: "Earnings", path: "/pro/earnings" },
-    { icon: User, label: "Profile", path: "/pro/profile" },
     { icon: MessageSquare, label: "Messages", path: "/pro/messages" },
     { icon: Star, label: "Ratings", path: "/pro/ratings" },
+    { icon: Calendar1, label: "Slots", path: "/pro/slot-management" },
+    { icon: User, label: "Profile", path: "/pro/profile" },
     { icon: LogOut, label: "Log Out", path: "/login", onClick: handleLogoutClick },
   ];
 
@@ -77,8 +78,8 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
                         : "hover:bg-gray-100"
                     } rounded-md mx-2 transition-colors duration-200 cursor-pointer`}
                   >
-                    <item.icon className="h-5 w-5 mr-3 text-red-600" /> {/* Red color for icon */}
-                    <span className="text-red-600">{item.label}</span> {/* Red color for text */}
+                    <item.icon className="h-5 w-5 mr-3 text-red-600" />
+                    <span className="text-red-600">{item.label}</span> 
                   </div>
                 </li>
               ) : (

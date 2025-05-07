@@ -28,7 +28,7 @@ export const getOtpEmailTemplate = (otp: string): string => `
   </html>
 `;
 
-export const getApprovalEmailTemplate = (email: string, name:string, password: string): string => `
+export const getApprovalEmailTemplate = (email: string, name: string, password: string): string => `
   <!DOCTYPE html>
   <html lang="en">
   <head>
@@ -87,6 +87,37 @@ export const getRejectionEmailTemplate = (reason: string): string => `
           <p><strong>Reason:</strong> ${reason}</p>
         </div>
         <p>If you have any questions, please contact support.</p>
+      </div>
+      <div class="footer">
+        <p>© 2025 Fixeify. All rights reserved.</p>
+      </div>
+    </div>
+  </body>
+  </html>
+`;
+
+export const getResetPasswordEmailTemplate = (resetUrl: string): string => `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reset Your Fixeify Password</title>
+    <style>
+      body { margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4; }
+      .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); overflow: hidden; }
+      .content { padding: 30px; text-align: center; }
+      .footer { background-color: #f4f4f4; padding: 10px; text-align: center; font-size: 12px; color: #000; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="content">
+        <h1>Reset Your Fixeify Password</h1>
+        <p>We received a request to reset your password. Click the button below to set a new password.</p>
+        <a href="${resetUrl}"  style="display:inline-block; padding:12px 24px; background-color:#032B44; color:#ffffff; text-decoration:none; border-radius:5px; font-weight:bold; margin:20px 0;">Reset Password</a>
+        <p>This link will expire in <strong>1 hour</strong>.</p>
+        <p>If you did not request a password reset, please ignore this email.</p>
       </div>
       <div class="footer">
         <p>© 2025 Fixeify. All rights reserved.</p>

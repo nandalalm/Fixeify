@@ -4,7 +4,7 @@ import { HttpError } from "../middleware/errorMiddleware";
 export const generateAccessToken = (userId: string): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET;
   if (!secret) throw new HttpError(500, "ACCESS_TOKEN_SECRET is not defined");
-  return jwt.sign({ userId }, secret, { expiresIn: "15m" });
+  return jwt.sign({ userId }, secret, { expiresIn: "1h" });
 };
 
 export const generateRefreshToken = (userId: string): string => {

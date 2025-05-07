@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { RootState, AppDispatch } from "../../store/store";
-import { updateUserProfile, UserProfile, getUserProfile } from "../../api/userApi";
+import { updateUserProfile, getUserProfile } from "../../api/userApi";
+import { UserProfile } from "../../interfaces/userInterface";
 import { updateUser } from "../../store/authSlice";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { LocateFixed } from "lucide-react";
@@ -25,7 +26,7 @@ interface LocationData {
   state: string;
   coordinates: {
     type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
+    coordinates: [number, number]; 
   };
 }
 
@@ -84,7 +85,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
             id: user.id,
             firstName,
             lastName,
-            email: fetchedUser.email, // Set email but won't be editable
+            email: fetchedUser.email, 
             phoneNo: fetchedUser.phoneNo || "",
             address,
             photo: fetchedUser.photo || null,
@@ -584,7 +585,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
                     />
                     <label
                       htmlFor="profilePhotoInput"
-                      className="mt-2 inline-block px-4 py-2 bg-blue-500 text-white rounded-md cursor-pointer hover:bg-blue-600 dark:!text-white"
+                      className="mt-2 inline-block px-4 py-2 bg-[#032B44] text-white rounded-md cursor-pointer hover:bg-[#054869] dark:!text-white"
                     >
                       Choose an image to upload
                     </label>

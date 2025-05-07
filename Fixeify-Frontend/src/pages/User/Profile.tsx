@@ -4,6 +4,7 @@ import Footer from "../../components/User/Footer";
 import ProfileInfo from "../../components/User/ProfileInfo";
 import EditProfile from "../../components/User/EditProfile";
 import ChangePassword from "../../components/User/ChangePassword";
+import OngoingRequest from "../../components/User/OngoingRequest";
 import { User, GitPullRequestDraft, Bell, IndianRupee, ChevronLeft, ChevronRight, ListCollapse, LogOut, X } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
@@ -29,12 +30,12 @@ const Profile = () => {
       const width = window.innerWidth;
       setIsExtraSmallScreen(width <= 600);
       if (width <= 600) {
-        setIsSidebarVisible(false); // Hide sidebar by default on extra-small screens
-        setIsToggleActive(false); // Reset toggle active state
-        setIsSidebarShrunk(true); // Shrink sidebar by default on extra-small screens
+        setIsSidebarVisible(false); 
+        setIsToggleActive(false); 
+        setIsSidebarShrunk(true); 
       } else {
-        setIsSidebarVisible(true); // Show sidebar on larger screens
-        setIsToggleActive(false); // Reset toggle active state
+        setIsSidebarVisible(true); 
+        setIsToggleActive(false); 
       }
     };
 
@@ -194,6 +195,25 @@ const Profile = () => {
                   onChangePassword={() => { setIsChangingPassword(true); }}
                 />
               )}
+            </div>
+          )}
+          {activeTab === "Ongoing Request" && <OngoingRequest />}
+          {activeTab === "Booking History" && (
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Booking History</h2>
+              <p className="text-gray-700 dark:text-gray-300">Booking history will be displayed here.</p>
+            </div>
+          )}
+          {activeTab === "Payment Section" && (
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Payment Section</h2>
+              <p className="text-gray-700 dark:text-gray-300">Payment details will be displayed here.</p>
+            </div>
+          )}
+          {activeTab === "Notifications & Alerts" && (
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Notifications & Alerts</h2>
+              <p className="text-gray-700 dark:text-gray-300">Notifications will be displayed here.</p>
             </div>
           )}
         </div>

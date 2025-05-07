@@ -1,21 +1,10 @@
 import api from "./axios";
-
-export interface UserProfile {
-  id: string;
-  name: string;
-  email: string;
-  phoneNo?: string | null;
-  address?: {
-    address: string;
-    city: string;
-    state: string;
-    coordinates: { type: "Point"; coordinates: [number, number] };
-  } | null;
-  photo?: string | null;
-}
+import { UserProfile } from "../interfaces/userInterface";
+import { IApprovedPro, ILocation } from "../interfaces/adminInterface";
+import { BookingResponse } from "../interfaces/bookingInterface";
 
 export const getUserProfile = async (userId: string): Promise<UserProfile> => {
-  const response = await api.get(`/user/getProfile/${userId}`, { withCredentials: true });
+  const response = await api.get(`/user/fetchProfile/${userId}`, { withCredentials: true });
   return response.data;
 };
 
@@ -24,10 +13,47 @@ export const updateUserProfile = async (userId: string, data: Partial<Omit<UserP
   return response.data;
 };
 
-export const changeUserPassword = async (userId: string, data: {
-  currentPassword: string;
-  newPassword: string;
-}): Promise<void> => {
+export const changeUserPassword = async (
+  userId: string,
+  data: { currentPassword: string; newPassword: string }
+): Promise<{ message: string }> => {
   const response = await api.put(`/user/changePassword/${userId}`, data, { withCredentials: true });
+  return response.data;
+};
+
+export const getNearbyPros = async (categoryId: string, longitude: number, latitude: number): Promise<IApprovedPro[]> => {
+  const response = await api.get("/user/nearbyPros", {
+    params: { categoryId, longitude, latitude },
+    withCredentials: true,
+  });
+  return response.data;
+};
+
+export const createBooking = async (
+  userId: string,
+  proId: string,
+  bookingData: {
+    categoryId: string;
+    issueDescription: string;
+    location: ILocation;
+    phoneNumber: string;
+    preferredDate: string;
+    preferredTime: string;
+  }
+): Promise<BookingResponse> => {
+  const response = await api.post(
+    "/user/book",
+    {
+      userId,
+      proId,
+      ...bookingData,
+    },
+    { withCredentials: true }
+  );
+  return response.data;
+};
+
+export const fetchBookingDetails = async (userId: string): Promise<BookingResponse[]> => {
+  const response = await api.get(`/user/bookings/${userId}`, { withCredentials: true });
   return response.data;
 };

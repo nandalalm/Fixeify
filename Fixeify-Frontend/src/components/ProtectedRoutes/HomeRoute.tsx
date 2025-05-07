@@ -12,18 +12,15 @@ const HomeRoute = () => {
   }
 
   if (isAuthenticated) {
-    // Redirect based on role
     if (user?.role === "admin") {
       return <Navigate to="/admin-dashboard" replace />;
     }
     if (user?.role === "pro") {
       return <Navigate to="/pro-dashboard" replace />;
     }
-    // Allow users to access /home
     return <Outlet />;
   }
 
-  // Allow unauthenticated users to access /home
   return <Outlet />;
 };
 

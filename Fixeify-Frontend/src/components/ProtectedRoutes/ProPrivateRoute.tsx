@@ -11,7 +11,6 @@ const ProPrivateRoute = () => {
   const isPro = user?.role === "pro";
   const dispatch = useDispatch<AppDispatch>();
 
-  // Check ban status on mount only
   useEffect(() => {
     if (!isAuthenticated || !isPro) return;
     dispatch(checkBanStatus());

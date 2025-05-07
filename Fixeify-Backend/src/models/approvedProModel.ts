@@ -1,22 +1,25 @@
 import mongoose, { Schema, Document } from "mongoose";
-import { IPendingPro } from "./pendingProModel";
+import { ILocation, IAvailability, ITimeSlot } from "./pendingProModel";
 
-export interface ILocation {
-  address: string;
-  city: string;
-  state: string;
-  coordinates: {
-    type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
-  };
-}
-
-export interface IApprovedPro extends Omit<IPendingPro, "location"> {
+export interface IApprovedPro {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  categoryId: mongoose.Types.ObjectId;
+  customService?: string;
   location: ILocation;
+  profilePhoto: string;
+  idProof: string[];
+  accountHolderName: string;
+  accountNumber: string;
+  bankName: string;
+  availability: IAvailability;
   isBanned: boolean;
   password: string;
   about?: string | null;
   isBooked: boolean;
+  isUnavailable: boolean;
 }
 
 export interface ApprovedProDocument extends IApprovedPro, Document {
@@ -29,22 +32,33 @@ const locationSchema = new Schema<ILocation>(
     city: { type: String, required: true },
     state: { type: String, required: true },
     coordinates: {
-      type: {
-        type: String,
-        enum: ["Point"],
-        required: true,
-      },
-      coordinates: {
-        type: [Number], // [longitude, latitude]
-        required: true,
-      },
+      type: { type: String, enum: ["Point"], required: true },
+      coordinates: { type: [Number], required: true }, 
     },
   },
   { _id: false }
 );
 
-// Create a 2dsphere index on the coordinates field for geospatial queries
-locationSchema.index({ coordinates: "2dsphere" });
+const timeSlotSchema = new Schema<ITimeSlot>(
+  {
+    startTime: { type: String, required: true },
+    endTime: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const availabilitySchema = new Schema<IAvailability>(
+  {
+    monday: { type: [timeSlotSchema], default: [] },
+    tuesday: { type: [timeSlotSchema], default: [] },
+    wednesday: { type: [timeSlotSchema], default: [] },
+    thursday: { type: [timeSlotSchema], default: [] },
+    friday: { type: [timeSlotSchema], default: [] },
+    saturday: { type: [timeSlotSchema], default: [] },
+    sunday: { type: [timeSlotSchema], default: [] },
+  },
+  { _id: false }
+);
 
 const approvedProSchema = new Schema<ApprovedProDocument>(
   {
@@ -52,33 +66,25 @@ const approvedProSchema = new Schema<ApprovedProDocument>(
     lastName: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     phoneNumber: { type: String, required: true },
-    serviceType: { type: String, required: true },
+    categoryId: { type: Schema.Types.ObjectId, ref: "Category", required: true },
     customService: { type: String },
-    skills: { type: [String], required: true },
     location: { type: locationSchema, required: true },
     profilePhoto: { type: String, required: true },
     idProof: { type: [String], required: true },
     accountHolderName: { type: String, required: true },
     accountNumber: { type: String, required: true },
     bankName: { type: String, required: true },
-    availability: {
-      monday: { type: Boolean, default: false },
-      tuesday: { type: Boolean, default: false },
-      wednesday: { type: Boolean, default: false },
-      thursday: { type: Boolean, default: false },
-      friday: { type: Boolean, default: false },
-      saturday: { type: Boolean, default: false },
-      sunday: { type: Boolean, default: false },
-    },
-    workingHours: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now },
+    availability: { type: availabilitySchema, default: {} },
     isBanned: { type: Boolean, default: false },
     password: { type: String, required: true },
     about: { type: String, default: null },
     isBooked: { type: Boolean, default: false },
+    isUnavailable: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
+
+approvedProSchema.index({ "location.coordinates": "2dsphere" });
 
 export const ApprovedProModel = mongoose.model<ApprovedProDocument>("ApprovedPro", approvedProSchema);
 export default ApprovedProModel;

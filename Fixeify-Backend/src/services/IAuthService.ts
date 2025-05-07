@@ -6,7 +6,7 @@ export interface IAuthService {
   sendOtp(email: string): Promise<void>;
   verifyOtp(email: string, otp: string): Promise<boolean>;
   isEmailVerified(email: string): Promise<boolean>;
-  register(firstName: string, lastName: string | null, email: string, password: string, role: UserRole): Promise<any>;
+  register(name: string, email: string, password: string, role: UserRole): Promise<any>;
   login(email: string, password: string, role: UserRole, res: Response): Promise<{
     accessToken: string;
     refreshToken: string;
@@ -15,4 +15,7 @@ export interface IAuthService {
   refreshAccessToken(req: Request, res: Response): Promise<string>;
   getUserById(userId: string): Promise<UserResponse>;
   logout(refreshToken: string, role: UserRole, res: Response): Promise<void>;
+  checkBanStatus(userId: string): Promise<{ isBanned: boolean }>;
+  requestPasswordReset(email: string): Promise<void>;
+  resetPassword(userId: string, token: string, newPassword: string): Promise<void>;
 }

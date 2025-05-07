@@ -5,10 +5,6 @@ import { IProService } from "../services/IProService";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "../middleware/errorMiddleware";
 
-interface AuthRequest extends Request {
-  userId?: string;
-}
-
 @injectable()
 export class ProController {
   constructor(@inject(TYPES.IProService) private _proService: IProService) {}
@@ -16,54 +12,81 @@ export class ProController {
   async applyPro(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const proData = req.body;
-      const { message, pendingPro } = await this._proService.applyPro(proData);
-      res.status(201).json({ message, pendingPro });
+      const result = await this._proService.applyPro(proData);
+      res.status(201).json(result);
     } catch (error) {
       next(error);
     }
   }
 
-  async getProfile(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  async getProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { userId } = req.params;
-      if (!req.userId || req.userId !== userId) {
-        throw new HttpError(403, MESSAGES.ACCESS_DENIED);
-      }
-      const pro = await this._proService.getProfile(userId);
-      res.status(200).json(pro);
+      const proId = req.params.id;
+      const profile = await this._proService.getProfile(proId);
+      res.status(200).json(profile);
     } catch (error) {
       next(error);
     }
   }
 
-  async updateProfile(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { userId } = req.params;
-      const { firstName, lastName, phoneNumber, location, profilePhoto, about } = req.body;
-      const updatedPro = await this._proService.updateProfile(userId, {
-        firstName,
-        lastName,
-        phoneNumber,
-        location,
-        profilePhoto,
-        about,
-      });
-      res.status(200).json(updatedPro);
+      const proId = req.params.id;
+      const profileData = req.body;
+      const updatedProfile = await this._proService.updateProfile(proId, profileData);
+      res.status(200).json(updatedProfile);
     } catch (error) {
       next(error);
     }
   }
 
-  async changePassword(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { userId } = req.params;
-      if (!req.userId || req.userId !== userId) {
-        throw new HttpError(403, MESSAGES.ACCESS_DENIED);
-      }
+      const proId = req.params.id;
       const { currentPassword, newPassword } = req.body;
-      const updatedUser = await this._proService.changePassword(userId, { currentPassword, newPassword });
-      if (!updatedUser) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
-      res.status(200).json({ message: "Password changed successfully" });
+      const user = await this._proService.changePassword(proId, { currentPassword, newPassword });
+      if (!user) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+      res.status(200).json({ message: MESSAGES.PASSWORD_CHANGED_SUCCESSFULLY });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const proId = req.params.id;
+      const availability = await this._proService.getAvailability(proId);
+      res.status(200).json(availability);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async updateAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const proId = req.params.id;
+      const { availability, isUnavailable } = req.body;
+      const updatedAvailability = await this._proService.updateAvailability(proId, { availability, isUnavailable });
+      res.status(200).json(updatedAvailability);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAllCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const categories = await this._proService.getAllCategories();
+      res.status(200).json(categories);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async fetchProBookings(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const proId = req.params.id;
+      const bookings = await this._proService.fetchProBookings(proId);
+      res.status(200).json(bookings);
     } catch (error) {
       next(error);
     }

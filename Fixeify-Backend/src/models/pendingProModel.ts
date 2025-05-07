@@ -6,8 +6,23 @@ export interface ILocation {
   state: string;
   coordinates: {
     type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
+    coordinates: [number, number];
   };
+}
+
+export interface ITimeSlot {
+  startTime: string;
+  endTime: string;
+}
+
+export interface IAvailability {
+  monday?: ITimeSlot[];
+  tuesday?: ITimeSlot[];
+  wednesday?: ITimeSlot[];
+  thursday?: ITimeSlot[];
+  friday?: ITimeSlot[];
+  saturday?: ITimeSlot[];
+  sunday?: ITimeSlot[];
 }
 
 export interface IPendingPro {
@@ -15,25 +30,15 @@ export interface IPendingPro {
   lastName: string;
   email: string;
   phoneNumber: string;
-  serviceType: string;
+  categoryId: mongoose.Types.ObjectId;
   customService?: string;
-  skills: string[];
   location: ILocation;
   profilePhoto: string;
   idProof: string[];
   accountHolderName: string;
   accountNumber: string;
   bankName: string;
-  availability: {
-    monday: boolean;
-    tuesday: boolean;
-    wednesday: boolean;
-    thursday: boolean;
-    friday: boolean;
-    saturday: boolean;
-    sunday: boolean;
-  };
-  workingHours: string;
+  availability: IAvailability;
   createdAt?: Date;
 }
 
@@ -53,7 +58,7 @@ const locationSchema = new Schema<ILocation>(
         required: true,
       },
       coordinates: {
-        type: [Number], // [longitude, latitude]
+        type: [Number],
         required: true,
       },
     },
@@ -63,31 +68,42 @@ const locationSchema = new Schema<ILocation>(
 
 locationSchema.index({ coordinates: "2dsphere" });
 
+const timeSlotSchema = new Schema<ITimeSlot>(
+  {
+    startTime: { type: String, required: true },
+    endTime: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const availabilitySchema = new Schema<IAvailability>(
+  {
+    monday: { type: [timeSlotSchema], default: [] },
+    tuesday: { type: [timeSlotSchema], default: [] },
+    wednesday: { type: [timeSlotSchema], default: [] },
+    thursday: { type: [timeSlotSchema], default: [] },
+    friday: { type: [timeSlotSchema], default: [] },
+    saturday: { type: [timeSlotSchema], default: [] },
+    sunday: { type: [timeSlotSchema], default: [] },
+  },
+  { _id: false }
+);
+
 const pendingProSchema = new Schema<PendingProDocument>(
   {
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     phoneNumber: { type: String, required: true },
-    serviceType: { type: String, required: true },
+    categoryId: { type: Schema.Types.ObjectId, ref: "Category", required: true },
     customService: { type: String },
-    skills: { type: [String], required: true },
     location: { type: locationSchema, required: true },
     profilePhoto: { type: String, required: true },
     idProof: { type: [String], required: true },
     accountHolderName: { type: String, required: true },
     accountNumber: { type: String, required: true },
     bankName: { type: String, required: true },
-    availability: {
-      monday: { type: Boolean, default: false },
-      tuesday: { type: Boolean, default: false },
-      wednesday: { type: Boolean, default: false },
-      thursday: { type: Boolean, default: false },
-      friday: { type: Boolean, default: false },
-      saturday: { type: Boolean, default: false },
-      sunday: { type: Boolean, default: false },
-    },
-    workingHours: { type: String, required: true },
+    availability: { type: availabilitySchema, required: true },
     createdAt: { type: Date, default: Date.now },
   },
   { timestamps: true }

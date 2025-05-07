@@ -1,5 +1,5 @@
 import type { FC } from "react";
-import { Home, Users, Award, Grid, Calendar, HelpCircle, Star, User, LogOut } from "lucide-react";
+import { Home, Users, Award, Grid, Calendar, BadgeIndianRupee, Star, LogOut } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { LucideProps } from "lucide-react";
 import { useDispatch } from "react-redux";
@@ -46,14 +46,13 @@ export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
   };
 
   const navItems: NavItem[] = [
-    { icon: Home, label: "Home", path: "/admin-dashboard" },
+    { icon: Home, label: "Dashboard", path: "/admin-dashboard" },
     { icon: Users, label: "User Management", path: "/admin/users" },
     { icon: Award, label: "Fixeify Pro Management", path: "/admin/pro-management" },
     { icon: Grid, label: "Category Management", path: "/admin/categories" },
     { icon: Calendar, label: "Booking Management", path: "/admin/bookings" },
-    { icon: HelpCircle, label: "Support and Dispute Management", path: "/admin/support" },
-    { icon: Star, label: "Reviews and Rating Management", path: "/admin/reviews" },
-    { icon: User, label: "Admin Profile Management", path: "/admin/profile" },
+    { icon: BadgeIndianRupee, label: "Payment Management", path: "/admin/payment" },
+    { icon: Star, label: "Reviews Management", path: "/admin/reviews" },
     { icon: LogOut, label: "Log Out", path: "/admin-login", onClick: handleLogoutClick },
   ];
 

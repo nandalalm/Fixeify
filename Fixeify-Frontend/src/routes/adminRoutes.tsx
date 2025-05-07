@@ -4,6 +4,7 @@ import AdminLogin from "../pages/Admin/AdminLogin";
 import AdminDashboard from "../pages/Admin/AdminDashboard";
 import UserManagement from "../pages/Admin/AdminUserManagement";
 import AdminProManagement from "../pages/Admin/AdminProManagement";
+import AdminCategoryManagement from "../pages/Admin/AdminCategoryManagement";
 import ProProfileView from "../components/Admin/ProProfileView";
 import PublicRoute from "../components/ProtectedRoutes/PublicRoute";
 import AdminPrivateRoute from "../components/ProtectedRoutes/AdminPrivateRoute";
@@ -18,6 +19,7 @@ const adminRoutes = (
       <Route path="/admin-dashboard" element={<AdminDashboard />} />
       <Route path="/admin/users" element={<UserManagement />} />
       <Route path="/admin/pro-management" element={<AdminProManagement />} />
+      <Route path="/admin/categories" element={<AdminCategoryManagement />} />
       <Route path="/pro-profile/:id" element={<ProProfileView />} />
     </Route>
   </>

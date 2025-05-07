@@ -2,32 +2,48 @@ import { type FC, useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   fetchPendingProById,
-  PendingPro,
   approvePro,
   rejectPro,
   fetchApprovedProById,
-  IApprovedPro,
   toggleBanPro,
 } from "../../api/adminApi";
+import { IApprovedPro, PendingPro } from "../../interfaces/adminInterface";
 import { ChevronRight, Phone, MapPin, Mail, User, CreditCard, Building, Calendar } from "lucide-react";
 import { AdminNavbar } from "./AdminNavbar";
 import { Menu } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
-import { ConfirmationModal } from "./ConfirmationModal"; // Import the reusable modal
+import { ConfirmationModal } from "./ConfirmationModal";
 
 const SkillBadge = ({ name }: { name: string }) => (
   <div className="px-4 py-2 text-sm font-medium bg-gray-100 rounded-lg text-gray-800">{name}</div>
 );
 
-const AvailabilityRow = ({ day, status }: { day: string; status: string }) => (
+const convertTo12Hour = (time: string): { time: string; period: "AM" | "PM" } => {
+  const [hour, minute] = time.split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const adjustedHour = hour % 12 || 12;
+  return { time: `${adjustedHour}:${minute.toString().padStart(2, "0")}`, period };
+};
+
+const AvailabilityRow = ({ day, timeSlots }: { day: string; timeSlots: { startTime: string; endTime: string }[] }) => (
   <div className="flex items-center gap-3 mb-3">
     <div className="flex items-center justify-center w-8 h-8 bg-gray-100 rounded-full">
       <Calendar className="w-4 h-4 text-gray-600" />
     </div>
     <div>
-      <div className={`font-medium ${status === "Not Available" ? "text-gray-400" : "text-gray-900"}`}>{day}</div>
-      <div className="text-sm text-gray-500">{status}</div>
+      <div className={`font-medium ${timeSlots.length === 0 ? "text-gray-400" : "text-gray-900"}`}>{day}</div>
+      <div className="text-sm text-gray-500">
+        {timeSlots.length === 0
+          ? "Not Available"
+          : timeSlots
+              .map((slot) => {
+                const start = convertTo12Hour(slot.startTime);
+                const end = convertTo12Hour(slot.endTime);
+                return `${start.time} ${start.period} - ${end.time} ${end.period}`;
+              })
+              .join(", ")}
+      </div>
     </div>
   </div>
 );
@@ -65,8 +81,8 @@ const ProProfileView: FC = () => {
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<
-    "serviceSkills" | "identity" | "availability" | "contact" | "bankDetails" | "action"
-  >("serviceSkills");
+    "service" | "identity" | "availability" | "contact" | "bankDetails" | "action"
+  >("service");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [action, setAction] = useState<"approve" | "reject" | "ban" | "unban" | null>(null);
   const [reason, setReason] = useState("");
@@ -124,7 +140,7 @@ const ProProfileView: FC = () => {
   const defaultAbout = !("createdAt" in pro) && pro.about
     ? pro.about
     : !("createdAt" in pro) && !pro.about
-    ? `Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.serviceType} works, and if you have any questions, feel free to message me.`
+    ? `Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.category.name} works, and if you have any questions, feel free to message me.`
     : "";
 
   const handleApprove = () => {
@@ -306,11 +322,11 @@ const ProProfileView: FC = () => {
                   <div className="flex border-b">
                     <button
                       className={`px-4 py-2 font-medium text-sm ${
-                        activeTab === "serviceSkills" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
+                        activeTab === "service" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
                       }`}
-                      onClick={() => setActiveTab("serviceSkills")}
+                      onClick={() => setActiveTab("service")}
                     >
-                      Service/Skills
+                      Service
                     </button>
                     <button
                       className={`px-4 py-2 font-medium text-sm ${
@@ -358,17 +374,11 @@ const ProProfileView: FC = () => {
                 </div>
 
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                  {activeTab === "serviceSkills" && (
+                  {activeTab === "service" && (
                     <div>
-                      <h3 className="text-md font-medium text-gray-600 mb-4">Services</h3>
-                      <div className="flex flex-wrap gap-4 mb-4">
-                        <SkillBadge name={pro.serviceType} />
-                      </div>
-                      <h3 className="text-md font-medium text-gray-600 mb-4">Skills</h3>
+                      <h3 className="text-md font-medium text-gray-600 mb-4">Service</h3>
                       <div className="flex flex-wrap gap-4">
-                        {pro.skills.map((skill, index) => (
-                          <SkillBadge key={index} name={skill} />
-                        ))}
+                        <SkillBadge name={pro.category.name} />
                       </div>
                     </div>
                   )}
@@ -398,46 +408,25 @@ const ProProfileView: FC = () => {
                       </div>
                     </div>
                   )}
-
                   {activeTab === "availability" && (
-                    <div>
+                    <div className={!('createdAt' in pro) && pro.isUnavailable ? "opacity-50" : ""}>
                       <h3 className="text-md font-medium text-gray-600 mb-4">Available Days</h3>
+                      {!('createdAt' in pro) && pro.isUnavailable && (
+                        <p className="text-red-500 mb-4">Status: Currently Unavailable</p>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <AvailabilityRow
-                            day="Monday"
-                            status={pro.availability.monday ? "Available" : "Not Available"}
-                          />
-                          <AvailabilityRow
-                            day="Tuesday"
-                            status={pro.availability.tuesday ? "Available" : "Not Available"}
-                          />
-                          <AvailabilityRow
-                            day="Wednesday"
-                            status={pro.availability.wednesday ? "Available" : "Not Available"}
-                          />
-                          <AvailabilityRow
-                            day="Thursday"
-                            status={pro.availability.thursday ? "Available" : "Not Available"}
-                          />
+                          <AvailabilityRow day="Monday" timeSlots={pro.availability.monday || []} />
+                          <AvailabilityRow day="Tuesday" timeSlots={pro.availability.tuesday || []} />
+                          <AvailabilityRow day="Wednesday" timeSlots={pro.availability.wednesday || []} />
+                          <AvailabilityRow day="Thursday" timeSlots={pro.availability.thursday || []} />
                         </div>
                         <div>
-                          <AvailabilityRow
-                            day="Friday"
-                            status={pro.availability.friday ? "Available" : "Not Available"}
-                          />
-                          <AvailabilityRow
-                            day="Saturday"
-                            status={pro.availability.saturday ? "Available" : "Not Available"}
-                          />
-                          <AvailabilityRow
-                            day="Sunday"
-                            status={pro.availability.sunday ? "Available" : "Not Available"}
-                          />
+                          <AvailabilityRow day="Friday" timeSlots={pro.availability.friday || []} />
+                          <AvailabilityRow day="Saturday" timeSlots={pro.availability.saturday || []} />
+                          <AvailabilityRow day="Sunday" timeSlots={pro.availability.sunday || []} />
                         </div>
                       </div>
-                      <h3 className="text-md font-medium text-gray-600 mt-6 mb-4">Working Hours</h3>
-                      <p className="text-gray-700">{pro.workingHours}</p>
                     </div>
                   )}
 

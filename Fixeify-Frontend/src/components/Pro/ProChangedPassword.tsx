@@ -22,6 +22,7 @@ const ProChangePassword = ({ onCancel }: ProChangePasswordProps) => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -37,25 +38,31 @@ const ProChangePassword = ({ onCancel }: ProChangePasswordProps) => {
     setFormData((prev) => ({ ...prev, [name]: value.trim() }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
     setServerError("");
+    setSuccessMessage("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
     setServerError("");
+    setSuccessMessage("");
     try {
       const validatedData = changePasswordSchema.parse(formData);
       setIsSubmitting(true);
-      await changeProPassword(user.id, {
+      const response = await changeProPassword(user.id, {
         currentPassword: validatedData.currentPassword,
         newPassword: validatedData.newPassword,
       });
+      setSuccessMessage(response.message);
       setFormData({
         currentPassword: "",
         newPassword: "",
         confirmNewPassword: "",
       });
-      onCancel();
+      setTimeout(() => {
+        setSuccessMessage("");
+        onCancel();
+      }, 2000);
     } catch (error) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
@@ -142,6 +149,9 @@ const ProChangePassword = ({ onCancel }: ProChangePasswordProps) => {
           </div>
           {errors.confirmNewPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmNewPassword}</p>}
         </div>
+        {successMessage && (
+          <p className="text-green-500 text-sm mt-4 text-center">{successMessage}</p>
+        )}
         {serverError && <p className="text-red-500 text-sm mt-4 text-center">{serverError}</p>}
         <div className="flex flex-col sm:flex-row gap-4 mt-8">
           <button
@@ -168,6 +178,7 @@ const ProChangePassword = ({ onCancel }: ProChangePasswordProps) => {
               });
               setErrors({});
               setServerError("");
+              setSuccessMessage("");
               onCancel();
             }}
             className="flex-1 bg-white border border-[#032B44] text-[#032B44] hover:bg-[#032B44] hover:text-white py-3 px-6 rounded-md transition-colors"

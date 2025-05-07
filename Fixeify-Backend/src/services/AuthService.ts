@@ -12,7 +12,7 @@ import { UserResponse } from "../dtos/response/userDtos";
 import { createClient } from "redis";
 import nodemailer from "nodemailer";
 import { UserRole } from "../enums/roleEnum";
-import { getOtpEmailTemplate } from "../utils/emailTemplates";
+import { getOtpEmailTemplate, getResetPasswordEmailTemplate } from "../utils/emailTemplates";
 import { IAuthService } from "./IAuthService";
 import { HttpError } from "../middleware/errorMiddleware";
 import logger from "../config/logger";
@@ -20,6 +20,7 @@ import { mapUserDtoToModel } from "../utils/mappers";
 import { MESSAGES } from "../constants/messages";
 import jwt from "jsonwebtoken";
 import { Request, Response } from "express";
+import crypto from "crypto";
 
 @injectable()
 export class AuthService implements IAuthService {
@@ -107,7 +108,6 @@ export class AuthService implements IAuthService {
   }> {
     let user: IUser | IAdmin | ApprovedProDocument | null = null;
 
-    // Query based on selected role
     if (role === UserRole.USER) {
       user = await this._userRepository.findUserByEmail(email);
     } else if (role === UserRole.PRO) {
@@ -117,7 +117,6 @@ export class AuthService implements IAuthService {
     }
 
     if (!user) {
-      // Check other roles for email and password match
       let otherUser: IUser | IAdmin | ApprovedProDocument | null = null;
       if (role !== UserRole.USER) {
         otherUser = await this._userRepository.findUserByEmail(email);
@@ -140,13 +139,11 @@ export class AuthService implements IAuthService {
       throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new HttpError(422, MESSAGES.INCORRECT_PASSWORD); 
+      throw new HttpError(422, MESSAGES.INCORRECT_PASSWORD);
     }
 
-    // Check if banned
     if ("isBanned" in user && user.isBanned) {
       throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
     }
@@ -304,5 +301,73 @@ export class AuthService implements IAuthService {
     if (!user) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
 
     return { isBanned: user.isBanned || false };
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    let user: IUser | ApprovedProDocument | null = await this._userRepository.findUserByEmail(email);
+    let role = UserRole.USER;
+    if (!user) {
+      user = await this._proRepository.findApprovedProByEmail(email);
+      role = UserRole.PRO;
+    }
+    if (!user) {
+      throw new HttpError(404, "Email not registered");
+    }
+
+    if ("isBanned" in user && user.isBanned) {
+      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetTokenKey = `reset:${user.id}`;
+    await this._redisClient.setEx(resetTokenKey, 3600, resetToken);
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&id=${user.id}`;
+
+    try {
+      await this._transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Reset Your Fixeify Password",
+        html: getResetPasswordEmailTemplate(resetUrl),
+      });
+    } catch (error) {
+      logger.error("Failed to send password reset email:", error);
+      await this._redisClient.del(resetTokenKey);
+      throw new HttpError(500, "Failed to send password reset email");
+    }
+  }
+
+  async resetPassword(userId: string, token: string, newPassword: string): Promise<void> {
+    const resetTokenKey = `reset:${userId}`;
+    const storedToken = await this._redisClient.get(resetTokenKey);
+    if (!storedToken || storedToken !== token) {
+      throw new HttpError(400, "Invalid or expired reset token");
+    }
+
+    let user: IUser | ApprovedProDocument | null = await this._userRepository.findUserById(userId);
+    let role: UserRole = UserRole.USER;
+
+    if (!user) {
+      user = await this._proRepository.findApprovedProById(userId);
+      role = UserRole.PRO;
+    }
+    if (!user) {
+      throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+    }
+
+    if ("isBanned" in user && user.isBanned) {
+      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    if (role === UserRole.USER) {
+      await this._userRepository.updateUser(userId, { password: hashedPassword } as Partial<IUser>);
+    } else if (role === UserRole.PRO) {
+      await this._proRepository.updateApprovedPro(userId, { password: hashedPassword } as Partial<ApprovedProDocument>);
+    }
+
+    await this._redisClient.del(resetTokenKey);
   }
 }

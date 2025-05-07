@@ -1,6 +1,5 @@
 import api from "./axios";
-// @ts-ignore
-import { User, UserRole } from "../store/authSlice"; 
+import { User } from "../store/authSlice";
 
 interface AuthResponse {
   accessToken: string;
@@ -33,5 +32,19 @@ export const registerUser = async (
   role: "user" | "admin"
 ): Promise<AuthResponse> => {
   const response = await api.post("/auth/register", { name, email, password, role });
+  return response.data;
+};
+
+export const forgotPassword = async (email: string): Promise<{ message: string }> => {
+  const response = await api.post("/auth/forgot-password", { email });
+  return response.data;
+};
+
+export const resetPassword = async (
+  userId: string,
+  token: string,
+  newPassword: string
+): Promise<{ message: string }> => {
+  const response = await api.post("/auth/reset-password", { userId, token, newPassword });
   return response.data;
 };

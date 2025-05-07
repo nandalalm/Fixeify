@@ -6,6 +6,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../../components/Admin/ConfirmationModal";
+import { UserDetailsModal } from "../../components/Admin/UserDetailsModal";
 
 export interface ILocation {
   address: string;
@@ -13,7 +14,7 @@ export interface ILocation {
   state: string;
   coordinates: {
     type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
+    coordinates: [number, number]; 
   };
 }
 
@@ -36,7 +37,9 @@ const UserManagement: FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const limit = 10;
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [userToView, setUserToView] = useState<User | null>(null);
+  const limit = 5;
 
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.auth.user);
@@ -67,6 +70,7 @@ const UserManagement: FC = () => {
         prevUsers.map((user) => (user.id === selectedUser.id ? { ...user, isBanned: updatedUser.isBanned } : user))
       );
       setIsModalOpen(false);
+      setIsDetailsModalOpen(false); 
     } catch (error) {
       console.error("Failed to toggle ban status:", error);
     } finally {
@@ -85,13 +89,22 @@ const UserManagement: FC = () => {
     setSelectedUser(null);
   };
 
+  const openDetailsModal = (user: User) => {
+    setUserToView(user);
+    setIsDetailsModalOpen(true);
+  };
+
+  const closeDetailsModal = () => {
+    setIsDetailsModalOpen(false);
+    setUserToView(null);
+  };
+
   if (!user || user.role !== "admin") return null;
 
   const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (user.address?.address || "").toLowerCase().includes(searchQuery.toLowerCase())
+      user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -141,7 +154,7 @@ const UserManagement: FC = () => {
               </div>
               <input
                 type="text"
-                placeholder="Search users by name, email, or address"
+                placeholder="Search users by name or email"
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-gray-100 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -158,8 +171,6 @@ const UserManagement: FC = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone No.</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -175,10 +186,6 @@ const UserManagement: FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.phoneNo || "N/A"}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {user.address ? `${user.address.address}, ${user.address.city}, ${user.address.state}` : "N/A"}
-                        </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
@@ -190,10 +197,10 @@ const UserManagement: FC = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
-                            onClick={() => openModal(user)}
+                            onClick={() => openDetailsModal(user)}
                             className="bg-blue-900 text-white px-4 py-1 rounded-md text-sm hover:bg-blue-800 transition-colors"
                           >
-                            {user.isBanned ? "Unban" : "Ban"}
+                            View
                           </button>
                         </td>
                       </tr>
@@ -226,6 +233,14 @@ const UserManagement: FC = () => {
           </div>
         </main>
       </div>
+
+      {/* User Details Modal */}
+      <UserDetailsModal
+        isOpen={isDetailsModalOpen}
+        onClose={closeDetailsModal}
+        user={userToView}
+        onToggleBan={openModal}
+      />
 
       {/* Confirmation Modal */}
       <ConfirmationModal

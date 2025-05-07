@@ -6,8 +6,45 @@ export interface ILocation {
   state: string;
   coordinates: {
     type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
+    coordinates: [number, number];
   };
+}
+
+export interface ICategory {
+  id: string;
+  name: string;
+  image: string;
+}
+
+interface TimeSlot {
+  startTime: string;
+  endTime: string;
+}
+
+export interface PendingProResponse {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  category: ICategory;
+  customService?: string;
+  location: ILocation;
+  profilePhoto: string;
+  idProof: string[];
+  accountHolderName: string;
+  accountNumber: string;
+  bankName: string;
+  availability: {
+    monday?: TimeSlot[];
+    tuesday?: TimeSlot[];
+    wednesday?: TimeSlot[];
+    thursday?: TimeSlot[];
+    friday?: TimeSlot[];
+    saturday?: TimeSlot[];
+    sunday?: TimeSlot[];
+  };
+  createdAt?: Date;
 }
 
 export class ProResponse {
@@ -17,9 +54,8 @@ export class ProResponse {
   public lastName: string;
   public email: string;
   public phoneNumber: string;
-  public serviceType: string;
+  public category: ICategory;
   public customService: string | null;
-  public skills: string[];
   public location: ILocation;
   public profilePhoto: string;
   public idProof: string[];
@@ -27,18 +63,18 @@ export class ProResponse {
   public accountNumber: string;
   public bankName: string;
   public availability: {
-    monday: boolean;
-    tuesday: boolean;
-    wednesday: boolean;
-    thursday: boolean;
-    friday: boolean;
-    saturday: boolean;
-    sunday: boolean;
+    monday?: TimeSlot[];
+    tuesday?: TimeSlot[];
+    wednesday?: TimeSlot[];
+    thursday?: TimeSlot[];
+    friday?: TimeSlot[];
+    saturday?: TimeSlot[];
+    sunday?: TimeSlot[];
   };
-  public workingHours: string;
   public isBanned: boolean;
   public about: string | null;
   public isBooked: boolean;
+  public isUnavailable: boolean;
 
   constructor({
     _id,
@@ -47,9 +83,8 @@ export class ProResponse {
     lastName,
     email,
     phoneNumber,
-    serviceType,
+    category,
     customService = null,
-    skills,
     location,
     profilePhoto,
     idProof,
@@ -57,10 +92,10 @@ export class ProResponse {
     accountNumber,
     bankName,
     availability,
-    workingHours,
     isBanned,
     about = null,
     isBooked,
+    isUnavailable = false,
   }: {
     _id: string;
     firstName: string;
@@ -68,9 +103,8 @@ export class ProResponse {
     lastName: string;
     email: string;
     phoneNumber: string;
-    serviceType: string;
+    category: ICategory;
     customService?: string | null;
-    skills: string[];
     location: ILocation;
     profilePhoto: string;
     idProof: string[];
@@ -78,18 +112,18 @@ export class ProResponse {
     accountNumber: string;
     bankName: string;
     availability: {
-      monday: boolean;
-      tuesday: boolean;
-      wednesday: boolean;
-      thursday: boolean;
-      friday: boolean;
-      saturday: boolean;
-      sunday: boolean;
+      monday?: TimeSlot[];
+      tuesday?: TimeSlot[];
+      wednesday?: TimeSlot[];
+      thursday?: TimeSlot[];
+      friday?: TimeSlot[];
+      saturday?: TimeSlot[];
+      sunday?: TimeSlot[];
     };
-    workingHours: string;
     isBanned: boolean;
     about?: string | null;
     isBooked: boolean;
+    isUnavailable: boolean;
   }) {
     this._id = _id;
     this.firstName = firstName;
@@ -97,9 +131,8 @@ export class ProResponse {
     this.lastName = lastName;
     this.email = email;
     this.phoneNumber = phoneNumber;
-    this.serviceType = serviceType;
+    this.category = category;
     this.customService = customService;
-    this.skills = skills;
     this.location = location;
     this.profilePhoto = profilePhoto;
     this.idProof = idProof;
@@ -107,10 +140,10 @@ export class ProResponse {
     this.accountNumber = accountNumber;
     this.bankName = bankName;
     this.availability = availability;
-    this.workingHours = workingHours;
     this.isBanned = isBanned;
     this.about = about;
     this.isBooked = isBooked;
+    this.isUnavailable = isUnavailable;
   }
 }
 
@@ -124,6 +157,7 @@ export class ProProfileResponse {
   public profilePhoto: string;
   public about: string | null;
   public isBanned: boolean;
+  public isUnavailable: boolean;
 
   constructor({
     _id,
@@ -135,6 +169,7 @@ export class ProProfileResponse {
     profilePhoto,
     about = null,
     isBanned,
+    isUnavailable = false,
   }: {
     _id: string;
     firstName: string;
@@ -145,6 +180,7 @@ export class ProProfileResponse {
     profilePhoto: string;
     about?: string | null;
     isBanned: boolean;
+    isUnavailable: boolean;
   }) {
     this._id = _id;
     this.firstName = firstName;
@@ -155,5 +191,6 @@ export class ProProfileResponse {
     this.profilePhoto = profilePhoto;
     this.about = about;
     this.isBanned = isBanned;
+    this.isUnavailable = isUnavailable;
   }
 }

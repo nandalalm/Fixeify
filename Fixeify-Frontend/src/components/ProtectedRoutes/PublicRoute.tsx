@@ -12,11 +12,10 @@ const PublicRoute = () => {
   }
 
   if (isAuthenticated) {
-    // Redirect based on role
     if (user?.role === "admin") {
       return <Navigate to="/admin-dashboard" replace />;
     }
-    return <Navigate to="/home" replace />; // Default to home for users or pros
+    return <Navigate to="/home" replace />; 
   }
 
   return <Outlet />;

@@ -10,23 +10,27 @@ import DatabaseConnector from "./config/databaseConnector";
 import createAuthRoutes from "./routes/authRoutes";
 import createAdminRoutes from "./routes/adminRoutes";
 import createProRoutes from "./routes/proRoute";
-import createUserRoutes from "./routes/userRoutes"; // Add this import
+import createUserRoutes from "./routes/userRoutes";
 import { Container } from "inversify";
 import { TYPES } from "./types";
 import { AuthController } from "./controllers/authController";
 import { AdminController } from "./controllers/adminController";
 import { ProController } from "./controllers/proController";
-import { UserController } from "./controllers/userController"; // Add this import
+import { UserController } from "./controllers/userController";
 import { AuthService } from "./services/AuthService";
 import { AdminService } from "./services/AdminService";
 import { ProService } from "./services/ProService";
-import { UserService } from "./services/UserService"; // Add this import
+import { UserService } from "./services/UserService";
 import { IUserRepository } from "./repositories/IUserRepository";
 import { IAdminRepository } from "./repositories/IAdminRepository";
 import { IProRepository } from "./repositories/IProRepository";
+import { ICategoryRepository } from "./repositories/ICategoryRepository";
+import { IBookingRepository } from "./repositories/IBookingRepository";
 import { MongoUserRepository } from "./repositories/mongoUserRepository";
 import { MongoAdminRepository } from "./repositories/mongoAdminRepository";
 import { MongoProRepository } from "./repositories/mongoProRepository";
+import { MongoCategoryRepository } from "./repositories/mongoCategoryRepository";
+import { MongoBookingRepository } from "./repositories/mongoBookingRepository";
 import { errorMiddleware } from "./middleware/errorMiddleware";
 
 dotenv.config();
@@ -41,14 +45,16 @@ container.bind<DatabaseConnector>(TYPES.DatabaseConnector).to(DatabaseConnector)
 container.bind<IUserRepository>(TYPES.IUserRepository).to(MongoUserRepository).inSingletonScope();
 container.bind<IAdminRepository>(TYPES.IAdminRepository).to(MongoAdminRepository).inSingletonScope();
 container.bind<IProRepository>(TYPES.IProRepository).to(MongoProRepository).inSingletonScope();
+container.bind<ICategoryRepository>(TYPES.ICategoryRepository).to(MongoCategoryRepository).inSingletonScope();
+container.bind<IBookingRepository>(TYPES.IBookingRepository).to(MongoBookingRepository).inSingletonScope();
 container.bind<AuthService>(TYPES.AuthService).to(AuthService).inSingletonScope();
 container.bind<AdminService>(TYPES.IAdminService).to(AdminService).inSingletonScope();
 container.bind<ProService>(TYPES.IProService).to(ProService).inSingletonScope();
-container.bind<UserService>(TYPES.IUserService).to(UserService).inSingletonScope(); // Add this binding
+container.bind<UserService>(TYPES.IUserService).to(UserService).inSingletonScope();
 container.bind<AuthController>(TYPES.AuthController).to(AuthController).inSingletonScope();
 container.bind<AdminController>(TYPES.AdminController).to(AdminController).inSingletonScope();
 container.bind<ProController>(TYPES.ProController).to(ProController).inSingletonScope();
-container.bind<UserController>(TYPES.UserController).to(UserController).inSingletonScope(); // Add this binding
+container.bind<UserController>(TYPES.UserController).to(UserController).inSingletonScope();
 
 const app = express();
 
@@ -68,7 +74,7 @@ app.use(express.static("public"));
 app.use("/api/auth", createAuthRoutes(container));
 app.use("/api/admin", createAdminRoutes(container));
 app.use("/api/pro", createProRoutes(container));
-app.use("/api/user", createUserRoutes(container)); // Add this route
+app.use("/api/user", createUserRoutes(container));
 
 app.use(errorMiddleware);
 

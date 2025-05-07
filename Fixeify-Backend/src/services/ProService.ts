@@ -1,10 +1,14 @@
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
 import { IProRepository } from "../repositories/IProRepository";
+import { ICategoryRepository } from "../repositories/ICategoryRepository";
+import { IBookingRepository } from "../repositories/IBookingRepository";
 import { IPendingPro } from "../models/pendingProModel";
-import { IProService } from "./IProService";
+import { IProService, IAvailability } from "./IProService";
 import { ProProfileResponse } from "../dtos/response/proDtos";
 import { UserResponse } from "../dtos/response/userDtos";
+import { CategoryResponse } from "../dtos/response/categoryDtos";
+import { BookingResponse } from "../dtos/response/bookingDtos";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
 import { ApprovedProDocument } from "../models/approvedProModel";
@@ -13,7 +17,11 @@ import bcrypt from "bcryptjs";
 
 @injectable()
 export class ProService implements IProService {
-  constructor(@inject(TYPES.IProRepository) private _proRepository: IProRepository) {}
+  constructor(
+    @inject(TYPES.IProRepository) private _proRepository: IProRepository,
+    @inject(TYPES.ICategoryRepository) private _categoryRepository: ICategoryRepository,
+    @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository
+  ) {}
 
   async applyPro(proData: Partial<IPendingPro>): Promise<{ message: string; pendingPro: IPendingPro }> {
     const existingPending = await this._proRepository.findPendingProByEmail(proData.email!);
@@ -70,6 +78,32 @@ export class ProService implements IProService {
     if (!updatedPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
 
     return this.mapToUserResponse(updatedPro);
+  }
+
+  async getAvailability(proId: string): Promise<{ availability: IAvailability; isUnavailable: boolean }> {
+    const pro = await this._proRepository.findApprovedProById(proId);
+    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    return { availability: pro.availability || {}, isUnavailable: pro.isUnavailable };
+  }
+
+  async updateAvailability(proId: string, data: { availability: IAvailability; isUnavailable: boolean }): Promise<{ availability: IAvailability; isUnavailable: boolean }> {
+    const existingPro = await this._proRepository.findApprovedProById(proId);
+    if (!existingPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+
+    const updatedPro = await this._proRepository.updateApprovedPro(proId, { availability: data.availability, isUnavailable: data.isUnavailable });
+    if (!updatedPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+
+    return { availability: updatedPro.availability || {}, isUnavailable: updatedPro.isUnavailable };
+  }
+
+  async getAllCategories(): Promise<CategoryResponse[]> {
+    return this._categoryRepository.getCategoriesWithPagination(0, 100);
+  }
+
+  async fetchProBookings(proId: string): Promise<BookingResponse[]> {
+    const pro = await this._proRepository.findApprovedProById(proId);
+    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    return this._bookingRepository.fetchProBookings(proId);
   }
 
   private mapToApprovedProDocument(data: Partial<ProProfileResponse>, existingPro: ApprovedProDocument): Partial<ApprovedProDocument> {

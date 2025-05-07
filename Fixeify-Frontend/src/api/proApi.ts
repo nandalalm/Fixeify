@@ -1,29 +1,9 @@
 import api from "./axios";
-
-export interface ILocation {
-  address: string;
-  city: string;
-  state: string;
-  coordinates: {
-    type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
-  };
-}
-
-export interface ProProfile {
-  id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phoneNumber: string;
-  location: ILocation;
-  profilePhoto: string;
-  about: string | null;
-  isBanned: boolean;
-}
+import { ProProfile, Availability } from "../interfaces/proInterface";
+import { BookingResponse } from "../interfaces/bookingInterface";
 
 export const getProProfile = async (userId: string): Promise<ProProfile> => {
-  const response = await api.get(`/pro/getProfile/${userId}`, { withCredentials: true });
+  const response = await api.get(`/pro/fetchProfile/${userId}`, { withCredentials: true });
   const proData = response.data;
   return {
     id: proData._id,
@@ -57,6 +37,22 @@ export const updateProProfile = async (userId: string, data: Partial<ProProfile>
 export const changeProPassword = async (
   userId: string,
   data: { currentPassword: string; newPassword: string }
-): Promise<void> => {
-  await api.put(`/pro/change-password/${userId}`, data, { withCredentials: true });
+): Promise<{ message: string }> => {
+  const response = await api.put(`/pro/changePassword/${userId}`, data, { withCredentials: true });
+  return response.data;
+};
+
+export const getProAvailability = async (userId: string): Promise<{ availability: Availability; isUnavailable: boolean }> => {
+  const response = await api.get(`/pro/fetchAvailability/${userId}`, { withCredentials: true });
+  return response.data;
+};
+
+export const updateProAvailability = async (userId: string, data: { availability: Availability; isUnavailable: boolean }): Promise<{ availability: Availability; isUnavailable: boolean }> => {
+  const response = await api.put(`/pro/updateAvailability/${userId}`, data, { withCredentials: true });
+  return response.data;
+};
+
+export const fetchProBookings = async (proId: string): Promise<BookingResponse[]> => {
+  const response = await api.get(`/pro/bookings/${proId}`, { withCredentials: true });
+  return response.data;
 };

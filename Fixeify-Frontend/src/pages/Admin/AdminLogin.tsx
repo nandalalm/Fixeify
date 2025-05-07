@@ -25,7 +25,6 @@ const AdminLogin = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Log route changes and clear auth state on mount
   useEffect(() => {
     console.log("Current location:", location.pathname);
     dispatch({ type: "auth/clearError" });

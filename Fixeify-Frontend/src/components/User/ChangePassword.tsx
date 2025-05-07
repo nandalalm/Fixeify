@@ -24,6 +24,7 @@ const ChangePassword = ({ onCancel }: ChangePasswordProps) => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -39,20 +40,26 @@ const ChangePassword = ({ onCancel }: ChangePasswordProps) => {
     setFormData((prev) => ({ ...prev, [name]: value.trim() }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
     setServerError("");
+    setSuccessMessage("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
     setServerError("");
+    setSuccessMessage("");
     try {
       const validatedData = changePasswordSchema.parse(formData);
       setIsSubmitting(true);
-      await changeUserPassword(user.id, {
+      const response = await changeUserPassword(user.id, {
         currentPassword: validatedData.currentPassword,
         newPassword: validatedData.newPassword,
       });
-      onCancel();
+      setSuccessMessage(response.message);
+      setTimeout(() => {
+        setSuccessMessage("");
+        onCancel();
+      }, 2000);
     } catch (error) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
@@ -61,7 +68,11 @@ const ChangePassword = ({ onCancel }: ChangePasswordProps) => {
         });
         setErrors(fieldErrors);
       } else {
-        setServerError(error === "Incorrect current password. Please try again" ? "An error occurred. Please try again." : "Incorrect current password. Please try again");
+        setServerError(
+          error === "Incorrect current password. Please try again"
+            ? "An error occurred. Please try again."
+            : "Incorrect current password. Please try again"
+        );
       }
     } finally {
       setIsSubmitting(false);
@@ -142,6 +153,11 @@ const ChangePassword = ({ onCancel }: ChangePasswordProps) => {
               </div>
               {errors.confirmNewPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmNewPassword}</p>}
             </div>
+
+            {/* Success Message */}
+            {successMessage && (
+              <p className="text-green-500 text-sm mt-4 text-center">{successMessage}</p>
+            )}
 
             {/* Server Error */}
             {serverError && <p className="text-red-500 text-sm mt-4">{serverError}</p>}

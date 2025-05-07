@@ -32,8 +32,11 @@ export const changePasswordSchema = z.object({
   newPassword: signupPasswordSchema,
   confirmNewPassword: signupPasswordSchema,
 }).refine((data) => data.newPassword === data.confirmNewPassword, {
-  message: "New passwords do not match",
+  message: "New password and confirm password do not match",
   path: ["confirmNewPassword"],
+}).refine((data) => data.newPassword !== data.currentPassword, {
+  message: "New password cannot be the same as the current password",
+  path: ["newPassword"],
 });
 
 export const verifyCurrentPasswordSchema = z.object({
@@ -62,4 +65,56 @@ export const loginSchema = z.object({
   email: emailSchema,
   password: loginPasswordSchema,
   role: z.enum(["user", "pro"], { message: "Role must be 'user' or 'pro'" }),
+});
+
+export const resetPasswordSchema = z.object({
+  newPassword: signupPasswordSchema,
+  confirmNewPassword: signupPasswordSchema,
+}).refine((data) => data.newPassword === data.confirmNewPassword, {
+  message: "New password and confirm password do not match",
+  path: ["confirmNewPassword"],
+});
+
+export const bookingSchema = z.object({
+  issueDescription: z
+    .string()
+    .min(10, "Issue description must be at least 10 characters long")
+    .max(500, "Issue description cannot exceed 500 characters")
+    .nonempty("Issue description is required")
+    .trim(), // Trims leading/trailing spaces; allows internal spaces, letters, numbers, and special characters
+  location: z
+    .object({
+      address: z.string().nonempty("Address is required"),
+      city: z.string().nonempty("City is required"),
+      state: z.string().nonempty("State is required"),
+      coordinates: z.object({
+        type: z.literal("Point"),
+        coordinates: z.tuple([z.number(), z.number()], {
+          errorMap: () => ({ message: "Valid coordinates are required" }),
+        }),
+      }),
+    })
+    .nullable()
+    .refine((val) => val !== null, { message: "Location is required" }),
+  phoneNumber: z
+    .string()
+    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits")
+    .nonempty("Phone number is required")
+    .trim(),
+  preferredDate: z
+    .string()
+    .nonempty("Preferred date is required")
+    .refine(
+      (date) => {
+        const selectedDate = new Date(date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return selectedDate >= today;
+      },
+      { message: "Preferred date cannot be in the past" }
+    ),
+  preferredTime: z
+    .string()
+    .nonempty("Preferred time is required")
+    .regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
 });

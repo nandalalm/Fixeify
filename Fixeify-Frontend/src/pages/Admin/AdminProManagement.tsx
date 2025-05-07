@@ -4,7 +4,8 @@ import { Menu, Search, ChevronLeft, ChevronRight, Bell } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchPendingPros, PendingPro, fetchApprovedPros, IApprovedPro } from "../../api/adminApi";
+import { fetchPendingPros, fetchApprovedPros } from "../../api/adminApi";
+import { IApprovedPro, PendingPro } from "../../interfaces/adminInterface";
 
 const AdminProManagement: FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -13,7 +14,7 @@ const AdminProManagement: FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [activeTab, setActiveTab] = useState<"approved" | "pending">("approved");
-  const limit = 10;
+  const limit = 5;
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -66,19 +67,11 @@ const AdminProManagement: FC = () => {
   if (!user || user.role !== "admin") return null;
 
   const filteredPros = pros.filter((pro) => {
-    if ("createdAt" in pro) {
-      return (
-        pro.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pro.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pro.email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    } else {
-      return (
-        pro.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pro.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        pro.email.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    }
+    return (
+      pro.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pro.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      pro.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
   });
 
   const handleViewProfile = (proId: string) => {
@@ -174,19 +167,24 @@ const AdminProManagement: FC = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-[10%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Serial No.
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="w-[15%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Image
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className={`${activeTab === "approved" ? "w-[25%]" : "w-[30%]"} px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}>
                         Full Name
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className={`${activeTab === "approved" ? "w-[25%]" : "w-[30%]"} px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider`}>
                         Email
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      {activeTab === "approved" && (
+                        <th className="w-[15%] px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                      )}
+                      <th className="w-[15%] px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -194,31 +192,48 @@ const AdminProManagement: FC = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredPros.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
+                        <td colSpan={activeTab === "approved" ? 6 : 5} className="px-6 py-4 text-center text-sm text-gray-500">
                           No {activeTab === "pending" ? "pending" : "approved"} pros found.
                         </td>
                       </tr>
                     ) : (
                       filteredPros.map((pro, index) => (
                         <tr key={pro._id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <td className="w-[10%] px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {(currentPage - 1) * limit + index + 1}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="w-[15%] px-6 py-4 whitespace-nowrap">
                             <img
                               src={pro.profilePhoto || "/placeholder.svg"}
                               alt={`${pro.firstName} ${pro.lastName}`}
                               className="h-10 w-10 rounded-full"
                             />
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <td className={`${activeTab === "approved" ? "w-[25%]" : "w-[30%]"} px-6 py-4 whitespace-nowrap text-sm text-gray-500`}>
                             {`${pro.firstName} ${pro.lastName}`}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pro.email}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <td className={`${activeTab === "approved" ? "w-[25%]" : "w-[30%]"} px-6 py-4 whitespace-nowrap text-sm text-gray-500`}>
+                            {pro.email}
+                          </td>
+                          {activeTab === "approved" && (
+                            <td className="w-[15%] px-6 py-4 whitespace-nowrap text-sm">
+                              {"isBanned" in pro && (
+                                <span
+                                  className={`px-2 py-1 rounded ${
+                                    pro.isBanned
+                                      ? "bg-red-100 text-red-600"
+                                      : "bg-green-100 text-green-600"
+                                  }`}
+                                >
+                                  {pro.isBanned ? "Banned" : "Active"}
+                                </span>
+                              )}
+                            </td>
+                          )}
+                          <td className="w-[15%] px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
                             <button
                               onClick={() => handleViewProfile(pro._id)}
-                              className="bg-blue-100 text-blue-800 px-4 py-1 rounded-md text-sm hover:bg-blue-200 transition-colors"
+                              className="bg-blue-900 text-white px-4 py-1 rounded-md text-sm hover:bg-blue-800 transition-colors"
                             >
                               View
                             </button>

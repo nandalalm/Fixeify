@@ -191,7 +191,7 @@ const Register = () => {
                 <button
                   type="button"
                   onClick={handleSendOtp}
-                  className="mt-4 bg-[#00205B] text-white py-1 px-3 rounded-md hover:bg-[#003087] flex items-center justify-center dark:bg-gray-700 dark:!text-white dark:hover:bg-gray-600 transition duration-300"
+                  className="mt-4 bg-[#032B44] text-white py-1 px-3 rounded-md hover:bg-[#054869] flex items-center justify-center dark:bg-gray-700 dark:!text-white dark:hover:bg-gray-600 transition duration-300"
                   disabled={isSendingOtp || !formData.email}
                 >
                   {isSendingOtp ? (
@@ -354,7 +354,7 @@ const Register = () => {
 
                 <button
                   type="submit"
-                  className="w-full bg-[#00205B] text-white py-2 px-4 rounded-md hover:bg-blue-800 transition duration-300 dark:bg-gray-700 dark:!text-white dark:hover:bg-gray-600"
+                  className="w-full bg-[#032B44] text-white py-2 px-4 rounded-md hover:bg-[#054869] transition duration-300 dark:bg-gray-700 dark:!text-white dark:hover:bg-gray-600"
                   disabled={!formData.firstName || !formData.email || !formData.password || !formData.confirmPassword}
                 >
                   Sign Up
