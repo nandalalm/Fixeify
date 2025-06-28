@@ -99,14 +99,14 @@ npm install
 ### 3. Create a .env file in Fixeify-Backend directory and add the following environment variables
 ```
 PORT=5000
-MONGO_URI=mongodb://localhost:27017/Fixeify
-ACCESS_TOKEN_SECRET=yourAccessTokenSecretKey
-REFRESH_TOKEN_SECRET=yourRefreshTokenSecretKey
+MONGO_URI=your_mongodb_connection_string
+ACCESS_TOKEN_SECRET=your_access_token_secret
+REFRESH_TOKEN_SECRET=your_refresh_token_secret
 ACCESS_TOKEN_EXPIRY=15m
 REFRESH_TOKEN_EXPIRY=7d
 NODE_ENV=development
-EMAIL_USER=nandalal673029@gmail.com
-EMAIL_PASS=jpziyyjtknpjysuu
+EMAIL_USER=your_email_address
+EMAIL_PASS=your_email_app_password
 REDIS_URL=redis://localhost:6379
 FRONTEND_URL=http://localhost:5173
 ```
