@@ -45,39 +45,38 @@ Fixeify is a scalable full-stack **handyman booking web application** built with
 
 ### 🔧 Backend (`Fixeify-Backend`)
 src/
-├── config/ # Environment/config settings
-├── constants/ # Application constants
-├── controllers/ # Route handlers
-├── dtos/ # Data Transfer Objects
-├── enums/ # App enums
-├── logs/ # Request & error logging
-├── middleware/ # Auth, error, request logging
-├── models/ # Mongoose schemas
-├── repositories/ # DB access logic
-├── routes/ # Route definitions
-├── services/ # Business logic
-├── utils/ # Helpers & utilities
-├── server.ts # Entry point
-└── types.ts # Custom TypeScript types
+├── config/          # Environment/config settings
+├── constants/       # Application constants
+├── controllers/     # Route handlers
+├── dtos/            # Data Transfer Objects
+├── enums/           # App enums
+├── logs/            # Request & error logging
+├── middleware/      # Auth, error, request logging
+├── models/          # Mongoose schemas
+├── repositories/    # DB access logic
+├── routes/          # Route definitions
+├── services/        # Business logic
+├── utils/           # Helpers & utilities
+├── server.ts        # Entry point
+└── types.ts         # Custom TypeScript types
 
 ---
 
-
 ### 🎨 Frontend (`Fixeify-Frontend`)
 src/
-├── api/ # Axios configurations & API calls
-├── assets/ # Static files/images
-├── components/ # Reusable UI components
-├── context/ # Context Providers
-├── interfaces/ # TS interfaces & types
-├── lib/ # Custom hooks or helpers
-├── pages/ # Route pages (Home, Profile, etc.)
-├── routes/ # Route configurations
-├── store/ # Redux Toolkit slices
-├── Validation/ # Yup/Zod validation schemas
-├── App.tsx # Root component
-├── main.tsx # App entry point
-└── vite-env.d.ts # Vite env type definitions
+├── api/             # Axios configurations & API calls
+├── assets/          # Static files/images
+├── components/      # Reusable UI components
+├── context/         # Context Providers
+├── interfaces/      # TypeScript interfaces & types
+├── lib/             # Custom hooks or helpers
+├── pages/           # Route pages (Home, Profile, etc.)
+├── routes/          # Route configurations
+├── store/           # Redux Toolkit slices
+├── Validation/      # Yup/Zod validation schemas
+├── App.tsx          # Root component
+├── main.tsx         # App entry point
+└── vite-env.d.ts    # Vite env type definitions
 
 ---
 
