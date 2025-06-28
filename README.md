@@ -44,6 +44,7 @@ Fixeify is a scalable full-stack **handyman booking web application** built with
 ## 📂 Project Structure
 
 ### 🔧 Backend (`Fixeify-Backend`)
+```
 src/
 ├── config/          # Environment/config settings
 ├── constants/       # Application constants
@@ -59,10 +60,11 @@ src/
 ├── utils/           # Helpers & utilities
 ├── server.ts        # Entry point
 └── types.ts         # Custom TypeScript types
-
+```
 ---
 
 ### 🎨 Frontend (`Fixeify-Frontend`)
+```
 src/
 ├── api/             # Axios configurations & API calls
 ├── assets/          # Static files/images
@@ -77,20 +79,25 @@ src/
 ├── App.tsx          # Root component
 ├── main.tsx         # App entry point
 └── vite-env.d.ts    # Vite env type definitions
-
+```
 ---
 
 ## ⚙️ Getting Started
 
 ### 1. Clone the Repository
+```
 git clone https://github.com/your-username/fixeify.git
 cd fixeify
+```
 
 ### 2. Navigate to the backend folder and install dependencies
+```
 cd Fixeify-Backend
 npm install
+```
 
 ### 3. Create a .env file in Fixeify-Backend directory and add the following environment variables
+```
 PORT=5000
 MONGO_URI=mongodb://localhost:27017/Fixeify
 ACCESS_TOKEN_SECRET=yourAccessTokenSecretKey
@@ -102,14 +109,21 @@ EMAIL_USER=nandalal673029@gmail.com
 EMAIL_PASS=jpziyyjtknpjysuu
 REDIS_URL=redis://localhost:6379
 FRONTEND_URL=http://localhost:5173
+```
 
 ### 4. Start the backend server
+```
 npm run dev
+```
 
 ### 5. Navigate to the frontend folder and install dependencies
+```
 cd ../Fixeify-Frontend
 npm install
+```
 
 ### 6. Start the frontend development server
+```
 npm run dev
+```
 
