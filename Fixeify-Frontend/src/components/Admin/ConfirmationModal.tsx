@@ -1,11 +1,11 @@
-import { type FC } from "react";
+import { type FC, useState } from "react";
 
 interface ConfirmationModalProps {
   isOpen: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  action: "approve" | "reject" | "ban" | "unban" | "logout" | "saveSlot" | "dontSaveSlot" | "addCategory" | "dontAddCategory" | "updateCategory" | "dontUpdateCategory" | null;
-  entityType?: "pro" | "user";
+  action: "approve" | "reject" | "ban" | "unban" | "logout" | "saveSlot" | "addCategory" | "updateCategory" | "acceptBooking" | "rejectBooking" | null;
+  entityType?: "pro" | "user" | "booking";
   reason?: string;
   setReason?: (reason: string) => void;
   customReason?: string;
@@ -32,10 +32,26 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
   if (!isOpen) return null;
 
   const reasons = ["Incomplete documentation", "Insufficient skills", "Background check failed", "Other"];
+  const bookingRejectionReasons = [
+    "Schedule Conflict",
+    "Not Enough Expertise",
+    "Location Too Far",
+    "Personal Reasons",
+    "Other"
+  ];
+
+  // Track dropdown selection separately
+  const [selectValue, setSelectValue] = useState("");
 
   return (
-    <div className="fixed inset-0 p-5 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 supports-[backdrop-filter]:bg-transparent supports-[backdrop-filter]:bg-opacity-0">
-      <div className={`p-6 rounded-lg shadow-lg w-96 relative ${action === "logout" ? "bg-white dark:bg-[#1E2939]" : "bg-white"}`}>
+    <div
+      className="fixed inset-0 p-5 flex items-center justify-center z-50 bg-gray-800/30 backdrop-blur-sm"
+      onClick={onCancel}
+    >
+      <div
+        className={`p-6 rounded-lg shadow-lg w-96 relative ${action === "logout" ? "bg-white dark:bg-[#1E2939]" : "bg-white"}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         {isProcessing && (
           <div className="absolute inset-0 bg-white bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-10">
             <div className="spinner"></div>
@@ -48,11 +64,10 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           {action === "unban" && `Unban ${entityType === "pro" ? "Pro" : "User"}`}
           {action === "logout" && "Confirm Logout"}
           {action === "saveSlot" && "Confirm Slot Changes"}
-          {action === "dontSaveSlot" && "Discard Slot Changes"}
           {action === "addCategory" && "Confirm Add Category"}
-          {action === "dontAddCategory" && "Discard Add Category"}
           {action === "updateCategory" && "Confirm Update Category"}
-          {action === "dontUpdateCategory" && "Discard Update Category"}
+          {action === "acceptBooking" && "Confirm Accept Booking"}
+          {action === "rejectBooking" && "Reject Booking"}
           {action === null && (customTitle || "Confirm Action")}
         </h3>
         <p className={`mb-4 ${action === "logout" ? "dark:text-white" : ""}`}>
@@ -62,21 +77,23 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           {action === "unban" && `Are you sure you want to unban this ${entityType === "pro" ? "pro" : "user"}?`}
           {action === "logout" && "Are you sure you want to log out?"}
           {action === "saveSlot" && "Are you sure you want to save your slot changes?"}
-          {action === "dontSaveSlot" && "Are you sure you want to discard your slot changes?"}
           {action === "addCategory" && "Are you sure you want to add this category?"}
-          {action === "dontAddCategory" && "Are you sure you want to discard adding this category?"}
           {action === "updateCategory" && "Are you sure you want to update this category?"}
-          {action === "dontUpdateCategory" && "Are you sure you want to discard updating this category?"}
+          {action === "acceptBooking" && "Are you sure you want to accept this booking?"}
+          {action === "rejectBooking" && "Please select a reason for rejecting this booking:"}
         </p>
-        {action === "reject" && setReason && setCustomReason && (
+        {(action === "reject" || action === "rejectBooking") && setReason && setCustomReason && (
           <div className="mb-4">
             <select
-              value={reason === customReason && customReason ? "Other" : reason}
+              value={selectValue}
               onChange={(e) => {
-                if (e.target.value === "Other") {
+                const value = e.target.value;
+                setSelectValue(value);
+                if (value === "Other") {
                   setReason("");
+                  setCustomReason("");
                 } else {
-                  setReason(e.target.value);
+                  setReason(value);
                   setCustomReason("");
                 }
               }}
@@ -84,19 +101,21 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
               disabled={isProcessing}
             >
               <option value="">Select a reason</option>
-              {reasons.map((r, index) => (
+              {(action === "rejectBooking" ? bookingRejectionReasons : reasons).map((r, index) => (
                 <option key={index} value={r}>{r}</option>
               ))}
             </select>
-            {reason === "" && (
+            {selectValue === "Other" && (
               <textarea
                 value={customReason}
                 onChange={(e) => {
+                  e.stopPropagation();
                   setCustomReason(e.target.value);
                   setReason(e.target.value);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md mt-2"
                 placeholder="Enter custom reason"
+                autoFocus
                 disabled={isProcessing}
               />
             )}
@@ -122,7 +141,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
                 ? "bg-green-600 text-white hover:bg-green-700 dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
                 : "bg-green-600 text-white hover:bg-green-700"
             } disabled:opacity-50`}
-            disabled={isProcessing}
+            disabled={isProcessing || (action === "reject" && !reason)}
           >
             {isProcessing ? "Processing..." : "Confirm"}
           </button>

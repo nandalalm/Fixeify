@@ -22,17 +22,14 @@ export const phoneNumberSchema = z
 export const locationSchema = z.object({
   address: z
     .string()
-    .regex(/^[\w\s.,-]+$/, "Address can only contain letters, numbers, spaces, commas, periods, and hyphens")
     .trim()
     .min(1, "Please provide a valid address"),
   city: z
     .string()
-    .regex(/^[\w\s.,-]+$/, "City can only contain letters, numbers, spaces, commas, periods, and hyphens")
     .trim()
     .min(1, "Please provide the city"),
   state: z
     .string()
-    .regex(/^[\w\s.,-]+$/, "State can only contain letters, numbers, spaces, commas, periods, and hyphens")
     .trim()
     .min(1, "Please provide the state"),
   coordinates: z.object({

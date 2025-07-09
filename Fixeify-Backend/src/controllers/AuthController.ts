@@ -72,6 +72,22 @@ export class AuthController {
     }
   }
 
+   async googleLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { credential, role } = req.body;
+      if (!credential || !role) {
+        throw new HttpError(400, "Credential and role are required");
+      }
+      if (role !== UserRole.USER) {
+        throw new HttpError(400, "Google login is only available for users");
+      }
+      const loginResult = await this._authService.googleLogin(credential, role, res);
+      res.status(200).json(new LoginResponse(loginResult.accessToken, loginResult.user));
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async refreshToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const refreshToken = req.cookies.refreshToken;

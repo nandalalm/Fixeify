@@ -15,6 +15,7 @@ export default function createAuthRoutes(container: Container): Router {
   router.post("/verify-otp", authController.verifyOtp.bind(authController));
   router.post("/register", authController.register.bind(authController));
   router.post("/login", authController.login.bind(authController));
+  router.post("/google-login", authController.googleLogin.bind(authController));
   router.post("/forgot-password", authController.forgotPassword.bind(authController));
   router.post("/reset-password", authController.resetPassword.bind(authController));
   router.post("/refresh-token", authController.refreshToken.bind(authController));

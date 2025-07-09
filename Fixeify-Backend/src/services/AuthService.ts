@@ -21,6 +21,7 @@ import { MESSAGES } from "../constants/messages";
 import jwt from "jsonwebtoken";
 import { Request, Response } from "express";
 import crypto from "crypto";
+import { OAuth2Client } from "google-auth-library";
 
 @injectable()
 export class AuthService implements IAuthService {
@@ -34,6 +35,10 @@ export class AuthService implements IAuthService {
   private _transporter = nodemailer.createTransport({
     service: "gmail",
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+  });
+  private _googleClient = new OAuth2Client({
+    clientId: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   });
 
   constructor(
@@ -172,6 +177,82 @@ export class AuthService implements IAuthService {
       phoneNo: "phoneNo" in user ? user.phoneNo : null,
       address: "address" in user ? user.address : null,
       photo: "photo" in user ? user.photo : null,
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: userResponse,
+    };
+  }
+
+  async googleLogin(
+    credential: string,
+    role: UserRole,
+    res: Response
+  ): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: UserResponse;
+  }> {
+    if (role !== UserRole.USER) {
+      throw new HttpError(400, "Google login is only available for users");
+    }
+
+    let ticket;
+    try {
+      ticket = await this._googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+    } catch (error) {
+      logger.error("Failed to verify Google ID token:", error);
+      throw new HttpError(400, "Invalid Google credential");
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload || !payload.email || !payload.name) {
+      throw new HttpError(400, "Invalid Google user data");
+    }
+
+    let user = await this._userRepository.findUserByEmail(payload.email);
+    let created = false;
+
+    if (!user) {
+      const userData = mapUserDtoToModel({
+        name: payload.name,
+        email: payload.email,
+        password: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10),
+      });
+      user = await this._userRepository.createUser(userData);
+      created = true;
+    }
+
+    if ("isBanned" in user && user.isBanned) {
+      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+    }
+
+    const accessToken = generateAccessToken(user.id);
+    const refreshToken = generateRefreshToken(user.id);
+
+    await this._redisClient.setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
+
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    const userResponse = new UserResponse({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: UserRole.USER,
+      isBanned: user.isBanned || false,
+      phoneNo: user.phoneNo || null,
+      address: user.address || null,
+      photo:  null,
     });
 
     return {

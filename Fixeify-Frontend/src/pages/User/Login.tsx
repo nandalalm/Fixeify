@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch } from "react-redux";
 import { setAuth, UserRole } from "../../store/authSlice";
-import { loginUser } from "../../api/authApi";
+import { loginUser, googleLogin } from "../../api/authApi";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
 import { loginSchema } from "../../Validation/validationSchemas";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import ForgotPassword from "../../components/User/ForgotPassword";
+import { GoogleLogin } from '@react-oauth/google';
+import api from "../../api/axios";
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });
@@ -108,6 +110,27 @@ const LoginPage = () => {
         setServerError("An unexpected error occurred. Please try again.");
         dispatch({ type: "auth/logoutUserSync" });
       }
+    }
+  };
+
+  const handleGoogleLoginSuccess = async (credentialResponse: { credential?: string }) => {
+    try {
+      if (!credentialResponse.credential) {
+        throw new Error("No credential received from Google");
+      }
+      const response = await googleLogin(credentialResponse.credential, 'user');
+      const { accessToken, user } = response;
+      const mappedUser = {
+        ...user,
+        role: user.role === "user" ? UserRole.USER : UserRole.ADMIN,
+      };
+      dispatch(setAuth({ user: mappedUser, accessToken }));
+      console.log("Google login successful, user role:", user.role);
+      navigate("/home", { replace: true });
+    } catch (error: any) {
+      console.error("Google login error:", error);
+      setServerError(error.response?.data?.message || error.message || "Google login failed. Please try again.");
+      dispatch({ type: "auth/logoutUserSync" });
     }
   };
 
@@ -224,6 +247,32 @@ const LoginPage = () => {
                   Login
                 </button>
               </form>
+
+              {userRole === "user" && (
+                <div className="mt-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-2 bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-300">Or</span>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <div className="w-full">
+                      <GoogleLogin
+                        onSuccess={handleGoogleLoginSuccess}
+                        onError={() => {
+                          setServerError("Google login failed. Please try again.");
+                        }}
+                        theme="outline"
+                        size="large"
+                        width="100%"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-2 text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-300">

@@ -12,6 +12,11 @@ export interface IAuthService {
     refreshToken: string;
     user: UserResponse;
   }>;
+  googleLogin(credential: string, role: UserRole, res: Response): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    user: UserResponse;
+  }>;
   refreshAccessToken(req: Request, res: Response): Promise<string>;
   getUserById(userId: string): Promise<UserResponse>;
   logout(refreshToken: string, role: UserRole, res: Response): Promise<void>;
