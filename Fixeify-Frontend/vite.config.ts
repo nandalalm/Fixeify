@@ -13,4 +13,8 @@ export default defineConfig({
       "@/lib": path.resolve(__dirname, "src/lib"),
     },
   },
+  server:{
+      host:"0.0.0.0",
+      port:5173
+    }
 });

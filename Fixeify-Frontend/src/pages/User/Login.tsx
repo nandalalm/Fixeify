@@ -9,7 +9,6 @@ import { loginSchema } from "../../Validation/validationSchemas";
 import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
 import ForgotPassword from "../../components/User/ForgotPassword";
 import { GoogleLogin } from '@react-oauth/google';
-import api from "../../api/axios";
 
 const LoginPage = () => {
   const [formData, setFormData] = useState({ email: "", password: "" });

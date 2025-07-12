@@ -80,7 +80,7 @@ const ChangePassword = ({ onCancel }: ChangePasswordProps) => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col mb-[50px] bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen flex flex-col mb-[50px] bg-gray-50 dark:bg-gray-900 mt-8">
       <div className="flex-1 p-6 md:p-10">
         <div className="max-w-md mx-auto">
           <h1 className="text-3xl font-bold mb-8 text-center dark:text-gray-200">Change Password</h1>

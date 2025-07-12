@@ -58,12 +58,14 @@ const Navbar = () => {
       className={`sticky top-0 left-0 w-full z-60 transition-all duration-300 ${
         isScrolled ? "shadow-md" : "shadow-none"
       } bg-white dark:bg-gray-900`}
+      style={{ top: 0, margin: 0, padding: 0, transform: "translateY(0)" }} // Force flush with top
     >
-      <div className="container flex justify-between items-center mx-auto px-4 py-3">
+      <div className="container flex justify-between items-center mx-auto px-4 py-3" style={{ margin: 0 }}>
         <img
           src="/logo.png"
           alt="Fixeify Logo"
           className="h-8 w-auto md:h-10 dark:filter dark:invert"
+          onClick={() => navigate('/home')}
         />
 
         <nav className="gap-6 hidden items-center md:flex">
@@ -127,8 +129,8 @@ const Navbar = () => {
                       Profile
                     </Link>
                     <button
-                      onClick={handleLogoutClick} // Trigger modal instead of direct logout
-                      className="block w-full text-left px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-gray-100  dark:hover:bg-gray-700"
+                      onClick={handleLogoutClick}
+                      className="block w-full text-left px-4 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Logout
                     </button>
@@ -181,7 +183,7 @@ const Navbar = () => {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="bg-white border-t shadow-md md:hidden pb-4 px-4 py-2 dark:bg-gray-900 dark:border-gray-700"
+            className="fixed top-[60px] left-0 w-full bg-white shadow-md md:hidden pb-4 px-4 py-2 z-50 dark:bg-gray-900 dark:border-gray-700"
           >
             <nav className="flex flex-col space-y-3">
               <Link to="#how-it-works" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
@@ -190,34 +192,25 @@ const Navbar = () => {
               <Link to="#help" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
                 Help
               </Link>
-              <button
-                onClick={() => navigate("/become-pro")}
-                className="bg-[#032B44] rounded-md text-white hover:bg-[#054869] text-sm font-medium   px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
-              >
+              <Link to="/become-pro" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
                 Become a Fixeify Pro
-              </button>
+              </Link>
               {accessToken ? (
                 <>
-                  <button
-                    onClick={() => navigate("/profile")}
-                    className="bg-[#032B44] rounded-md text-white hover:bg-[#054869] text-sm font-medium  px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
-                  >
+                  <Link to="/profile" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
                     Profile
-                  </button>
+                  </Link>
                   <button
-                    onClick={handleLogoutClick} // Trigger modal instead of direct logout
-                    className="bg-[#de2c2c] rounded-md text-white text-sm font-medium  px-4 py-1.5 transition-colors dark:bg-gray-300 dark:border-gray-300 dark:!text-[#de2c2c] dark:hover:bg-gray-500 dark:hover:!text-white"
+                    onClick={handleLogoutClick}
+                    className="text-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-500 text-left"
                   >
                     Logout
                   </button>
                 </>
               ) : (
-                <button
-                  onClick={() => navigate("/login")}
-                  className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
-                >
+                <Link to="/login" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
                   Login
-                </button>
+                </Link>
               )}
             </nav>
           </motion.div>

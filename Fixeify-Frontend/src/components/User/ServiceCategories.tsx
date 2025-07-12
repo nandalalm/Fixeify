@@ -75,6 +75,12 @@ const ServiceCategories = () => {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  useEffect(() => {
+    if (!loading && categories.length > 0 && carouselRef.current) {
+      carouselRef.current.scrollTo({ left: 100, behavior: "smooth" });
+    }
+  }, [loading, categories]);
+
   return (
     <section className="container text-center mx-auto px-6 py-8 dark:bg-gray-900">
       <h2 className="text-2xl font-bold mb-5 pb-5 dark:text-white">Our Services</h2>

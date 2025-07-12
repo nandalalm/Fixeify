@@ -3,14 +3,16 @@ import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { ArrowLeft, LocateFixed } from "lucide-react";
+import { LocateFixed, ArrowLeft } from "lucide-react";
 import { bookingSchema } from "../../Validation/validationSchemas";
 import { createBooking, getUserProfile } from "../../api/userApi";
 import { RootState } from "../../store/store";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
-import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
+import { IApprovedPro, ILocation, ITimeSlot } from "../../interfaces/adminInterface";
 import { BookingResponse } from "../../interfaces/bookingInterface";
+import BookingFormSecond from "./BookingFormSecond";
+import BookingFormSuccess from "./BookingFormSuccess";
 
 const BookingForm = () => {
   const navigate = useNavigate();
@@ -27,7 +29,7 @@ const BookingForm = () => {
     location: selectedLocation || null as ILocation | null,
     phoneNumber: "",
     preferredDate: "",
-    preferredTime: "",
+    preferredTime: [] as ITimeSlot[],
   });
   const [savedLocation, setSavedLocation] = useState<ILocation | null>(null);
   const [savedPhoneNumber, setSavedPhoneNumber] = useState<string | null>(null);
@@ -130,6 +132,12 @@ const BookingForm = () => {
     };
   }, [isLoadingProfile]);
 
+  useEffect(() => {
+    if (bookingDetails) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [bookingDetails]);
+
   const handleGetCurrentLocation = () => {
     if (navigator.geolocation) {
       setIsLoadingLocation(true);
@@ -221,10 +229,25 @@ const BookingForm = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    // Allow spaces in issueDescription during typing; trimming is handled by the schema on submit
     const updatedValue = name === "issueDescription" ? value : value.trim();
     setFormData((prev) => ({ ...prev, [name]: updatedValue }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
+    setServerError("");
+    setSuccessMessage("");
+  };
+
+  const handleTimeSlotToggle = (slot: ITimeSlot) => {
+    if (slot.booked) return;
+    setFormData((prev) => {
+      const isSelected = prev.preferredTime.some(
+        (s) => s.startTime === slot.startTime && s.endTime === slot.endTime
+      );
+      const updatedTimeSlots = isSelected
+        ? prev.preferredTime.filter((s) => !(s.startTime === slot.startTime && s.endTime === slot.endTime))
+        : [...prev.preferredTime, { ...slot, booked: false }];
+      return { ...prev, preferredTime: updatedTimeSlots };
+    });
+    setErrors((prev) => ({ ...prev, preferredTime: "" }));
     setServerError("");
     setSuccessMessage("");
   };
@@ -255,53 +278,25 @@ const BookingForm = () => {
 
       const validatedData = bookingSchema.parse(dataToValidate);
 
-      // Construct full preferred date-time
-      const [prefHour, prefMinute] = formData.preferredTime.split(":").map(Number);
-      const preferredDateTime = new Date(formData.preferredDate);
-      preferredDateTime.setHours(prefHour, prefMinute, 0, 0);
-
       const now = new Date();
-
-      // Check if the selected date-time is in the past
-      if (preferredDateTime < now) {
-        setErrors({ preferredTime: "Past time not allowed" });
-        return;
-      }
-
-      // Check if the selected date is today and enforce the 2-hour advance booking rule
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(formData.preferredDate);
+      const selectedDate = new Date(validatedData.preferredDate);
       selectedDate.setHours(0, 0, 0, 0);
 
       if (selectedDate.getTime() === today.getTime()) {
-        const minTime = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2 hours from now
-        if (preferredDateTime < minTime) {
-          setErrors({ preferredTime: "Booking must be scheduled at least 2 hours in advance" });
+        const earliestAllowedTime = new Date(now.getTime() + 1 * 60 * 60 * 1000);
+        const selectedTimes = validatedData.preferredTime.map((slot) => {
+          const [hours, minutes] = slot.startTime.split(":").map(Number);
+          const slotDate = new Date(validatedData.preferredDate);
+          slotDate.setHours(hours, minutes, 0, 0);
+          return slotDate;
+        });
+
+        if (selectedTimes.some((time) => time < earliestAllowedTime)) {
+          setErrors({ preferredTime: "Booking must be scheduled at least 1 hour in advance" });
           return;
         }
-      }
-
-      // Validate against professional's availability
-      const dayOfWeek = preferredDateTime.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
-      const availableSlots = pro.availability[dayOfWeek as keyof IApprovedPro["availability"]] || [];
-      if (availableSlots.length === 0) {
-        setErrors({ preferredDate: `Professional is not available on ${dayOfWeek}` });
-        return;
-      }
-
-      const preferredTimeInMinutes = prefHour * 60 + prefMinute;
-      const isTimeValid = availableSlots.some((slot) => {
-        const [startHour, startMinute] = slot.startTime.split(":").map(Number);
-        const [endHour, endMinute] = slot.endTime.split(":").map(Number);
-        const startTimeInMinutes = startHour * 60 + startMinute;
-        const endTimeInMinutes = endHour * 60 + endMinute;
-        return preferredTimeInMinutes >= startTimeInMinutes && preferredTimeInMinutes <= endTimeInMinutes;
-      });
-
-      if (!isTimeValid) {
-        setErrors({ preferredTime: "Selected time is not within the professional's availability" });
-        return;
       }
 
       const response = await createBooking(userId, proId, {
@@ -314,7 +309,7 @@ const BookingForm = () => {
       });
 
       setBookingDetails(response);
-      setSuccessMessage("Booking created successfully! Displaying booking details...");
+      setSuccessMessage("Booking created successfully!");
     } catch (error) {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
@@ -329,14 +324,13 @@ const BookingForm = () => {
           const message = err.response?.data?.message || err.message || "Booking failed";
           switch (status) {
             case 400:
-              // Map specific server errors to form fields
-              if (message === "Preferred date cannot be in the past") {
+              if (message.includes("Preferred date")) {
                 setErrors({ preferredDate: message });
-              } else if (message === "Preferred time is not within the professional's availability") {
+              } else if (message.includes("Time slot is already booked")) {
+                setErrors({ preferredTime: "One or more selected time slots are already booked. Please choose different slots." });
+              } else if (message.includes("Time slot") || message.includes("Preferred time")) {
                 setErrors({ preferredTime: message });
-              } else if (message === "Preferred time must be at least 2 hours from now") {
-                setErrors({ preferredTime: message });
-              } else if (message === "Professional is currently unavailable") {
+              } else if (message.includes("Professional is currently unavailable")) {
                 setErrors({ general: message });
               } else {
                 setServerError(message);
@@ -358,6 +352,13 @@ const BookingForm = () => {
         setServerError("An unexpected error occurred. Please try again.");
       }
     }
+  };
+
+  const formatTimeTo12Hour = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    const period = hours >= 12 ? "PM" : "AM";
+    const adjustedHours = hours % 12 || 12;
+    return `${adjustedHours}:${minutes.toString().padStart(2, "0")} ${period}`;
   };
 
   if (!pro || !proId || !categoryId) {
@@ -383,15 +384,6 @@ const BookingForm = () => {
           transition={{ duration: 0.3 }}
           className="w-full max-w-md"
         >
-          <button
-            onClick={() => navigate(`/pro-details/${proId}`, { state: { pro, categoryId, location: selectedLocation } })}
-            className="inline-block mb-3 p-1 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-200" />
-          </button>
-          <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100 text-center">
-            Book {pro.firstName} {pro.lastName}
-          </h1>
           {isLoadingProfile ? (
             <div className="text-center">
               <svg
@@ -409,26 +401,16 @@ const BookingForm = () => {
               </svg>
             </div>
           ) : bookingDetails ? (
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md">
-              <h2 className="text-xl font-semibold mb-4 text-green-600 dark:text-green-400">Booking Successful</h2>
-              <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Booking Details</h3>
-              <p className="text-gray-700 dark:text-gray-300"><strong>User:</strong> {bookingDetails.user.name}</p>
-              <p className="text-gray-700 dark:text-gray-300"><strong>Professional:</strong> {bookingDetails.pro.firstName} {bookingDetails.pro.lastName}</p>
-              <p className="text-gray-700 dark:text-gray-300"><strong>Category:</strong> {bookingDetails.category.name}</p>
-              <p className="text-gray-700 dark:text-gray-300"><strong>Issue:</strong> {bookingDetails.issueDescription}</p>
-              <p className="text-gray-700 dark:text-gray-300"><strong>Location:</strong> {bookingDetails.location.address}, {bookingDetails.location.city}, {bookingDetails.location.state}</p>
-              <p className="text-gray-700 dark:text-gray-300"><strong>Phone:</strong> {bookingDetails.phoneNumber}</p>
-              <p className="text-gray-700 dark:text-gray-300"><strong>Date:</strong> {new Date(bookingDetails.preferredDate).toLocaleDateString()}</p>
-              <p className="text-gray-700 dark:text-gray-300"><strong>Time:</strong> {bookingDetails.preferredTime}</p>
-              <p className="text-gray-700 dark:text-gray-300"><strong>Status:</strong> {bookingDetails.status}</p>
-            </div>
+            <BookingFormSuccess bookingDetails={bookingDetails} navigate={navigate} proId={proId} pro={pro} categoryId={categoryId} location={selectedLocation} />
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
-              {serverError && <p className="text-red-500 text-sm mb-4">{serverError}</p>}
-              {successMessage && <p className="text-green-500 text-sm mb-4">{successMessage}</p>}
-              {errors.general && <p className="text-red-500 text-sm mb-4">{errors.general}</p>}
-
               <div>
+                <button
+                  onClick={() => navigate(-1)}
+                  className="inline-block mb-3 p-1 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                >
+                  <ArrowLeft className="w-6 h-6" />
+                </button>
                 <label htmlFor="issueDescription" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Issue Description <span className="text-red-500">*</span>
                 </label>
@@ -525,42 +507,19 @@ const BookingForm = () => {
                 <p className="text-gray-400 text-sm pl-3">Saved Phone No: {savedPhoneNumber}</p>
               </div>
 
-              <div>
-                <label htmlFor="preferredDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Preferred Date <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    id="preferredDate"
-                    name="preferredDate"
-                    value={formData.preferredDate}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                    required
-                    min={new Date().toISOString().split("T")[0]}
-                  />
-                </div>
-                {errors.preferredDate && <p className="text-red-500 text-sm mt-1">{errors.preferredDate}</p>}
-              </div>
+              <BookingFormSecond
+                formData={formData}
+                setFormData={setFormData}
+                proId={proId}
+                setErrors={setErrors} // Added setErrors prop
+                handleTimeSlotToggle={handleTimeSlotToggle}
+                errors={errors}
+                formatTimeTo12Hour={formatTimeTo12Hour}
+              />
 
-              <div>
-                <label htmlFor="preferredTime" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Preferred Time <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="time"
-                    id="preferredTime"
-                    name="preferredTime"
-                    value={formData.preferredTime}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                    required
-                  />
-                </div>
-                {errors.preferredTime && <p className="text-red-500 text-sm mt-1">{errors.preferredTime}</p>}
-              </div>
+              {serverError && <p className="text-red-500 text-sm mb-4">{serverError}</p>}
+              {successMessage && <p className="text-green-500 text-sm mb-4">{successMessage}</p>}
+              {errors.general && <p className="text-red-500 text-sm mb-4">{errors.general}</p>}
 
               <button
                 type="submit"
@@ -570,7 +529,7 @@ const BookingForm = () => {
                   !formData.location ||
                   !formData.phoneNumber ||
                   !formData.preferredDate ||
-                  !formData.preferredTime
+                  formData.preferredTime.length === 0
                 }
               >
                 Submit Booking

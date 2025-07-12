@@ -1,5 +1,5 @@
 import { PendingProDocument } from "../models/pendingProModel";
-import { ApprovedProDocument } from "../models/approvedProModel";
+import { ApprovedProDocument, ITimeSlot } from "../models/approvedProModel";
 import { ProResponse, ProProfileResponse } from "../dtos/response/proDtos";
 
 export interface IProRepository {
@@ -20,4 +20,5 @@ export interface IProRepository {
   deletePendingPro(id: string): Promise<void>;
   updateApprovedPro(id: string, data: Partial<ApprovedProDocument>): Promise<ApprovedProDocument | null>;
   findNearbyPros(categoryId: string, longitude: number, latitude: number): Promise<ProResponse[]>;
+  updateAvailability(proId: string, dayOfWeek: string, timeSlots: ITimeSlot[],booked: boolean ): Promise<ApprovedProDocument | null>;
 }

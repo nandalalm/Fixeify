@@ -19,6 +19,7 @@ export interface ICategory {
 interface TimeSlot {
   startTime: string;
   endTime: string;
+  booked:boolean;
 }
 
 export interface PendingProResponse {
@@ -73,7 +74,6 @@ export class ProResponse {
   };
   public isBanned: boolean;
   public about: string | null;
-  public isBooked: boolean;
   public isUnavailable: boolean;
 
   constructor({
@@ -94,7 +94,6 @@ export class ProResponse {
     availability,
     isBanned,
     about = null,
-    isBooked,
     isUnavailable = false,
   }: {
     _id: string;
@@ -122,7 +121,6 @@ export class ProResponse {
     };
     isBanned: boolean;
     about?: string | null;
-    isBooked: boolean;
     isUnavailable: boolean;
   }) {
     this._id = _id;
@@ -142,7 +140,6 @@ export class ProResponse {
     this.availability = availability;
     this.isBanned = isBanned;
     this.about = about;
-    this.isBooked = isBooked;
     this.isUnavailable = isUnavailable;
   }
 }

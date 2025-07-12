@@ -100,14 +100,24 @@ const ProDetails = () => {
             <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-200" />
           </button>
 
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-32 h-32 rounded-full overflow-hidden mb-3">
+          <div className="relative h-48 mb-16">
+            <div className="h-48 bg-gray-200">
+              <img
+                src="https://images.unsplash.com/photo-1504307651254-35680f356dfd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2340&q=80"
+                alt="Banner"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 top-[100%] w-32 h-32 rounded-full overflow-hidden border-4 border-white dark:border-gray-800 z-10">
               <img
                 src={pro.profilePhoto || "/placeholder.svg"}
                 alt={`${pro.firstName} ${pro.lastName}`}
                 className="w-full h-full object-cover"
               />
             </div>
+          </div>
+
+          <div className="flex flex-col items-center mb-8">
             <h1 className="text-4xl font-bold text-center mb-2 dark:text-gray-200">
               {pro.firstName} {pro.lastName}
             </h1>
@@ -229,12 +239,13 @@ const ProDetails = () => {
             </div>
 
             <div className="flex flex-col gap-3">
-              {pro.about && (
-                <div>
-                  <h2 className="text-xl font-medium mb-3 text-gray-900 dark:text-gray-200">About Me</h2>
-                  <p className="text-base text-gray-900 dark:text-gray-300 whitespace-pre-line">{pro.about}</p>
-                </div>
-              )}
+              <div>
+                <h2 className="text-xl font-medium mb-3 text-gray-900 dark:text-gray-200">About Me</h2>
+                <p className="text-base text-gray-900 dark:text-gray-300 whitespace-pre-line">
+                  {pro.about ||
+                    `Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.category.name} works, and if you have any questions, feel free to message me.`}
+                </p>
+              </div>
 
               <h2 className="text-base font-medium mb-2 text-gray-600 dark:text-gray-400">
                 {pro.category.name} Expert

@@ -4,6 +4,7 @@ export const TYPES = {
   IAdminRepository: Symbol.for("IAdminRepository"),
   IProRepository: Symbol.for("IProRepository"),
   IBookingRepository: Symbol.for("IBookingRepository"),
+  IQuotaRepository: Symbol.for("IQuotaRepository"),
   AuthService: Symbol.for("AuthService"),
   AuthController: Symbol.for("AuthController"),
   AdminController: Symbol.for("AdminController"),

@@ -1,12 +1,4 @@
-export interface ILocation {
-  address: string;
-  city: string;
-  state: string;
-  coordinates: {
-    type: "Point";
-    coordinates: [number, number];
-  };
-}
+import { ILocation, ITimeSlot } from "../../models/bookingModel";
 
 export class BookingResponse {
   id: string;
@@ -29,7 +21,7 @@ export class BookingResponse {
   location: ILocation;
   phoneNumber: string;
   preferredDate: Date;
-  preferredTime: string;
+  preferredTime: ITimeSlot[];
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
   createdAt: Date;
@@ -44,7 +36,7 @@ export class BookingResponse {
     location: ILocation;
     phoneNumber: string;
     preferredDate: Date;
-    preferredTime: string;
+    preferredTime: ITimeSlot[];
     status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
     rejectedReason?: string;
     createdAt: Date;

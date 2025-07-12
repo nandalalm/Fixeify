@@ -1,26 +1,38 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
 import { IBookingRepository } from "./IBookingRepository";
-import Booking, { IBooking } from "../models/bookingModel";
+import Booking, { BookingDocument, ITimeSlot, ILocation } from "../models/bookingModel";
 import { BookingResponse } from "../dtos/response/bookingDtos";
 import mongoose, { Document, Types } from "mongoose";
 
-// Define the shape of the populated booking document
+interface PopulatedUser {
+  _id: Types.ObjectId;
+  name: string;
+  email: string;
+}
+
+interface PopulatedPro {
+  _id: Types.ObjectId;
+  firstName: string;
+  lastName: string;
+}
+
+interface PopulatedCategory {
+  _id: Types.ObjectId;
+  name: string;
+  image?: string;
+}
+
 interface PopulatedBookingDocument extends Document {
-  _id: mongoose.Types.ObjectId;
-  userId: { _id: mongoose.Types.ObjectId; name: string; email: string };
-  proId: { _id: mongoose.Types.ObjectId; firstName: string; lastName: string };
-  categoryId: { _id: mongoose.Types.ObjectId; name: string; image?: string };
+  _id: Types.ObjectId;
+  userId: PopulatedUser;
+  proId: PopulatedPro;
+  categoryId: PopulatedCategory;
   issueDescription: string;
-  location: {
-    address: string;
-    city: string;
-    state: string;
-    coordinates: { type: "Point"; coordinates: [number, number] };
-  };
+  location: ILocation;
   phoneNumber: string;
   preferredDate: Date;
-  preferredTime: string;
+  preferredTime: ITimeSlot[];
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
   createdAt: Date;
@@ -28,13 +40,13 @@ interface PopulatedBookingDocument extends Document {
 }
 
 @injectable()
-export class MongoBookingRepository extends BaseRepository<IBooking> implements IBookingRepository {
+export class MongoBookingRepository extends BaseRepository<BookingDocument> implements IBookingRepository {
   constructor() {
     super(Booking);
   }
 
-  async createBooking(bookingData: Partial<IBooking>): Promise<BookingResponse> {
-    const booking = (await this._model
+  async createBooking(bookingData: Partial<BookingDocument>): Promise<BookingResponse> {
+    const booking = await this._model
       .create(bookingData)
       .then((doc) =>
         doc.populate([
@@ -42,35 +54,43 @@ export class MongoBookingRepository extends BaseRepository<IBooking> implements 
           { path: "proId", select: "firstName lastName" },
           { path: "categoryId", select: "name image" },
         ])
-      )) as unknown as PopulatedBookingDocument;
+      ) as PopulatedBookingDocument;
 
     return this.mapToBookingResponse(booking);
   }
 
   async fetchBookingDetails(userId: string): Promise<BookingResponse[]> {
-    const bookings = (await this._model
+    const bookings = await this._model
       .find({ userId, status: { $in: ["pending", "accepted"] } })
-      .populate([
+      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
         { path: "userId", select: "name email" },
         { path: "proId", select: "firstName lastName" },
         { path: "categoryId", select: "name image" },
       ])
-      .exec()) as unknown as PopulatedBookingDocument[];
+      .exec() as PopulatedBookingDocument[];
 
     return bookings.map((booking) => this.mapToBookingResponse(booking));
   }
 
   async fetchProBookings(proId: string): Promise<BookingResponse[]> {
-    const bookings = (await this._model
+    const bookings = await this._model
       .find({ proId })
-      .populate([
+      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
         { path: "userId", select: "name email" },
         { path: "proId", select: "firstName lastName" },
         { path: "categoryId", select: "name image" },
       ])
-      .exec()) as unknown as PopulatedBookingDocument[];
+      .exec() as PopulatedBookingDocument[];
 
     return bookings.map((booking) => this.mapToBookingResponse(booking));
+  }
+
+  async updateBooking(bookingId: string, updateData: Partial<BookingDocument>): Promise<BookingDocument | null> {
+    return this._model.findByIdAndUpdate(bookingId, updateData, { new: true }).exec();
+  }
+
+  async findBookingById(bookingId: string): Promise<BookingDocument | null> {
+    return this._model.findById(bookingId).exec();
   }
 
   private mapToBookingResponse(booking: PopulatedBookingDocument): BookingResponse {

@@ -81,7 +81,7 @@ export const bookingSchema = z.object({
     .min(10, "Issue description must be at least 10 characters long")
     .max(500, "Issue description cannot exceed 500 characters")
     .nonempty("Issue description is required")
-    .trim(), // Trims leading/trailing spaces; allows internal spaces, letters, numbers, and special characters
+    .trim(),
   location: z
     .object({
       address: z.string().nonempty("Address is required"),
@@ -114,7 +114,16 @@ export const bookingSchema = z.object({
       { message: "Preferred date cannot be in the past" }
     ),
   preferredTime: z
-    .string()
-    .nonempty("Preferred time is required")
-    .regex(/^\d{2}:\d{2}$/, "Time must be in HH:MM format"),
+    .array(
+      z.object({
+        startTime: z.string().regex(/^\d{2}:\d{2}$/, "Start time must be in HH:MM format"),
+        endTime: z.string().regex(/^\d{2}:\d{2}$/, "End time must be in HH:MM format"),
+        booked: z.boolean(),
+      })
+    )
+    .min(1, "At least one time slot is required")
+    .refine(
+      (slots) => slots.every((slot) => !slot.booked),
+      { message: "Selected time slots cannot be booked" }
+    ),
 });

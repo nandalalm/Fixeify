@@ -5,13 +5,14 @@ export interface LocationData {
   country: string;
   coordinates: {
     type: "Point";
-    coordinates: [number, number]; 
+    coordinates: [number, number];
   };
 }
 
 export interface TimeSlot {
-  startTime: string; 
-  endTime: string;   
+  startTime: string;
+  endTime: string;
+  booked: boolean;
 }
 
 export interface Availability {

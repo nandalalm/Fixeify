@@ -9,7 +9,7 @@ import { ProResponse } from "../dtos/response/proDtos";
 import { BookingResponse } from "../dtos/response/bookingDtos";
 import { UserRole } from "../enums/roleEnum";
 import { IUser } from "../models/userModel";
-import { IApprovedPro } from "../models/approvedProModel";
+import { IApprovedPro, ITimeSlot } from "../models/approvedProModel";
 import { IBooking } from "../models/bookingModel";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
@@ -104,52 +104,54 @@ export class UserService implements IUserService {
       };
       phoneNumber: string;
       preferredDate: Date;
-      preferredTime: string;
+      preferredTime: ITimeSlot[];
     }
   ): Promise<BookingResponse> {
     const user = await this._userRepository.findUserById(userId);
     if (!user) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
     if (user.isBanned) throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
-  
+
     const pro = await this._proRepository.findApprovedProById(proId);
     if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
     if (pro.isBanned) throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
     if (pro.isUnavailable) throw new HttpError(400, "Professional is currently unavailable");
-  
+
     const preferredDate = new Date(bookingData.preferredDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (preferredDate < today) {
       throw new HttpError(400, "Preferred date cannot be in the past");
     }
-  
+
     const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
     const availableSlots = pro.availability[dayOfWeek as keyof IApprovedPro["availability"]] || [];
-    const [prefHour, prefMinute] = bookingData.preferredTime.split(":").map(Number);
-    const preferredTimeInMinutes = prefHour * 60 + prefMinute;
-  
-    const isTimeValid = availableSlots.some((slot) => {
-      const [startHour, startMinute] = slot.startTime.split(":").map(Number);
-      const [endHour, endMinute] = slot.endTime.split(":").map(Number);
-      const startTimeInMinutes = startHour * 60 + startMinute;
-      const endTimeInMinutes = endHour * 60 + endMinute;
-      return preferredTimeInMinutes >= startTimeInMinutes && preferredTimeInMinutes <= endTimeInMinutes;
-    });
-  
-    if (!isTimeValid) {
-      throw new HttpError(400, "Preferred time is not within the professional's availability");
-    }
-  
-    if (preferredDate.getTime() === today.getTime()) {
-      const now = new Date();
-      const minTime = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-      const [minHour, minMinute] = [minTime.getHours(), minTime.getMinutes()];
-      const minTimeInMinutes = minHour * 60 + minMinute;
-      if (preferredTimeInMinutes < minTimeInMinutes) {
-        throw new HttpError(400, "Preferred time must be at least 2 hours from now");
+
+    for (const selectedSlot of bookingData.preferredTime) {
+      const slotExists = availableSlots.some(
+        (slot) =>
+          slot.startTime === selectedSlot.startTime &&
+          slot.endTime === selectedSlot.endTime
+      );
+      if (!slotExists) {
+        throw new HttpError(400, `Time slot ${selectedSlot.startTime}-${selectedSlot.endTime} is not available`);
+      }
+      if (availableSlots.find(
+        (slot) =>
+          slot.startTime === selectedSlot.startTime &&
+          slot.endTime === selectedSlot.endTime &&
+          slot.booked
+      )) {
+        throw new HttpError(400, `Time slot ${selectedSlot.startTime}-${selectedSlot.endTime} is already booked`);
       }
     }
-  
+
+    const updatedSlots = bookingData.preferredTime.map(slot => ({ ...slot, booked: true }));
+    const updateResult = await this._proRepository.updateAvailability(proId, dayOfWeek, updatedSlots,true);
+    
+    if (!updateResult) {
+      throw new HttpError(400, "Failed to reserve time slots. Some slots may be booked by another user.");
+    }
+
     const booking: Partial<IBooking> = {
       userId: new mongoose.Types.ObjectId(userId),
       proId: new mongoose.Types.ObjectId(proId),
@@ -158,10 +160,10 @@ export class UserService implements IUserService {
       location: bookingData.location,
       phoneNumber: bookingData.phoneNumber,
       preferredDate,
-      preferredTime: bookingData.preferredTime,
+      preferredTime: updatedSlots,
       status: "pending",
     };
-  
+
     return await this._bookingRepository.createBooking(booking);
   }
 

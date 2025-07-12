@@ -34,9 +34,10 @@ export interface LocationData {
   };
 }
 
-interface TimeSlot {
+export interface ITimeSlot {
   startTime: string;
   endTime: string;
+  booked:boolean
 }
 
 export interface PendingPro {
@@ -54,13 +55,13 @@ export interface PendingPro {
   accountNumber: string;
   bankName: string;
   availability: {
-    monday?: TimeSlot[];
-    tuesday?: TimeSlot[];
-    wednesday?: TimeSlot[];
-    thursday?: TimeSlot[];
-    friday?: TimeSlot[];
-    saturday?: TimeSlot[];
-    sunday?: TimeSlot[];
+    monday?: ITimeSlot[];
+    tuesday?: ITimeSlot[];
+    wednesday?: ITimeSlot[];
+    thursday?: ITimeSlot[];
+    friday?: ITimeSlot[];
+    saturday?: ITimeSlot[];
+    sunday?: ITimeSlot[];
   };
   createdAt: Date;
 }
@@ -79,17 +80,16 @@ export interface IApprovedPro {
   accountNumber: string;
   bankName: string;
   availability: {
-    monday?: TimeSlot[];
-    tuesday?: TimeSlot[];
-    wednesday?: TimeSlot[];
-    thursday?: TimeSlot[];
-    friday?: TimeSlot[];
-    saturday?: TimeSlot[];
-    sunday?: TimeSlot[];
+    monday?: ITimeSlot[];
+    tuesday?: ITimeSlot[];
+    wednesday?: ITimeSlot[];
+    thursday?: ITimeSlot[];
+    friday?: ITimeSlot[];
+    saturday?: ITimeSlot[];
+    sunday?: ITimeSlot[];
   };
   isBanned: boolean;
   about?: string | null;
-  isBooked: boolean;
   isUnavailable: boolean;
 }
 

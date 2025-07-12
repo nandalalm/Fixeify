@@ -1,5 +1,11 @@
 import mongoose, { Schema, Document } from "mongoose";
-import { ILocation, IAvailability, ITimeSlot } from "./pendingProModel";
+import { ILocation, IAvailability } from "./pendingProModel";
+
+export interface ITimeSlot {
+  startTime: string;
+  endTime: string;
+  booked:boolean;
+}
 
 export interface IApprovedPro {
   firstName: string;
@@ -18,7 +24,6 @@ export interface IApprovedPro {
   isBanned: boolean;
   password: string;
   about?: string | null;
-  isBooked: boolean;
   isUnavailable: boolean;
 }
 
@@ -33,7 +38,7 @@ const locationSchema = new Schema<ILocation>(
     state: { type: String, required: true },
     coordinates: {
       type: { type: String, enum: ["Point"], required: true },
-      coordinates: { type: [Number], required: true }, 
+      coordinates: { type: [Number], required: true },
     },
   },
   { _id: false }
@@ -43,6 +48,7 @@ const timeSlotSchema = new Schema<ITimeSlot>(
   {
     startTime: { type: String, required: true },
     endTime: { type: String, required: true },
+    booked: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -78,7 +84,6 @@ const approvedProSchema = new Schema<ApprovedProDocument>(
     isBanned: { type: Boolean, default: false },
     password: { type: String, required: true },
     about: { type: String, default: null },
-    isBooked: { type: Boolean, default: false },
     isUnavailable: { type: Boolean, default: false },
   },
   { timestamps: true }

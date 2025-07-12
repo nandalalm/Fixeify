@@ -91,4 +91,47 @@ export class ProController {
       next(error);
     }
   }
+
+  async acceptBooking(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const bookingId = req.params.id;
+      const result = await this._proService.acceptBooking(bookingId);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async rejectBooking(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const bookingId = req.params.id;
+      const { rejectedReason } = req.body;
+      if (!rejectedReason) throw new HttpError(400, MESSAGES.REJECTION_REASON_REQUIRED);
+      const result = await this._proService.rejectBooking(bookingId, rejectedReason);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async generateQuota(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const bookingId = req.params.id;
+      const { laborCost, materialCost, additionalCharges } = req.body;
+      const quota = await this._proService.generateQuota(bookingId, { laborCost, materialCost, additionalCharges });
+      res.status(201).json(quota);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async fetchQuotaByBookingId(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const bookingId = req.params.id;
+      const quota = await this._proService.fetchQuotaByBookingId(bookingId);
+      res.status(200).json(quota);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

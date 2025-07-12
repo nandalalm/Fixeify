@@ -1,6 +1,6 @@
 import api from "./axios";
 import { UserProfile } from "../interfaces/userInterface";
-import { IApprovedPro, ILocation } from "../interfaces/adminInterface";
+import { IApprovedPro, ILocation, ITimeSlot } from "../interfaces/adminInterface";
 import { BookingResponse } from "../interfaces/bookingInterface";
 
 export const getUserProfile = async (userId: string): Promise<UserProfile> => {
@@ -38,7 +38,7 @@ export const createBooking = async (
     location: ILocation;
     phoneNumber: string;
     preferredDate: string;
-    preferredTime: string;
+    preferredTime: ITimeSlot[];
   }
 ): Promise<BookingResponse> => {
   const response = await api.post(

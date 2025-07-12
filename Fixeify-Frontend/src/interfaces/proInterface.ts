@@ -23,6 +23,7 @@ export interface ProProfile {
 export interface TimeSlot {
   startTime: string;
   endTime: string;
+  booked:boolean
 }
 
 export interface Availability {

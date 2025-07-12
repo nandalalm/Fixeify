@@ -1,4 +1,5 @@
-import { ILocation } from "./adminInterface";
+import { ILocation, ITimeSlot } from "./adminInterface";
+
 export class BookingResponse {
   id: string;
   user: {
@@ -20,7 +21,7 @@ export class BookingResponse {
   location: ILocation;
   phoneNumber: string;
   preferredDate: Date;
-  preferredTime: string;
+  preferredTime: ITimeSlot[];
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
   createdAt: Date;
@@ -35,7 +36,7 @@ export class BookingResponse {
     location: ILocation;
     phoneNumber: string;
     preferredDate: Date;
-    preferredTime: string;
+    preferredTime: ITimeSlot[];
     status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
     rejectedReason?: string;
     createdAt: Date;

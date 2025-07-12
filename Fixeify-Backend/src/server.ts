@@ -26,11 +26,13 @@ import { IAdminRepository } from "./repositories/IAdminRepository";
 import { IProRepository } from "./repositories/IProRepository";
 import { ICategoryRepository } from "./repositories/ICategoryRepository";
 import { IBookingRepository } from "./repositories/IBookingRepository";
+import { IQuotaRepository } from "./repositories/IQuotaRepository";
 import { MongoUserRepository } from "./repositories/mongoUserRepository";
 import { MongoAdminRepository } from "./repositories/mongoAdminRepository";
 import { MongoProRepository } from "./repositories/mongoProRepository";
 import { MongoCategoryRepository } from "./repositories/mongoCategoryRepository";
 import { MongoBookingRepository } from "./repositories/mongoBookingRepository";
+import { MongoQuotaRepository } from "./repositories/mongoQuotaRepository";
 import { errorMiddleware } from "./middleware/errorMiddleware";
 
 dotenv.config();
@@ -47,6 +49,7 @@ container.bind<IAdminRepository>(TYPES.IAdminRepository).to(MongoAdminRepository
 container.bind<IProRepository>(TYPES.IProRepository).to(MongoProRepository).inSingletonScope();
 container.bind<ICategoryRepository>(TYPES.ICategoryRepository).to(MongoCategoryRepository).inSingletonScope();
 container.bind<IBookingRepository>(TYPES.IBookingRepository).to(MongoBookingRepository).inSingletonScope();
+container.bind<IQuotaRepository>(TYPES.IQuotaRepository).to(MongoQuotaRepository).inSingletonScope();
 container.bind<AuthService>(TYPES.AuthService).to(AuthService).inSingletonScope();
 container.bind<AdminService>(TYPES.IAdminService).to(AdminService).inSingletonScope();
 container.bind<ProService>(TYPES.IProService).to(ProService).inSingletonScope();

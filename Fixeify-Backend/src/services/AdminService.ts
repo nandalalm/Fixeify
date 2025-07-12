@@ -123,7 +123,6 @@ export class AdminService implements IAdminService {
       },
       isBanned: updatedPro.isBanned,
       about: updatedPro.about ?? null,
-      isBooked: updatedPro.isBooked,
       isUnavailable: updatedPro.isUnavailable,
     });
   }

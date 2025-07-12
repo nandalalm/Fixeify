@@ -5,7 +5,7 @@ import ProfileInfo from "../../components/User/ProfileInfo";
 import EditProfile from "../../components/User/EditProfile";
 import ChangePassword from "../../components/User/ChangePassword";
 import OngoingRequest from "../../components/User/OngoingRequest";
-import { User, GitPullRequestDraft, Bell, IndianRupee, ChevronLeft, ChevronRight, ListCollapse, LogOut, X } from "lucide-react";
+import { User, GitPullRequestDraft, Bell, ChevronLeft, ChevronRight, ListCollapse, LogOut, X, Wallet } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
@@ -97,7 +97,7 @@ const Profile = () => {
         </div>
       ),
     },
-    { name: "Payment Section", icon: <IndianRupee className="w-5 h-5" /> },
+    { name: "Wallet", icon: <Wallet className="w-5 h-5" /> },
     { name: "Notifications & Alerts", icon: <Bell className="w-5 h-5" /> },
     { name: "Logout", icon: <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" /> },
   ];
@@ -206,8 +206,8 @@ const Profile = () => {
           )}
           {activeTab === "Payment Section" && (
             <div className="p-6">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Payment Section</h2>
-              <p className="text-gray-700 dark:text-gray-300">Payment details will be displayed here.</p>
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Wallet</h2>
+              <p className="text-gray-700 dark:text-gray-300">Wallet details will be displayed here.</p>
             </div>
           )}
           {activeTab === "Notifications & Alerts" && (

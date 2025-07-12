@@ -13,6 +13,7 @@ export interface ILocation {
 export interface ITimeSlot {
   startTime: string;
   endTime: string;
+  booked:boolean
 }
 
 export interface IAvailability {
@@ -72,6 +73,7 @@ const timeSlotSchema = new Schema<ITimeSlot>(
   {
     startTime: { type: String, required: true },
     endTime: { type: String, required: true },
+    booked: { type: Boolean, default: false },
   },
   { _id: false }
 );

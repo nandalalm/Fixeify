@@ -37,4 +37,8 @@ export const MESSAGES = {
   VALID_ROLE_REQUIRED: "Valid role (user or admin) is required",
   LOGGED_OUT: "Logged out successfully",
   USERID_REQUIRED: "User ID is required",
+  BOOKING_NOT_FOUND: "Booking not found",
+  BOOKING_NOT_PENDING: "Booking is not in pending status",
+  BOOKING_ACCEPTED_SUCCESSFULLY: "Booking accepted successfully",
+  BOOKING_REJECTED_SUCCESSFULLY: "Booking rejected successfully",
 };

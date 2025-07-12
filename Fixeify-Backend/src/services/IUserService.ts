@@ -1,6 +1,7 @@
 import { UserResponse } from "../dtos/response/userDtos";
 import { ProResponse } from "../dtos/response/proDtos";
 import { BookingResponse } from "../dtos/response/bookingDtos";
+import { ITimeSlot } from "../models/bookingModel";
 
 export interface IUserService {
   getUserProfile(userId: string): Promise<UserResponse | null>;
@@ -38,7 +39,7 @@ export interface IUserService {
       };
       phoneNumber: string;
       preferredDate: Date;
-      preferredTime: string;
+      preferredTime: ITimeSlot[];
     }
   ): Promise<BookingResponse>;
   fetchBookingDetails(userId: string): Promise<BookingResponse[]>;

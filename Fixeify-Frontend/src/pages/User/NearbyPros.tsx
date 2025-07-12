@@ -8,8 +8,8 @@ import Footer from "../../components/User/Footer";
 
 const ProCard = ({ pro }: { pro: IApprovedPro }) => {
   const aboutText = pro.about 
-    ? `${pro.about.slice(0, 32)}...` 
-    : `Hi, I’m ${pro.firstName}, a skilled handyman spe...`;
+    ? `${pro.about.slice(0, 28)}...` 
+    : `Hi, I’m ${pro.firstName}, a skilled handyman...`;
 
   return (
     <div className="flex flex-col">

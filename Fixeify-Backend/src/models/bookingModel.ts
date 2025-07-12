@@ -1,7 +1,22 @@
-import mongoose, { Schema, Document } from "mongoose";
-import { ILocation } from "./userModel";
+import mongoose, { Schema, Document, Model } from "mongoose";
 
-export interface IBooking extends Document {
+export interface ITimeSlot {
+  startTime: string;
+  endTime: string;
+  booked: boolean;
+}
+
+export interface ILocation {
+  address: string;
+  city: string;
+  state: string;
+  coordinates: {
+    type: "Point";
+    coordinates: [number, number];
+  };
+}
+
+export interface IBooking {
   userId: mongoose.Types.ObjectId;
   proId: mongoose.Types.ObjectId;
   categoryId: mongoose.Types.ObjectId;
@@ -9,41 +24,61 @@ export interface IBooking extends Document {
   location: ILocation;
   phoneNumber: string;
   preferredDate: Date;
-  preferredTime: string;
+  preferredTime: ITimeSlot[];
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
-const bookingSchema = new Schema<IBooking>(
+export interface BookingDocument extends IBooking, Document {
+  _id: mongoose.Types.ObjectId;
+}
+
+const locationSchema = new Schema<ILocation>(
+  {
+    address: { type: String, required: true },
+    city: { type: String, required: true },
+    state: { type: String, required: true },
+    coordinates: {
+      type: { type: String, enum: ["Point"], required: true },
+      coordinates: { type: [Number], required: true },
+    },
+  },
+  { _id: false }
+);
+
+const timeSlotSchema = new Schema<ITimeSlot>(
+  {
+    startTime: { type: String, required: true },
+    endTime: { type: String, required: true },
+    booked: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const bookingSchema = new Schema<BookingDocument>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     proId: { type: Schema.Types.ObjectId, ref: "ApprovedPro", required: true },
     categoryId: { type: Schema.Types.ObjectId, ref: "Category", required: true },
-    issueDescription: { type: String, required: true, minlength: 10, maxlength: 500 },
-    location: {
-      address: { type: String, required: true },
-      city: { type: String, required: true },
-      state: { type: String, required: true },
-      coordinates: {
-        type: { type: String, enum: ["Point"], required: true },
-        coordinates: { type: [Number], required: true },
-      },
-    },
-    phoneNumber: { type: String, required: true, match: [/^\d{10}$/, "Phone number must be a 10-digit number"] },
+    issueDescription: { type: String, required: true },
+    location: { type: locationSchema, required: true },
+    phoneNumber: { type: String, required: true },
     preferredDate: { type: Date, required: true },
-    preferredTime: { type: String, required: true, match: [/^\d{2}:\d{2}$/, "Time must be in HH:MM format"] },
+    preferredTime: { type: [timeSlotSchema], required: true },
     status: {
       type: String,
       enum: ["pending", "accepted", "rejected", "completed", "cancelled"],
       default: "pending",
     },
-    rejectedReason: { type: String, required: false },
+    rejectedReason: { type: String },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
 
-bookingSchema.index({ "location.coordinates": "2dsphere" });
+const Booking: Model<BookingDocument> = mongoose.model<BookingDocument>("Booking", bookingSchema);
 
-export default mongoose.model<IBooking>("Booking", bookingSchema);
+export default Booking;
