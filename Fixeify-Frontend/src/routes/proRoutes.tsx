@@ -4,6 +4,7 @@ import ProProfile from "../pages/Pro/ProProfile";
 import ProSlotManagement from "../pages/Pro/ProSlotManagement";
 import ProPrivateRoute from "../components/ProtectedRoutes/ProPrivateRoute";
 import JobManagementPage from "@/pages/Pro/JobManagementPage";
+import ProWalletManagement from "@/pages/Pro/ProWalletManagement";
 
 
 const ProEarnings = () => <div>Pro Earnings Page (To be implemented)</div>;
@@ -20,6 +21,7 @@ const proRoutes = (
       <Route path="/pro/messages" element={<ProMessages />} />
       <Route path="/pro/ratings" element={<ProRatings />} />
       <Route path="/pro/slot-management" element={<ProSlotManagement />} />
+      <Route path="/pro/wallet/:proId" element={<ProWalletManagement/>} />
     </Route>
   </>
 );

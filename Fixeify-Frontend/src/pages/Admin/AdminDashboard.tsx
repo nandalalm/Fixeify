@@ -3,8 +3,9 @@
 import { type FC, useState, useEffect } from "react";
 import { AdminNavbar } from "../../components/Admin/AdminNavbar";
 import { Menu, Bell } from "lucide-react";
-import { useSelector,  } from "react-redux";
-import { RootState, } from "../../store/store";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
+import { fetchDashboardMetrics } from "../../api/adminApi";
 
 interface StatCardProps {
   title?: string;
@@ -25,8 +26,17 @@ const StatCard: FC<StatCardProps> = ({ title, value, subtitle }) => {
 };
 
 const AdminDashboard: FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true); 
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [greeting, setGreeting] = useState("");
+  const [metrics, setMetrics] = useState<{
+    userCount: number;
+    proCount: number;
+    revenue: number;
+    categoryCount: number;
+    trendingService: { categoryId: string; name: string; bookingCount: number } | null;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const user = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
@@ -36,6 +46,22 @@ const AdminDashboard: FC = () => {
     else setGreeting("Good evening");
   }, []);
 
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      if (!user?.id) return;
+      try {
+        setLoading(true);
+        const data = await fetchDashboardMetrics(user.id);
+        setMetrics(data);
+      } catch (err) {
+        setError("Failed to load dashboard metrics");
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMetrics();
+  }, [user]);
 
   if (!user) {
     return null;
@@ -79,25 +105,35 @@ const AdminDashboard: FC = () => {
           }`}
         >
           <div className="max-w-7xl mx-auto">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-6">
+            <h2 className="text-2xl font-semibold text-gray-800 mb-6">
               {greeting}, {user.name}
-          </h2>
+            </h2>
             <h2 className="text-2xl font-semibold text-gray-800 mb-6">Dashboard</h2>
-            <section className="mb-8">
-              <h3 className="text-lg font-medium text-gray-800 mb-4">User count</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <StatCard value="3,100" subtitle="Customers" />
-                <StatCard value="400" subtitle="Fixeify Pros" />
-              </div>
-            </section>
+            {loading && <p>Loading metrics...</p>}
+            {error && <p className="text-red-500">{error}</p>}
+            {metrics && (
+              <>
+                <section className="mb-8">
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">Counts</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <StatCard value={metrics.userCount.toString()} subtitle="Customers" />
+                    <StatCard value={metrics.proCount.toString()} subtitle="Fixeify Pros" />
+                    <StatCard value={metrics.categoryCount.toString()} subtitle="Categories" />
+                  </div>
+                </section>
 
-            <section>
-              <h3 className="text-lg font-medium text-gray-800 mb-4">Revenue</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <StatCard value="₹20,000" subtitle="Revenue" />
-                <StatCard value="₹15,000" subtitle="Paid to Fixeify Pros" />
-              </div>
-            </section>
+                <section>
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">Insights</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <StatCard value={`₹${metrics.revenue.toLocaleString()}`} subtitle="Revenue" />
+                    <StatCard
+                      value={metrics.trendingService?.name || "None"}
+                      subtitle={`Trending Service (${metrics.trendingService?.bookingCount || 0} bookings)`}
+                    />
+                  </div>
+                </section>
+              </>
+            )}
           </div>
         </main>
       </div>

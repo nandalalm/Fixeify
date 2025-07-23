@@ -19,7 +19,7 @@ export interface ICategory {
 interface TimeSlot {
   startTime: string;
   endTime: string;
-  booked:boolean;
+  booked: boolean;
 }
 
 export interface PendingProResponse {
@@ -46,6 +46,7 @@ export interface PendingProResponse {
     sunday?: TimeSlot[];
   };
   createdAt?: Date;
+  isRejected?: boolean;
 }
 
 export class ProResponse {

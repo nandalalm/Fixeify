@@ -29,12 +29,35 @@ export interface User {
   photo?: string | null;
 }
 
+export interface BookingResponse {
+  id: string;
+  user: User;
+  pro: any; // Adjust to IApprovedPro
+  category: { id: string; name: string };
+  location: ILocation;
+  preferredDate: Date;
+  preferredTime: { startTime: string; endTime: string }[];
+  phoneNumber: string;
+  issueDescription: string;
+  status: string;
+  rejectedReason?: string;
+  paymentIntent?: any; // Adjust based on Stripe PaymentIntent type
+}
+
 interface AuthState {
   user: User | null;
   accessToken: string | null;
   isAuthenticated: boolean;
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
+  paymentSuccessData: {
+    bookingDetails: BookingResponse | null;
+    proId: string | null;
+    pro: any | null; // Adjust to IApprovedPro
+    categoryId: string | null;
+    location: ILocation | null;
+    totalCost: number | null;
+  } | null;
 }
 
 const initialState: AuthState = {
@@ -43,6 +66,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   status: "idle",
   error: null,
+  paymentSuccessData: null,
 };
 
 export interface RefreshTokenResponse {
@@ -155,6 +179,25 @@ const authSlice = createSlice({
     setAccessToken: (state, action: PayloadAction<string>) => {
       state.accessToken = action.payload;
     },
+    setPaymentSuccessData: (
+      state,
+      action: PayloadAction<{
+        bookingDetails: BookingResponse;
+        proId: string;
+        pro: any;
+        categoryId: string | null; // Updated to match state definition
+        location: ILocation;
+        totalCost: number;
+      }>
+    ) => {
+      state.paymentSuccessData = {
+        ...action.payload,
+        categoryId: action.payload.categoryId || null, // Ensure null if undefined
+      };
+    },
+    clearPaymentSuccessData: (state) => {
+      state.paymentSuccessData = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -211,5 +254,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { setAuth, updateUser, logoutUserSync, setError, clearError, setAccessToken } = authSlice.actions;
+export const { setAuth, updateUser, logoutUserSync, setError, clearError, setAccessToken, setPaymentSuccessData, clearPaymentSuccessData } = authSlice.actions;
 export default authSlice.reducer;

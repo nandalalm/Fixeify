@@ -63,7 +63,7 @@ export const getApprovalEmailTemplate = (email: string, name: string, password: 
   </html>
 `;
 
-export const getRejectionEmailTemplate = (reason: string): string => `
+export const getRejectionEmailTemplate = (reason: string, pendingProId: string): string => `
   <!DOCTYPE html>
   <html lang="en">
   <head>
@@ -86,6 +86,11 @@ export const getRejectionEmailTemplate = (reason: string): string => `
         <div class="reason">
           <p><strong>Reason:</strong> ${reason}</p>
         </div>
+        <p>You can reapply by clicking the button below:</p>
+        <a 
+        href="${process.env.FRONTEND_URL}/become-pro?pendingProId=${pendingProId}" 
+        style="display: inline-block; padding: 12px 24px; background-color: #032B44; color: #ffffff !important; text-decoration: none !important;
+        border-radius: 5px; font-weight: bold; margin: 20px 0;"> Reapply Now </a>
         <p>If you have any questions, please contact support.</p>
       </div>
       <div class="footer">

@@ -13,15 +13,17 @@ import {
 import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
-import { JSX } from "react";
+import { JSX, useEffect, useState } from "react";
+import { getProAvailability } from "../../api/proApi"; 
 
 const ProDetails = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const pro = location.state?.pro as IApprovedPro | undefined;
+  const proFromState = location.state?.pro as IApprovedPro | undefined;
   const categoryId = location.state?.categoryId as string | undefined;
   const selectedLocation = location.state?.location as ILocation | undefined;
 
+  const [pro, setPro] = useState<IApprovedPro | undefined>(proFromState);
   const dummyReviews = [
     {
       name: "John Doe",
@@ -53,6 +55,7 @@ const ProDetails = () => {
         const formattedSlots = slots.map((slot) => ({
           startTime: formatTimeTo12Hour(slot.startTime),
           endTime: formatTimeTo12Hour(slot.endTime),
+          booked: slot.booked,
         }));
         return { day: day.charAt(0).toUpperCase() + day.slice(1), slots: formattedSlots };
       });
@@ -68,6 +71,20 @@ const ProDetails = () => {
     Saturday: <CalendarDays className="w-5 h-5 text-gray-600 dark:text-gray-300" />,
     Sunday: <CalendarDays className="w-5 h-5 text-gray-600 dark:text-gray-300" />,
   };
+
+  useEffect(() => {
+    const fetchLatestAvailability = async () => {
+      if (proFromState?._id) {
+        try {
+          const response = await getProAvailability(proFromState._id);
+          setPro((prev) => ({ ...prev, ...response } as IApprovedPro));
+        } catch (error) {
+          console.error("Failed to fetch latest availability:", error);
+        }
+      }
+    };
+    fetchLatestAvailability();
+  }, [proFromState?._id]);
 
   if (!pro) {
     return (
@@ -180,10 +197,15 @@ const ProDetails = () => {
                               {day.slots.map((slot, index) => (
                                 <li
                                   key={index}
-                                  className="flex items-center gap-2 text-base text-gray-900 dark:text-gray-200"
+                                  className={`flex items-center gap-2 text-base ${
+                                    slot.booked
+                                      ? "text-gray-400 dark:text-gray-500 opacity-50"
+                                      : "text-gray-900 dark:text-gray-200"
+                                  }`}
                                 >
                                   <Clock className="w-4 h-4 text-gray-600 dark:text-gray-300" />
                                   {slot.startTime} - {slot.endTime}
+                                  {slot.booked && <span className="ml-2 text-red-500 text-xs">Booked</span>}
                                 </li>
                               ))}
                             </ul>

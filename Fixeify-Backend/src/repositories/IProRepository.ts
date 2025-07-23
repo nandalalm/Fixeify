@@ -18,6 +18,7 @@ export interface IProRepository {
   findApprovedProByIdAsProfile(id: string): Promise<ProProfileResponse | null>;
   updateBanStatus(proId: string, isBanned: boolean): Promise<ApprovedProDocument | null>;
   deletePendingPro(id: string): Promise<void>;
+  updatePendingPro(id: string, data: Partial<PendingProDocument>): Promise<PendingProDocument | null>;
   updateApprovedPro(id: string, data: Partial<ApprovedProDocument>): Promise<ApprovedProDocument | null>;
   findNearbyPros(categoryId: string, longitude: number, latitude: number): Promise<ProResponse[]>;
   updateAvailability(proId: string, dayOfWeek: string, timeSlots: ITimeSlot[],booked: boolean ): Promise<ApprovedProDocument | null>;

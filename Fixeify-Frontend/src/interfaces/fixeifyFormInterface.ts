@@ -30,3 +30,25 @@ export interface Category {
   name: string;
   image: string;
 }
+
+export interface PendingProResponse {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  category: {
+    id: string;
+    name: string;
+    image: string;
+  };
+  customService?: string;
+  location: LocationData;
+  profilePhoto: string;
+  idProof: string[];
+  accountHolderName: string;
+  accountNumber: string;
+  bankName: string;
+  availability: Availability;
+  createdAt?: Date;
+}

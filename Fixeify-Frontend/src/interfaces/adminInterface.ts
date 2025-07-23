@@ -37,7 +37,7 @@ export interface LocationData {
 export interface ITimeSlot {
   startTime: string;
   endTime: string;
-  booked:boolean
+  booked: boolean;
 }
 
 export interface PendingPro {
@@ -64,7 +64,9 @@ export interface PendingPro {
     sunday?: ITimeSlot[];
   };
   createdAt: Date;
+  isRejected?: boolean;
 }
+
 export interface IApprovedPro {
   _id: string;
   firstName: string;

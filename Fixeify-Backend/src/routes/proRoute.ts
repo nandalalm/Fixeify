@@ -19,6 +19,10 @@ export default function createProRoutes(container: Container): Router {
   router.put("/rejectBooking/:id", proController.rejectBooking.bind(proController));
   router.post("/generateQuota/:id", proController.generateQuota.bind(proController));
   router.get("/fetchQuota/:id", proController.fetchQuotaByBookingId.bind(proController));
+  router.get("/wallet/:proId", proController.getWallet.bind(proController));
+  router.get("/walletWithPagenation/:proId", proController.getWalletWithPagenation.bind(proController));
+  router.post("/requestWithdrawal/:proId", proController.requestWithdrawal.bind(proController));
+  router.get("/pending/:id", proController.getPendingProById.bind(proController));
 
   return router;
 }

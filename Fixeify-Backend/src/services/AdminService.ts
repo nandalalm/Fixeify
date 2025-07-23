@@ -3,17 +3,26 @@ import { TYPES } from "../types";
 import { IUserRepository } from "../repositories/IUserRepository";
 import { IProRepository } from "../repositories/IProRepository";
 import { ICategoryRepository } from "../repositories/ICategoryRepository";
+import { IBookingRepository } from "../repositories/IBookingRepository";
+import { IQuotaRepository } from "../repositories/IQuotaRepository";
+import { IWalletRepository } from "../repositories/IWalletRepository";
+import { IWithdrawalRequestRepository } from "../repositories/IWithdrawalRequestRepository";
+import { IAdminRepository } from "../repositories/IAdminRepository";
 import { UserResponse } from "../dtos/response/userDtos";
 import { IAdminService } from "./IAdminService";
 import { UserRole } from "../enums/roleEnum";
 import { PendingProDocument } from "../models/pendingProModel";
 import { ProResponse, PendingProResponse } from "../dtos/response/proDtos";
 import { CategoryResponse } from "../dtos/response/categoryDtos";
+import { BookingResponse } from "../dtos/response/bookingDtos";
+import { QuotaResponse } from "../dtos/response/quotaDtos";
+import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import { getApprovalEmailTemplate, getRejectionEmailTemplate } from "../utils/emailTemplates";
 import { createClient } from "redis";
 import { MESSAGES } from "../constants/messages";
+import { HttpError } from "../middleware/errorMiddleware";
 
 @injectable()
 export class AdminService implements IAdminService {
@@ -28,10 +37,27 @@ export class AdminService implements IAdminService {
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
     @inject(TYPES.IProRepository) private _proRepository: IProRepository,
-    @inject(TYPES.ICategoryRepository) private _categoryRepository: ICategoryRepository
+    @inject(TYPES.ICategoryRepository) private _categoryRepository: ICategoryRepository,
+    @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository,
+    @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
+    @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
+    @inject(TYPES.IWithdrawalRequestRepository) private _withdrawalRequestRepository: IWithdrawalRequestRepository,
+    @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
   ) {
     this._redisClient.connect().catch((err) => console.error("Failed to connect to Redis:", err));
     this._redisClient.on("error", (err) => console.error("Redis error:", err));
+  }
+
+
+  async getBookings(page: number, limit: number, search?: string, status?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const skip = (page - 1) * limit;
+    const { bookings, total } = await this._bookingRepository.fetchAllBookings(page, limit);
+    return { bookings, total };
+  }
+
+  async getQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null> {
+    const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
+    return quota;
   }
 
   async getUsers(page: number, limit: number): Promise<{ users: UserResponse[]; total: number }> {
@@ -86,7 +112,7 @@ export class AdminService implements IAdminService {
     }
 
     const category = await this._categoryRepository.findCategoryById(updatedPro.categoryId.toString());
-    if (!category) throw new Error("Category not found");
+    if (!category) throw new HttpError(404, MESSAGES.CATEGORY_NOT_FOUND);
 
     return new ProResponse({
       _id: updatedPro._id.toString(),
@@ -135,7 +161,7 @@ export class AdminService implements IAdminService {
       pros: await Promise.all(
         pros.map(async (doc: PendingProDocument) => {
           const category = await this._categoryRepository.findCategoryById(doc.categoryId.toString());
-          if (!category) throw new Error("Category not found");
+          if (!category) throw new HttpError(404, MESSAGES.CATEGORY_NOT_FOUND);
           return {
             _id: doc._id.toString(),
             firstName: doc.firstName,
@@ -156,6 +182,7 @@ export class AdminService implements IAdminService {
             bankName: doc.bankName,
             availability: doc.availability,
             createdAt: doc.createdAt,
+            isRejected: doc.isRejected,
           } as PendingProResponse;
         })
       ),
@@ -166,10 +193,10 @@ export class AdminService implements IAdminService {
   async getPendingProById(id: string): Promise<PendingProResponse> {
     const proDoc = await this._proRepository.findById(id);
     if (!proDoc) {
-      throw new Error("Pro not found");
+      throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
     }
     const category = await this._categoryRepository.findCategoryById(proDoc.categoryId.toString());
-    if (!category) throw new Error("Category not found");
+    if (!category) throw new HttpError(404, MESSAGES.CATEGORY_NOT_FOUND);
     return {
       _id: proDoc._id.toString(),
       firstName: proDoc.firstName,
@@ -190,22 +217,14 @@ export class AdminService implements IAdminService {
       bankName: proDoc.bankName,
       availability: proDoc.availability,
       createdAt: proDoc.createdAt,
+      isRejected: proDoc.isRejected,
     } as PendingProResponse;
   }
-
 
   async approvePro(id: string, about: string | null): Promise<void> {
     const { plainPassword, hashedPassword } = await this.generatePassword();
     const { email, firstName, lastName } = await this._proRepository.approvePro(id, hashedPassword, about || "");
-    console.log(`approve email: ${email}`);
     await this.sendApprovalEmail(email, `${firstName} ${lastName}`, plainPassword);
-  }
-
-  async rejectPro(id: string, reason: string): Promise<void> {
-    const pendingPro = await this.getPendingProById(id);
-    console.log(`reject email: ${pendingPro.email}`);
-    await this._proRepository.rejectPro(id);
-    await this.sendRejectionEmail(pendingPro.email, reason);
   }
 
   async getApprovedPros(page: number, limit: number): Promise<{ pros: ProResponse[]; total: number }> {
@@ -220,7 +239,7 @@ export class AdminService implements IAdminService {
   async getApprovedProById(id: string): Promise<ProResponse> {
     const proDoc = await this._proRepository.findApprovedProByIdAsResponse(id);
     if (!proDoc) {
-      throw new Error("Approved pro not found");
+      throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
     }
     return proDoc;
   }
@@ -228,7 +247,7 @@ export class AdminService implements IAdminService {
   async createCategory(name: string, image: string): Promise<CategoryResponse> {
     const existingCategory = await this._categoryRepository.findCategoryByName(name);
     if (existingCategory) {
-      throw new Error(MESSAGES.CATEGORY_NAME_EXISTS);
+      throw new HttpError(400, MESSAGES.CATEGORY_NAME_EXISTS);
     }
     const categoryData = { name, image };
     return this._categoryRepository.createCategory(categoryData);
@@ -247,10 +266,45 @@ export class AdminService implements IAdminService {
     if (data.name) {
       const existingCategory = await this._categoryRepository.findCategoryByName(data.name);
       if (existingCategory && existingCategory.id !== categoryId) {
-        throw new Error(MESSAGES.CATEGORY_NAME_EXISTS);
+        throw new HttpError(400, MESSAGES.CATEGORY_NAME_EXISTS);
       }
     }
     return this._categoryRepository.updateCategory(categoryId, data);
+  }
+
+  async getWithdrawalRequests(page: number, limit: number): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number; pros: ProResponse[] }> {
+    const skip = (page - 1) * limit;
+    const [withdrawals, total] = await Promise.all([
+      this._withdrawalRequestRepository.getAllWithdrawalRequests(skip, limit),
+      this._withdrawalRequestRepository.getTotalWithdrawalRequestsCount(),
+    ]);
+    const proIds = [...new Set(withdrawals.map((w) => w.proId))];
+    const pros = await Promise.all(proIds.map((id) => this._proRepository.findApprovedProByIdAsResponse(id)));
+    return { withdrawals, total, pros: pros.filter((p): p is ProResponse => p !== null) };
+  }
+
+  async acceptWithdrawalRequest(withdrawalId: string): Promise<void> {
+    const withdrawal = await this._withdrawalRequestRepository.findWithdrawalRequestById(withdrawalId);
+    if (!withdrawal) throw new HttpError(404, MESSAGES.WITHDRAWAL_NOT_FOUND);
+    if (withdrawal.status !== "pending") throw new HttpError(400, "Withdrawal request is not pending");
+
+    const wallet = await this._walletRepository.findWalletByProId(withdrawal.proId, false);
+    if (!wallet) throw new HttpError(404, MESSAGES.WALLET_NOT_FOUND);
+    if (wallet.balance < withdrawal.amount) throw new HttpError(400, MESSAGES.INSUFFICIENT_BALANCE);
+
+    await this._walletRepository.decreaseWalletBalance(wallet.id, withdrawal.amount);
+    await this._withdrawalRequestRepository.updateWithdrawalRequest(withdrawalId, { status: "approved" });
+  }
+
+  async rejectWithdrawalRequest(withdrawalId: string, reason: string): Promise<void> {
+    const withdrawal = await this._withdrawalRequestRepository.findWithdrawalRequestById(withdrawalId);
+    if (!withdrawal) throw new HttpError(404, MESSAGES.WITHDRAWAL_NOT_FOUND);
+    if (withdrawal.status !== "pending") throw new HttpError(400, "Withdrawal request is not pending");
+
+    await this._withdrawalRequestRepository.updateWithdrawalRequest(withdrawalId, {
+      status: "rejected",
+      rejectionReason: reason,
+    });
   }
 
   private async generatePassword(): Promise<{ plainPassword: string; hashedPassword: string }> {
@@ -302,11 +356,46 @@ export class AdminService implements IAdminService {
       console.log(`Approval email sent to ${email}`);
     } catch (error) {
       console.error(`Failed to send approval email to ${email}:`, error);
-      throw new Error("Failed to send approval email");
+      throw new HttpError(500, "Failed to send approval email");
     }
   }
 
-  private async sendRejectionEmail(email: string, reason: string): Promise<void> {
+  async getTrendingService(): Promise<{ categoryId: string; name: string; bookingCount: number } | null> {
+    return await this._bookingRepository.getTrendingService();
+  }
+
+  async getDashboardMetrics(adminId: string): Promise<{
+    userCount: number;
+    proCount: number;
+    revenue: number;
+    categoryCount: number;
+    trendingService: { categoryId: string; name: string; bookingCount: number } | null;
+  }> {
+    const [userCount, proCount, categoryCount, revenue, trendingService] = await Promise.all([
+      this._userRepository.getTotalUsersCount(),
+      this._proRepository.getTotalApprovedProsCount(),
+      this._categoryRepository.getTotalCategoriesCount(),
+      this._adminRepository.getAdminRevenue(adminId),
+      this._bookingRepository.getTrendingService(),
+    ]);
+
+    return {
+      userCount,
+      proCount,
+      revenue,
+      categoryCount,
+      trendingService,
+    };
+  }
+
+
+  async rejectPro(id: string, reason: string): Promise<void> {
+    const pendingPro = await this.getPendingProById(id);
+    await this._proRepository.rejectPro(id);
+    await this.sendRejectionEmail(pendingPro.email, reason, id);
+  }
+
+  private async sendRejectionEmail(email: string, reason: string, pendingProId: string): Promise<void> {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -319,7 +408,7 @@ export class AdminService implements IAdminService {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Fixeify - Request Rejected",
-      html: getRejectionEmailTemplate(reason),
+      html: getRejectionEmailTemplate(reason, pendingProId), // Pass pendingProId
     };
 
     try {
@@ -327,7 +416,7 @@ export class AdminService implements IAdminService {
       console.log(`Rejection email sent to ${email}`);
     } catch (error) {
       console.error(`Failed to send rejection email to ${email}:`, error);
-      throw new Error("Failed to send rejection email");
+      throw new HttpError(500, "Failed to send rejection email");
     }
   }
 }

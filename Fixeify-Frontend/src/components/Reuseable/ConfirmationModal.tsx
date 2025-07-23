@@ -4,8 +4,24 @@ interface ConfirmationModalProps {
   isOpen: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  action: "approve" | "reject" | "ban" | "unban" | "logout" | "saveSlot" | "addCategory" | "updateCategory" | "acceptBooking" | "rejectBooking" | null;
-  entityType?: "pro" | "user" | "booking";
+  action:
+    | "approve"
+    | "reject"
+    | "ban"
+    | "unban"
+    | "logout"
+    | "saveSlot"
+    | "addCategory"
+    | "updateCategory"
+    | "acceptBooking"
+    | "rejectBooking"
+    | "addQuota"
+    | "requestWithdrawal"
+    | "cancel"
+    | "acceptWithdrawal"
+    | "rejectWithdrawal"
+    | null;
+  entityType?: "pro" | "user" | "booking" | "wallet";
   reason?: string;
   setReason?: (reason: string) => void;
   customReason?: string;
@@ -37,10 +53,21 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
     "Not Enough Expertise",
     "Location Too Far",
     "Personal Reasons",
-    "Other"
+    "Other",
+  ];
+  const cancellationReasons = [
+    "Change of Plans",
+    "Found Another Professional",
+    "Issue Resolved",
+    "Other",
+  ];
+  const withdrawalRejectionReasons = [
+    "Insufficient Funds",
+    "Invalid Account Details",
+    "Suspicious Activity",
+    "Other",
   ];
 
-  // Track dropdown selection separately
   const [selectValue, setSelectValue] = useState("");
 
   return (
@@ -49,15 +76,19 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
       onClick={onCancel}
     >
       <div
-        className={`p-6 rounded-lg shadow-lg w-96 relative ${action === "logout" ? "bg-white dark:bg-[#1E2939]" : "bg-white"}`}
+        className={`p-6 rounded-lg shadow-lg w-96 relative ${
+          action === "logout" ? "bg-white dark:bg-[#1E2939]" : "bg-white"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {isProcessing && (
           <div className="absolute inset-0 bg-white bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-10">
-            <div className="spinner"></div>
+            <div className="spinner border-t-4 border-blue-500 rounded-full w-8 h-8 animate-spin"></div>
           </div>
         )}
-        <h3 className={`text-lg font-semibold mb-4 ${action === "logout" ? "dark:text-white" : ""}`}>
+        <h3
+          className={`text-lg font-semibold mb-4 ${action === "logout" ? "dark:text-white" : ""}`}
+        >
           {action === "approve" && `Approve ${entityType === "pro" ? "Pro" : "User"}`}
           {action === "reject" && `Reject ${entityType === "pro" ? "Pro" : "User"}`}
           {action === "ban" && `Ban ${entityType === "pro" ? "Pro" : "User"}`}
@@ -68,10 +99,16 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           {action === "updateCategory" && "Confirm Update Category"}
           {action === "acceptBooking" && "Confirm Accept Booking"}
           {action === "rejectBooking" && "Reject Booking"}
-          {action === null && (customTitle || "Confirm Action")}
+          {action === "addQuota" && (customTitle || "Confirm Quota Generation")}
+          {action === "requestWithdrawal" && (customTitle || "Confirm Withdrawal Request")}
+          {action === "cancel" && (customTitle || "Cancel Booking")}
+          {action === "acceptWithdrawal" && "Confirm Accept Withdrawal"}
+          {action === "rejectWithdrawal" && "Reject Withdrawal Request"}
         </h3>
         <p className={`mb-4 ${action === "logout" ? "dark:text-white" : ""}`}>
-          {action === null && customReason ? customReason : action === "approve" && `Are you sure you want to approve this ${entityType === "pro" ? "pro" : "user"}?`}
+          {action === null && customReason
+            ? customReason
+            : action === "approve" && `Are you sure you want to approve this ${entityType === "pro" ? "pro" : "user"}?`}
           {action === "reject" && `Please select a reason for rejection:`}
           {action === "ban" && `Are you sure you want to ban this ${entityType === "pro" ? "pro" : "user"}?`}
           {action === "unban" && `Are you sure you want to unban this ${entityType === "pro" ? "pro" : "user"}?`}
@@ -81,8 +118,15 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           {action === "updateCategory" && "Are you sure you want to update this category?"}
           {action === "acceptBooking" && "Are you sure you want to accept this booking?"}
           {action === "rejectBooking" && "Please select a reason for rejecting this booking:"}
+          {action === "addQuota" && "Are you sure you want to generate the quota for this booking?"}
+          {action === "requestWithdrawal" && (customReason || "Are you sure you want to request this withdrawal?")}
+          {action === "cancel" && (customTitle === "Select Cancellation Reason"
+            ? "Please select a reason for cancelling this booking:"
+            : "Are you sure you want to cancel this booking?")}
+          {action === "acceptWithdrawal" && "Are you sure you want to accept this withdrawal request?"}
+          {action === "rejectWithdrawal" && "Please select a reason for rejecting this withdrawal request:"}
         </p>
-        {(action === "reject" || action === "rejectBooking") && setReason && setCustomReason && (
+        {(action === "reject" || action === "rejectBooking" || action === "rejectWithdrawal" || (action === "cancel" && customTitle === "Select Cancellation Reason")) && setReason && setCustomReason && (
           <div className="mb-4">
             <select
               value={selectValue}
@@ -101,8 +145,10 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
               disabled={isProcessing}
             >
               <option value="">Select a reason</option>
-              {(action === "rejectBooking" ? bookingRejectionReasons : reasons).map((r, index) => (
-                <option key={index} value={r}>{r}</option>
+              {(action === "cancel" ? cancellationReasons : action === "rejectBooking" ? bookingRejectionReasons : action === "rejectWithdrawal" ? withdrawalRejectionReasons : reasons).map((r, index) => (
+                <option key={index} value={r}>
+                  {r}
+                </option>
               ))}
             </select>
             {selectValue === "Other" && (
@@ -121,6 +167,9 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
             )}
             {error && <p className="text-red-600 text-sm mt-2">{error}</p>}
           </div>
+        )}
+        {error && (action === "acceptBooking" || action === "addQuota" || action === "requestWithdrawal" || action === "acceptWithdrawal" || (action === "cancel" && customTitle === "Confirm Cancellation")) && (
+          <p className="text-red-600 text-sm mb-4">{error}</p>
         )}
         <div className="flex justify-end gap-4">
           <button
@@ -141,7 +190,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
                 ? "bg-green-600 text-white hover:bg-green-700 dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
                 : "bg-green-600 text-white hover:bg-green-700"
             } disabled:opacity-50`}
-            disabled={isProcessing || (action === "reject" && !reason)}
+            disabled={isProcessing || ((action === "reject" || action === "rejectBooking" || action === "rejectWithdrawal" || (action === "cancel" && customTitle === "Select Cancellation Reason")) && !reason)}
           >
             {isProcessing ? "Processing..." : "Confirm"}
           </button>

@@ -6,7 +6,6 @@ import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
 import { AddCategory } from "../../components/Admin/AddCategory";
-import { EditCategory } from "../../components/Admin/EditCategory";
 import { ICategory } from "../../interfaces/adminInterface";
 
 const AdminCategoryManagement: FC = () => {
@@ -16,8 +15,6 @@ const AdminCategoryManagement: FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<ICategory | null>(null);
   const limit = 5;
 
   const navigate = useNavigate();
@@ -43,14 +40,6 @@ const AdminCategoryManagement: FC = () => {
   const handleAddSuccess = (newCategory: ICategory) => {
     setCategories((prev) => [newCategory, ...prev]);
     setShowAddForm(false);
-  };
-
-  const handleEditSuccess = (updatedCategory: ICategory) => {
-    setCategories((prev) =>
-      prev.map((category) => (category.id === updatedCategory.id ? updatedCategory : category))
-    );
-    setShowEditForm(false);
-    setSelectedCategory(null);
   };
 
   if (!user || user.role !== "admin") return null;
@@ -99,12 +88,6 @@ const AdminCategoryManagement: FC = () => {
           <div className="max-w-7xl mx-auto">
             {showAddForm ? (
               <AddCategory onClose={() => setShowAddForm(false)} onSuccess={handleAddSuccess} />
-            ) : showEditForm && selectedCategory ? (
-              <EditCategory
-                onClose={() => setShowEditForm(false)}
-                onSuccess={handleEditSuccess}
-                category={selectedCategory}
-              />
             ) : (
               <>
                 <div className="flex justify-between items-center mb-6">
@@ -133,38 +116,26 @@ const AdminCategoryManagement: FC = () => {
                 </div>
 
                 {/* Categories Table */}
-                <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+                <div className="bg-white shadow-lg rounded-lg overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-gray-100">
                         <tr>
-                          <th className="w-1/5 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial No.</th>
-                          <th className="w-1/5 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
-                          <th className="w-2/5 px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                          <th className="w-1/5 px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Serial No.</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-7/12 ">Image</th>
+                          <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-3/12 ">Name</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {filteredCategories.map((category, index) => (
-                          <tr key={category.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                            <td className="w-1/5 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          <tr key={category.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                               {(currentPage - 1) * limit + index + 1}
                             </td>
-                            <td className="w-1/5 px-6 py-4 whitespace-nowrap">
-                              <img src={category.image} alt={category.name} className="h-10 w-10 rounded-full" />
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <img src={category.image} alt={category.name} className="h-12 w-12 rounded-full object-cover" />
                             </td>
-                            <td className="w-2/5 px-6 py-4 whitespace-nowrap text-sm text-gray-500">{category.name}</td>
-                            <td className="w-1/5 px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
-                              <button
-                                onClick={() => {
-                                  setSelectedCategory(category);
-                                  setShowEditForm(true);
-                                }}
-                                className="bg-blue-900 text-white px-4 py-1 rounded-md text-sm hover:bg-blue-800 transition-colors"
-                              >
-                                Edit
-                              </button>
-                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{category.name}</td>
                           </tr>
                         ))}
                       </tbody>

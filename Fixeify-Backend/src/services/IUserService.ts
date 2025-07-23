@@ -2,6 +2,7 @@ import { UserResponse } from "../dtos/response/userDtos";
 import { ProResponse } from "../dtos/response/proDtos";
 import { BookingResponse } from "../dtos/response/bookingDtos";
 import { ITimeSlot } from "../models/bookingModel";
+import { Stripe } from "stripe";
 
 export interface IUserService {
   getUserProfile(userId: string): Promise<UserResponse | null>;
@@ -9,7 +10,7 @@ export interface IUserService {
     userId: string,
     data: {
       name: string;
-      email: string;
+      email?: string;
       phoneNo: string | null;
       address?: {
         address: string;
@@ -42,5 +43,10 @@ export interface IUserService {
       preferredTime: ITimeSlot[];
     }
   ): Promise<BookingResponse>;
-  fetchBookingDetails(userId: string): Promise<BookingResponse[]>;
+  fetchBookingDetails(userId: string, page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>;
+  fetchBookingHistoryDetails(userId: string, page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>;
+ cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }>;
+  createPaymentIntent(bookingId: string, amount: number): Promise<{ clientSecret: string }>;
+  handlePaymentFailure(bookingId: string): Promise<void>;
+  handleWebhookEvent(event: Stripe.Event): Promise<void>; 
 }

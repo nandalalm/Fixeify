@@ -1,4 +1,4 @@
-import { Model, Document } from "mongoose";
+import { Model, Document,UpdateQuery } from "mongoose";
 
 export abstract class BaseRepository<T extends Document> {
   constructor(protected _model: Model<T>) {}
@@ -21,5 +21,9 @@ export abstract class BaseRepository<T extends Document> {
 
   async update(id: string, data: Partial<T>): Promise<T | null> {
     return this._model.findByIdAndUpdate(id, data, { new: true }).exec();
+  }
+
+  async updateById(id: string, update: UpdateQuery<T>): Promise<T | null> {
+    return this._model.findByIdAndUpdate(id, update, { new: true }).exec();
   }
 }

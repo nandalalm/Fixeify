@@ -314,7 +314,13 @@ const BookingForm = () => {
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
         error.errors.forEach((err) => {
-          fieldErrors[err.path[0]] = err.message;
+          const field = err.path[0] as string;
+          fieldErrors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
+          if (field === "phoneNumber" && formData.phoneNumber.length > 0 && formData.phoneNumber.length !== 10) {
+            fieldErrors[field] = "Enter a valid 10-digit phone number";
+          } else if (field === "preferredTime" && formData.preferredTime.length === 0) {
+            fieldErrors[field] = "Please select at least one time slot";
+          }
         });
         setErrors(fieldErrors);
       } else if (error instanceof Error) {
@@ -328,6 +334,8 @@ const BookingForm = () => {
                 setErrors({ preferredDate: message });
               } else if (message.includes("Time slot is already booked")) {
                 setErrors({ preferredTime: "One or more selected time slots are already booked. Please choose different slots." });
+              } else if (message.includes("You already have a booking")) {
+                setServerError(message); // Handle the new overlapping booking error
               } else if (message.includes("Time slot") || message.includes("Preferred time")) {
                 setErrors({ preferredTime: message });
               } else if (message.includes("Professional is currently unavailable")) {
@@ -511,7 +519,7 @@ const BookingForm = () => {
                 formData={formData}
                 setFormData={setFormData}
                 proId={proId}
-                setErrors={setErrors} // Added setErrors prop
+                setErrors={setErrors}
                 handleTimeSlotToggle={handleTimeSlotToggle}
                 errors={errors}
                 formatTimeTo12Hour={formatTimeTo12Hour}
@@ -523,14 +531,7 @@ const BookingForm = () => {
 
               <button
                 type="submit"
-                className="w-full px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 disabled:opacity-50"
-                disabled={
-                  !formData.issueDescription ||
-                  !formData.location ||
-                  !formData.phoneNumber ||
-                  !formData.preferredDate ||
-                  formData.preferredTime.length === 0
-                }
+                className="w-full px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500"
               >
                 Submit Booking
               </button>
@@ -542,5 +543,4 @@ const BookingForm = () => {
     </div>
   );
 };
-
 export default BookingForm;

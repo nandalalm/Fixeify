@@ -8,7 +8,7 @@ import { RootState, AppDispatch } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
 import { Sun, Moon } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
-import { ConfirmationModal } from "../Admin/ConfirmationModal"; 
+import { ConfirmationModal } from "../Reuseable/ConfirmationModal"; 
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);

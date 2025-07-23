@@ -1,3 +1,4 @@
+
 import express, { Router } from "express";
 import { Container } from "inversify";
 import { TYPES } from "../types";
@@ -14,6 +15,9 @@ export default function createUserRoutes(container: Container): Router {
   router.get("/nearbyPros", authenticateToken, userController.getNearbyPros.bind(userController));
   router.post("/book", authenticateToken, userController.createBooking.bind(userController));
   router.get("/bookings/:userId", authenticateToken, userController.fetchBookingDetails.bind(userController));
+  router.get("/bookings/history/:userId", authenticateToken, userController.fetchBookingHistoryDetails.bind(userController));
+  router.post("/create-payment-intent", authenticateToken, userController.createPaymentIntent.bind(userController));
+  router.post("/bookings/:userId/cancel", authenticateToken, userController.cancelBooking.bind(userController));
 
   return router;
 }

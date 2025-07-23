@@ -31,8 +31,9 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
   }
 
   async getPendingProsWithPagination(skip: number, limit: number): Promise<PendingProDocument[]> {
-    return this._model.find({}).skip(skip).limit(limit).exec();
+    return this._model.find({ isRejected: false }).skip(skip).limit(limit).exec();
   }
+
 
   async getTotalPendingProsCount(): Promise<number> {
     return this._model.countDocuments({}).exec();
@@ -71,8 +72,9 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
   async rejectPro(id: string): Promise<void> {
     const pendingPro = await this.findById(id);
     if (!pendingPro) throw new Error("Pending pro not found");
-    await this.delete(id);
+    await this._model.findByIdAndUpdate(id, { isRejected: true }).exec();
   }
+
 
   async getApprovedProsWithPagination(skip: number, limit: number): Promise<ProResponse[]> {
     const pros = (await ApprovedProModel.find({}, { password: 0 })
@@ -112,6 +114,16 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       isUnavailable: 1,
     }).exec();
     return pro ? this.mapToProProfileResponse(pro) : null;
+  }
+
+   async updatePendingPro(id: string, data: Partial<PendingProDocument>): Promise<PendingProDocument | null> {
+    return this._model
+      .findByIdAndUpdate(
+        id,
+        { $set: { ...data, isRejected: false, updatedAt: new Date() } },
+        { new: true, runValidators: true }
+      )
+      .exec();
   }
 
   async updateBanStatus(proId: string, isBanned: boolean): Promise<ApprovedProDocument | null> {

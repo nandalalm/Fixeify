@@ -1,12 +1,12 @@
 import type { FC } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Briefcase, DollarSign, User, MessageSquare, Star, Calendar1, LogOut } from "lucide-react";
+import { Home, Briefcase, Wallet, User, MessageSquare, Star, Calendar1, LogOut } from "lucide-react";
 import type { LucideProps } from "lucide-react";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "../../store/store";
+import { useDispatch,useSelector } from "react-redux";
+import { AppDispatch,RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
 import { useState } from "react";
-import { ConfirmationModal } from "../Admin/ConfirmationModal"; 
+import { ConfirmationModal } from "../Reuseable/ConfirmationModal"; 
 
 interface NavItem {
   icon: FC<LucideProps>;
@@ -24,6 +24,8 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const [showLogoutModal, setShowLogoutModal] = useState(false); 
+    const user = useSelector((state: RootState) => state.auth.user); // ✅ Moved inside
+  const proId = user?.id;
 
   const handleLogout = () => {
     dispatch(logoutUser("pro")).then(() => {
@@ -47,7 +49,7 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
   const navItems: NavItem[] = [
     { icon: Home, label: "Dashboard", path: "/pro-dashboard" },
     { icon: Briefcase, label: "Jobs", path: "/pro/jobs" },
-    { icon: DollarSign, label: "Earnings", path: "/pro/earnings" },
+    { icon: Wallet, label: "Wallet", path: `/pro/wallet/${proId}` },
     { icon: MessageSquare, label: "Messages", path: "/pro/messages" },
     { icon: Star, label: "Ratings", path: "/pro/ratings" },
     { icon: Calendar1, label: "Slots", path: "/pro/slot-management" },

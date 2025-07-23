@@ -2,6 +2,9 @@ import api from "./axios";
 import { ProProfile, Availability } from "../interfaces/proInterface";
 import { BookingResponse } from "../interfaces/bookingInterface";
 import { QuotaRequest, QuotaResponse } from "../interfaces/quotaInterface";
+import { WalletResponse } from "../interfaces/walletInterface";
+import { WithdrawalFormData } from "../interfaces/withdrawalRequestInterface";
+import { PendingProResponse } from "../interfaces/fixeifyFormInterface";
 
 export const getProProfile = async (userId: string): Promise<ProProfile> => {
   const response = await api.get(`/pro/fetchProfile/${userId}`, { withCredentials: true });
@@ -53,8 +56,11 @@ export const updateProAvailability = async (userId: string, data: { availability
   return response.data;
 };
 
-export const fetchProBookings = async (proId: string): Promise<BookingResponse[]> => {
-  const response = await api.get(`/pro/bookings/${proId}`, { withCredentials: true });
+export const fetchProBookings = async (proId: string, page: number = 1, limit: number = 5, status?: string): Promise<{ bookings: BookingResponse[]; total: number }> => {
+  const response = await api.get(`/pro/bookings/${proId}`, {
+    params: { page, limit, status },
+    withCredentials: true,
+  });
   return response.data;
 };
 
@@ -75,5 +81,28 @@ export const generateQuota = async (bookingId: string, data: QuotaRequest): Prom
 
 export const fetchQuotaByBookingId = async (bookingId: string): Promise<QuotaResponse | null> => {
   const response = await api.get(`/pro/fetchQuota/${bookingId}`, { withCredentials: true });
+  return response.data;
+};
+
+export const findWalletByProId = async (proId: string): Promise<WalletResponse> => {
+  const response = await api.get(`/pro/wallet/${proId}`, { withCredentials: true });
+  return response.data;
+};
+
+export const getWalletWithPagination = async (proId: string, page: number, limit: number): Promise<{ wallet: WalletResponse | null; total: number }> => {
+  const response = await api.get(`/pro/walletWithPagenation/${proId}`, {
+    params: { page, limit },
+    withCredentials: true,
+  });
+  return response.data;
+};
+
+export const requestWithdrawal = async (proId: string, data: { amount: number; paymentMode: "bank" | "upi"; bankName?: string; accountNumber?: string; ifscCode?: string; branchName?: string; upiCode?: string }): Promise<WithdrawalFormData> => {
+  const response = await api.post(`/pro/requestWithdrawal/${proId}`, data, { withCredentials: true });
+  return response.data;
+};
+
+export const getPendingProById = async (pendingProId: string): Promise<PendingProResponse> => {
+  const response = await api.get(`/pro/pending/${pendingProId}`);
   return response.data;
 };

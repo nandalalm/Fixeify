@@ -5,7 +5,7 @@ import { fetchUsers, toggleBanUser } from "../../api/adminApi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
-import { ConfirmationModal } from "../../components/Admin/ConfirmationModal";
+import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
 import { UserDetailsModal } from "../../components/Admin/UserDetailsModal";
 
 export interface ILocation {

@@ -18,6 +18,22 @@ export class MongoAdminRepository extends BaseRepository<IAdmin> implements IAdm
   }
 
   async findAdminById(adminId: string): Promise<IAdmin | null> {
-    return this.findById(adminId); 
+    return this.findById(adminId);
+  }
+
+  async updateRevenue(adminId: string, amount: number): Promise<IAdmin | null> {
+    return this.updateById(adminId, { $inc: { revenue: amount } }); 
+  }
+
+  async find(): Promise<IAdmin | null> {
+    return this._model.findOne().exec();
+  }
+
+  async getAdminRevenue(adminId: string): Promise<number> {
+    const admin = await this.findById(adminId);
+    if (!admin) {
+      throw new Error("Admin not found");
+    }
+    return admin.revenue || 0;
   }
 }

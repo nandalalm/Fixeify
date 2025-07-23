@@ -53,7 +53,28 @@ export const createBooking = async (
   return response.data;
 };
 
-export const fetchBookingDetails = async (userId: string): Promise<BookingResponse[]> => {
-  const response = await api.get(`/user/bookings/${userId}`, { withCredentials: true });
+export const fetchBookingDetails = async (userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> => {
+  const response = await api.get(`/user/bookings/${userId}`, {
+    withCredentials: true,
+    params: { page, limit },
+  });
+  return response.data; 
+};
+
+export const fetchBookingHistoryDetails = async (userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> => {
+  const response = await api.get(`/user/bookings/history/${userId}`, {
+    withCredentials: true,
+    params: { page, limit },
+  });
+  return response.data; 
+};
+
+export const createPaymentIntent = async (bookingId: string, amount: number): Promise<{ clientSecret: string }> => {
+  const response = await api.post(`/user/create-payment-intent`, { bookingId, amount }, { withCredentials: true });
+  return response.data;
+};
+
+export const cancelBooking = async (userId: string, bookingId: string, cancelReason: string): Promise<BookingResponse> => {
+  const response = await api.post(`/user/bookings/${userId}/cancel`, { bookingId, cancelReason }, { withCredentials: true });
   return response.data;
 };

@@ -5,6 +5,8 @@ export const TYPES = {
   IProRepository: Symbol.for("IProRepository"),
   IBookingRepository: Symbol.for("IBookingRepository"),
   IQuotaRepository: Symbol.for("IQuotaRepository"),
+  IWalletRepository: Symbol.for("IWalletRepository"),
+  IWithdrawalRequestRepository: Symbol.for("IWithdrawalRequestRepository"),
   AuthService: Symbol.for("AuthService"),
   AuthController: Symbol.for("AuthController"),
   AdminController: Symbol.for("AdminController"),

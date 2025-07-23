@@ -5,11 +5,12 @@ import ProfileInfo from "../../components/User/ProfileInfo";
 import EditProfile from "../../components/User/EditProfile";
 import ChangePassword from "../../components/User/ChangePassword";
 import OngoingRequest from "../../components/User/OngoingRequest";
-import { User, GitPullRequestDraft, Bell, ChevronLeft, ChevronRight, ListCollapse, LogOut, X, Wallet } from "lucide-react";
+import BookingHistory from "../../components/User/BookingHistory";
+import { User, GitPullRequestDraft, ChevronLeft, ChevronRight, ListCollapse, LogOut, X, MessageCircleIcon } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
-import { ConfirmationModal } from "../../components/Admin/ConfirmationModal";
+import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
 import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
@@ -30,12 +31,12 @@ const Profile = () => {
       const width = window.innerWidth;
       setIsExtraSmallScreen(width <= 600);
       if (width <= 600) {
-        setIsSidebarVisible(false); 
-        setIsToggleActive(false); 
-        setIsSidebarShrunk(true); 
+        setIsSidebarVisible(false);
+        setIsToggleActive(false);
+        setIsSidebarShrunk(true);
       } else {
-        setIsSidebarVisible(true); 
-        setIsToggleActive(false); 
+        setIsSidebarVisible(true);
+        setIsToggleActive(false);
       }
     };
 
@@ -97,8 +98,7 @@ const Profile = () => {
         </div>
       ),
     },
-    { name: "Wallet", icon: <Wallet className="w-5 h-5" /> },
-    { name: "Notifications & Alerts", icon: <Bell className="w-5 h-5" /> },
+    { name: "Messages", icon: <MessageCircleIcon className="w-5 h-5" /> },
     { name: "Logout", icon: <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" /> },
   ];
 
@@ -198,16 +198,11 @@ const Profile = () => {
             </div>
           )}
           {activeTab === "Ongoing Request" && <OngoingRequest />}
-          {activeTab === "Booking History" && (
+          {activeTab === "Booking History" && <BookingHistory />}
+          {activeTab === "Messages" && (
             <div className="p-6">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Booking History</h2>
-              <p className="text-gray-700 dark:text-gray-300">Booking history will be displayed here.</p>
-            </div>
-          )}
-          {activeTab === "Payment Section" && (
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Wallet</h2>
-              <p className="text-gray-700 dark:text-gray-300">Wallet details will be displayed here.</p>
+              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Messages</h2>
+              <p className="text-gray-700 dark:text-gray-300">Messages will be displayed here.</p>
             </div>
           )}
           {activeTab === "Notifications & Alerts" && (

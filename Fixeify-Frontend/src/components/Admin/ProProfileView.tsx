@@ -13,7 +13,7 @@ import { AdminNavbar } from "./AdminNavbar";
 import { Menu } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
-import { ConfirmationModal } from "./ConfirmationModal";
+import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 
 const SkillBadge = ({ name }: { name: string }) => (
   <div className="px-4 py-2 text-sm font-medium bg-gray-100 rounded-lg text-gray-800">{name}</div>

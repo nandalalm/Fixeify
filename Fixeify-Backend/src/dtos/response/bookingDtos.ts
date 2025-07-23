@@ -1,3 +1,4 @@
+
 import { ILocation, ITimeSlot } from "../../models/bookingModel";
 
 export class BookingResponse {
@@ -24,6 +25,7 @@ export class BookingResponse {
   preferredTime: ITimeSlot[];
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
+  cancelReason?: string; 
   createdAt: Date;
   updatedAt: Date;
 
@@ -39,6 +41,7 @@ export class BookingResponse {
     preferredTime: ITimeSlot[];
     status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
     rejectedReason?: string;
+    cancelReason?: string; 
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -53,6 +56,7 @@ export class BookingResponse {
     this.preferredTime = data.preferredTime;
     this.status = data.status;
     this.rejectedReason = data.rejectedReason;
+    this.cancelReason = data.cancelReason; 
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
   }

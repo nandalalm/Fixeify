@@ -6,7 +6,7 @@ import { useDispatch } from "react-redux";
 import { logoutUser } from "../../store/authSlice";
 import { AppDispatch } from "../../store/store";
 import { useState } from "react";
-import { ConfirmationModal } from "./ConfirmationModal";
+import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 
 interface NavItem {
   icon: FC<LucideProps>;
@@ -51,7 +51,7 @@ export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
     { icon: Award, label: "Fixeify Pro Management", path: "/admin/pro-management" },
     { icon: Grid, label: "Category Management", path: "/admin/categories" },
     { icon: Calendar, label: "Booking Management", path: "/admin/bookings" },
-    { icon: BadgeIndianRupee, label: "Payment Management", path: "/admin/payment" },
+    { icon: BadgeIndianRupee, label: "Revenue Management", path: "/admin/revenue" },
     { icon: Star, label: "Reviews Management", path: "/admin/reviews" },
     { icon: LogOut, label: "Log Out", path: "/admin-login", onClick: handleLogoutClick },
   ];

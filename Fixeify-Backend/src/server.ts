@@ -11,6 +11,7 @@ import createAuthRoutes from "./routes/authRoutes";
 import createAdminRoutes from "./routes/adminRoutes";
 import createProRoutes from "./routes/proRoute";
 import createUserRoutes from "./routes/userRoutes";
+import createStripeRoutes from "./routes/stripeRoutes";
 import { Container } from "inversify";
 import { TYPES } from "./types";
 import { AuthController } from "./controllers/authController";
@@ -27,12 +28,16 @@ import { IProRepository } from "./repositories/IProRepository";
 import { ICategoryRepository } from "./repositories/ICategoryRepository";
 import { IBookingRepository } from "./repositories/IBookingRepository";
 import { IQuotaRepository } from "./repositories/IQuotaRepository";
-import { MongoUserRepository } from "./repositories/mongoUserRepository";
-import { MongoAdminRepository } from "./repositories/mongoAdminRepository";
-import { MongoProRepository } from "./repositories/mongoProRepository";
-import { MongoCategoryRepository } from "./repositories/mongoCategoryRepository";
-import { MongoBookingRepository } from "./repositories/mongoBookingRepository";
-import { MongoQuotaRepository } from "./repositories/mongoQuotaRepository";
+import { IWalletRepository } from "./repositories/IWalletRepository";
+import { IWithdrawalRequestRepository } from "./repositories/IWithdrawalRequestRepository";
+import { MongoUserRepository } from "./repositories/UserRepository";
+import { MongoAdminRepository } from "./repositories/AdminRepository";
+import { MongoProRepository } from "./repositories/ProRepository";
+import { MongoCategoryRepository } from "./repositories/CategoryRepository";
+import { MongoBookingRepository } from "./repositories/BookingRepository";
+import { MongoQuotaRepository } from "./repositories/QuotaRepository";
+import { MongoWalletRepository } from "./repositories/WalletRepository";
+import { MongoWithdrawalRequestRepository } from "./repositories/WithdrawalRequestRepository";
 import { errorMiddleware } from "./middleware/errorMiddleware";
 
 dotenv.config();
@@ -50,6 +55,8 @@ container.bind<IProRepository>(TYPES.IProRepository).to(MongoProRepository).inSi
 container.bind<ICategoryRepository>(TYPES.ICategoryRepository).to(MongoCategoryRepository).inSingletonScope();
 container.bind<IBookingRepository>(TYPES.IBookingRepository).to(MongoBookingRepository).inSingletonScope();
 container.bind<IQuotaRepository>(TYPES.IQuotaRepository).to(MongoQuotaRepository).inSingletonScope();
+container.bind<IWalletRepository>(TYPES.IWalletRepository).to(MongoWalletRepository).inSingletonScope();
+container.bind<IWithdrawalRequestRepository>(TYPES.IWithdrawalRequestRepository).to(MongoWithdrawalRequestRepository).inSingletonScope();
 container.bind<AuthService>(TYPES.AuthService).to(AuthService).inSingletonScope();
 container.bind<AdminService>(TYPES.IAdminService).to(AdminService).inSingletonScope();
 container.bind<ProService>(TYPES.IProService).to(ProService).inSingletonScope();
@@ -71,13 +78,13 @@ app.use(
   })
 );
 app.use(cookieParser());
-app.use(express.json());
 app.use(express.static("public"));
 
-app.use("/api/auth", createAuthRoutes(container));
-app.use("/api/admin", createAdminRoutes(container));
-app.use("/api/pro", createProRoutes(container));
-app.use("/api/user", createUserRoutes(container));
+app.use("/api/auth", express.json(), createAuthRoutes(container));
+app.use("/api/admin", express.json(), createAdminRoutes(container));
+app.use("/api/pro", express.json(), createProRoutes(container));
+app.use("/api/user", express.json(), createUserRoutes(container));
+app.use("/api/stripe", createStripeRoutes(container));
 
 app.use(errorMiddleware);
 

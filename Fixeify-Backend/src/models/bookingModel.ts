@@ -16,25 +16,6 @@ export interface ILocation {
   };
 }
 
-export interface IBooking {
-  userId: mongoose.Types.ObjectId;
-  proId: mongoose.Types.ObjectId;
-  categoryId: mongoose.Types.ObjectId;
-  issueDescription: string;
-  location: ILocation;
-  phoneNumber: string;
-  preferredDate: Date;
-  preferredTime: ITimeSlot[];
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
-  rejectedReason?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface BookingDocument extends IBooking, Document {
-  _id: mongoose.Types.ObjectId;
-}
-
 const locationSchema = new Schema<ILocation>(
   {
     address: { type: String, required: true },
@@ -57,6 +38,26 @@ const timeSlotSchema = new Schema<ITimeSlot>(
   { _id: false }
 );
 
+export interface IBooking {
+  userId: mongoose.Types.ObjectId;
+  proId: mongoose.Types.ObjectId;
+  categoryId: mongoose.Types.ObjectId;
+  issueDescription: string;
+  location: ILocation;
+  phoneNumber: string;
+  preferredDate: Date;
+  preferredTime: ITimeSlot[];
+  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
+  rejectedReason?: string;
+  cancelReason?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface BookingDocument extends IBooking, Document {
+  _id: mongoose.Types.ObjectId;
+}
+
 const bookingSchema = new Schema<BookingDocument>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -73,6 +74,7 @@ const bookingSchema = new Schema<BookingDocument>(
       default: "pending",
     },
     rejectedReason: { type: String },
+    cancelReason: { type: String }, 
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },
@@ -80,5 +82,4 @@ const bookingSchema = new Schema<BookingDocument>(
 );
 
 const Booking: Model<BookingDocument> = mongoose.model<BookingDocument>("Booking", bookingSchema);
-
 export default Booking;

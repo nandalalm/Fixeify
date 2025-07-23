@@ -3,6 +3,8 @@ import { TYPES } from "../types";
 import { IUserRepository } from "../repositories/IUserRepository";
 import { IProRepository } from "../repositories/IProRepository";
 import { IBookingRepository } from "../repositories/IBookingRepository";
+import { IQuotaRepository } from "../repositories/IQuotaRepository";
+import { IWalletRepository } from "../repositories/IWalletRepository";
 import { IUserService } from "./IUserService";
 import { UserResponse } from "../dtos/response/userDtos";
 import { ProResponse } from "../dtos/response/proDtos";
@@ -11,19 +13,32 @@ import { UserRole } from "../enums/roleEnum";
 import { IUser } from "../models/userModel";
 import { IApprovedPro, ITimeSlot } from "../models/approvedProModel";
 import { IBooking } from "../models/bookingModel";
+import { WalletDocument } from "../models/walletModel";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
+import Stripe from "stripe";
+import { ApprovedProDocument } from "../models/approvedProModel";
+import { UpdateQuery } from "mongoose";
+import { IAdminRepository } from "../repositories/IAdminRepository"; 
 
 @injectable()
 export class UserService implements IUserService {
+  private stripe: Stripe;
+
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
     @inject(TYPES.IProRepository) private _proRepository: IProRepository,
-    @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository
-  ) {}
-
+    @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository,
+    @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
+    @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
+    @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
+  ) {
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: "2025-06-30.basil",
+    });
+  }
   async getUserProfile(userId: string): Promise<UserResponse | null> {
     const user = await this._userRepository.findUserById(userId);
     if (!user) return null;
@@ -90,7 +105,7 @@ export class UserService implements IUserService {
     return this._proRepository.findNearbyPros(categoryId, longitude, latitude);
   }
 
-  async createBooking(
+ async createBooking(
     userId: string,
     proId: string,
     bookingData: {
@@ -123,6 +138,18 @@ export class UserService implements IUserService {
       throw new HttpError(400, "Preferred date cannot be in the past");
     }
 
+    const existingBookings = await this._bookingRepository.findBookingsByUserProDateTime(
+      userId,
+      proId,
+      preferredDate,
+      bookingData.preferredTime,
+      "pending"
+    );
+
+    if (existingBookings.length > 0) {
+      throw new HttpError(400, "You already have a booking in progress for this date and time slot. Please choose a different time.");
+    }
+
     const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
     const availableSlots = pro.availability[dayOfWeek as keyof IApprovedPro["availability"]] || [];
 
@@ -145,13 +172,6 @@ export class UserService implements IUserService {
       }
     }
 
-    const updatedSlots = bookingData.preferredTime.map(slot => ({ ...slot, booked: true }));
-    const updateResult = await this._proRepository.updateAvailability(proId, dayOfWeek, updatedSlots,true);
-    
-    if (!updateResult) {
-      throw new HttpError(400, "Failed to reserve time slots. Some slots may be booked by another user.");
-    }
-
     const booking: Partial<IBooking> = {
       userId: new mongoose.Types.ObjectId(userId),
       proId: new mongoose.Types.ObjectId(proId),
@@ -160,16 +180,169 @@ export class UserService implements IUserService {
       location: bookingData.location,
       phoneNumber: bookingData.phoneNumber,
       preferredDate,
-      preferredTime: updatedSlots,
+      preferredTime: bookingData.preferredTime, 
       status: "pending",
     };
 
     return await this._bookingRepository.createBooking(booking);
   }
 
-  async fetchBookingDetails(userId: string): Promise<BookingResponse[]> {
-    const bookings = await this._bookingRepository.fetchBookingDetails(userId);
-    return bookings;
+ async fetchBookingDetails(userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> {
+  const { bookings, total } = await this._bookingRepository.fetchBookingDetails(userId, page, limit);
+  return { bookings, total };
+}
+
+ async fetchBookingHistoryDetails(userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const { bookings, total } = await this._bookingRepository.fetchBookingHistoryDetails(userId, page, limit);
+    return { bookings, total };
+  }
+  
+  async createPaymentIntent(bookingId: string, amount: number): Promise<{ clientSecret: string }> {
+    const paymentIntent = await this.stripe.paymentIntents.create({
+      amount,
+      currency: "inr",
+      automatic_payment_methods: { enabled: true },
+      metadata: { bookingId },
+    });
+    if (!paymentIntent.client_secret) {
+      throw new HttpError(500, "Failed to create payment intent");
+    }
+    return { clientSecret: paymentIntent.client_secret };
+  }
+
+  async completeBookingPayment(bookingId: string): Promise<void> {
+    const booking = await this._bookingRepository.findBookingById(bookingId);
+    if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
+
+    const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
+    if (!quota) throw new HttpError(404, "Quota not found");
+
+    await this._quotaRepository.updateQuota(quota.id, { paymentStatus: "completed" });
+
+    const proAmount = Math.round(quota.totalCost * 0.7);
+    let wallet = await this._walletRepository.findWalletByProId(booking.proId.toString());
+    if (!wallet) {
+      wallet = await this._walletRepository.createWallet({
+        proId: booking.proId,
+        balance: 0,
+        transactions: [],
+      });
+    }
+
+    const transaction = {
+      amount: proAmount,
+      type: "credit" as const,
+      date: new Date(),
+      quotaId: new mongoose.Types.ObjectId(quota.id),
+    };
+
+    const update: UpdateQuery<WalletDocument> = {
+      $set: { balance: wallet.balance + proAmount },
+      $push: { transactions: transaction },
+    };
+
+    const updatedWallet = await this._walletRepository.updateWallet(wallet.id, update);
+
+    if (!updatedWallet) {
+      throw new HttpError(500, "Failed to update pro wallet");
+    }
+
+    const adminRevenue = Math.round(quota.totalCost * 0.3);
+
+    const admin = await this._adminRepository.find();
+    if (admin) {
+      await this._adminRepository.updateRevenue(admin.id, adminRevenue);
+    } else {
+      throw new HttpError(404, "Admin not found");
+    }
+
+    const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
+    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+
+    const preferredDate = new Date(booking.preferredDate);
+    const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+    const availableSlots = pro.availability[dayOfWeek as keyof ApprovedProDocument["availability"]] || [];
+
+    const updatedSlots = booking.preferredTime.map((slot) => ({
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      booked: false,
+    }));
+
+    const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
+    if (!availabilityUpdate) {
+      console.log("Availability update failed. Pro document:", await this._proRepository.findApprovedProById(pro.id));
+      throw new HttpError(400, "Failed to update pro availability");
+    }
+
+    await this._bookingRepository.updateBooking(bookingId, {
+      status: "completed",
+      preferredTime: updatedSlots.map((slot) => ({ ...slot })),
+    });
+  }
+
+ async cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }> {
+    const booking = await this._bookingRepository.findBookingById(bookingId);
+    if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
+    if (booking.userId.toString() !== userId) throw new HttpError(403, "Unauthorized to cancel this booking");
+    if (booking.status !== "pending") throw new HttpError(400, "Only pending bookings can be cancelled");
+
+    await this._bookingRepository.cancelBooking(bookingId, {
+      status: "cancelled",
+      cancelReason: cancelReason,
+    });
+
+    return { message: "Booking cancelled successfully" };
+  }
+  
+  async handlePaymentFailure(bookingId: string): Promise<void> {
+    const booking = await this._bookingRepository.findBookingById(bookingId);
+    if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
+
+    const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
+    if (quota) {
+      await this._quotaRepository.updateQuota(quota.id, { paymentStatus: "failed" });
+    }
+  }
+
+  async handleWebhookEvent(event: Stripe.Event): Promise<void> {
+    switch (event.type) {
+      case "payment_intent.succeeded":
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        if (paymentIntent.metadata?.bookingId) {
+          await this.completeBookingPayment(paymentIntent.metadata.bookingId);
+        }
+        break;
+      case "payment_intent.payment_failed":
+        const failedPaymentIntent = event.data.object as Stripe.PaymentIntent;
+        if (failedPaymentIntent.metadata?.bookingId) {
+          await this.handlePaymentFailure(failedPaymentIntent.metadata.bookingId);
+        }
+        break;
+      case "payment_intent.created":
+        console.log(`Received payment_intent.created for PaymentIntent ${event.data.object.id}`);
+        break;
+      case "charge.succeeded":
+        const charge = event.data.object as Stripe.Charge;
+        if (charge.payment_intent) {
+          console.log(`Charge Succeeded for PaymentIntent ${charge.payment_intent}`);
+        }
+        break;
+      case "charge.failed":
+        const failCharge = event.data.object as Stripe.Charge;
+        if (failCharge.payment_intent) {
+          console.log(`Charge failed for PaymentIntent ${failCharge.payment_intent}`);
+        }
+        break;
+      case "charge.updated":
+        const updatedCharge = event.data.object as Stripe.Charge;
+        if (updatedCharge.payment_intent) {
+          console.log(`Charge updated for PaymentIntent ${updatedCharge.payment_intent}`);
+        }
+        break;
+      default:
+        console.log(`Unhandled event type ${event.type}`);
+    }
   }
 
   private mapToUserResponse(user: IUser): UserResponse {

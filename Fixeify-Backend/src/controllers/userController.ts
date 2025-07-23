@@ -5,10 +5,19 @@ import { IUserService } from "../services/IUserService";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
 import { AuthRequest } from "../middleware/authMiddleware";
+import Stripe from "stripe";
+
+type PaymentIntentStatus = Stripe.PaymentIntent.Status;
 
 @injectable()
 export class UserController {
-  constructor(@inject(TYPES.IUserService) private _userService: IUserService) {}
+  private stripe: Stripe;
+
+  constructor(@inject(TYPES.IUserService) private _userService: IUserService) {
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: "2025-06-30.basil",
+    });
+  }
 
   async getUserProfile(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -85,12 +94,77 @@ export class UserController {
   }
 
   async fetchBookingDetails(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { userId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 5;
+    const { bookings, total } = await this._userService.fetchBookingDetails(userId, page, limit);
+    res.status(200).json({ bookings, total });
+  } catch (error) {
+    next(error);
+  }
+}
+
+  async fetchBookingHistoryDetails(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { userId } = req.params;
-      const bookings = await this._userService.fetchBookingDetails(userId);
-      res.status(200).json(bookings);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 5;
+      const { bookings, total } = await this._userService.fetchBookingHistoryDetails(userId, page, limit);
+      res.status(200).json({ bookings, total });
     } catch (error) {
       next(error);
     }
   }
+  
+  async createPaymentIntent(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { bookingId, amount } = req.body;
+      if (!bookingId || !amount) throw new HttpError(400, "bookingId and amount are required");
+
+      const paymentIntent = await this._userService.createPaymentIntent(bookingId, amount);
+      res.status(200).json(paymentIntent);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async cancelBooking(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const { bookingId, cancelReason } = req.body;
+      if (!bookingId || !cancelReason) throw new HttpError(400, "bookingId and cancelReason are required");
+
+      const result = await this._userService.cancelBooking(userId, bookingId, cancelReason);
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async handleWebhook(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const sig = req.headers["stripe-signature"] as string;
+    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!endpointSecret) throw new HttpError(500, "Stripe webhook secret is not configured");
+
+    let event;
+    try {
+      const rawBody = req.body; // req.body is a Buffer from express.raw()
+      if (!rawBody || !(rawBody instanceof Buffer)) {
+        throw new Error("Raw body not available or not a Buffer");
+      }
+      event = this.stripe.webhooks.constructEvent(rawBody.toString(), sig, endpointSecret);
+    } catch (err: unknown) {
+      const error = err as Error;
+      console.error(`Webhook signature verification failed: ${error.message}`);
+      throw new HttpError(400, `Webhook Error: ${error.message}`);
+    }
+
+    await this._userService.handleWebhookEvent(event);
+    res.status(200).json({ received: true });
+  } catch (error) {
+    next(error);
+  }
+}
 }

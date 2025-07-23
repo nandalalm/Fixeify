@@ -72,15 +72,15 @@ const imageFileSchema = z
   .instanceof(File)
   .refine((file) => file.type.startsWith("image/"), "Only images are allowed");
 
-const profilePhotoSchema = imageFileSchema.refine(
-  (file) => file instanceof File,
-  "Profile photo is required"
-);
+const profilePhotoSchema = z.union([
+  imageFileSchema,
+  z.string().url("Invalid profile photo URL").min(1, "Profile photo is required"),
+]).refine((val) => val !== null && val !== undefined, "Profile photo is required");
 
-const idProofSchema = z
-  .array(imageFileSchema)
-  .nonempty("At least one ID proof image is required")
-  .refine((files) => files.every((file) => file.type.startsWith("image/")), "Only images are allowed");
+const idProofSchema = z.union([
+  z.array(imageFileSchema).nonempty("At least one ID proof image is required"),
+  z.array(z.string().url("Invalid ID proof URL")).nonempty("At least one ID proof URL is required"),
+]);
 
 const timeSlotSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/, "Start time must be in HH:mm format (00:00-23:59)"),

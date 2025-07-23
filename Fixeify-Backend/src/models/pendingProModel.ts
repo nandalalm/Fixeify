@@ -13,7 +13,7 @@ export interface ILocation {
 export interface ITimeSlot {
   startTime: string;
   endTime: string;
-  booked:boolean
+  booked: boolean;
 }
 
 export interface IAvailability {
@@ -41,6 +41,7 @@ export interface IPendingPro {
   bankName: string;
   availability: IAvailability;
   createdAt?: Date;
+  isRejected?: boolean;
 }
 
 export interface PendingProDocument extends IPendingPro, Document {
@@ -107,6 +108,7 @@ const pendingProSchema = new Schema<PendingProDocument>(
     bankName: { type: String, required: true },
     availability: { type: availabilitySchema, required: true },
     createdAt: { type: Date, default: Date.now },
+    isRejected: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

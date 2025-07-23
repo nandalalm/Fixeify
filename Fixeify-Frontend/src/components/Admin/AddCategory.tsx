@@ -2,7 +2,7 @@ import { type FC, useState, useCallback } from "react";
 import { addCategory } from "../../api/adminApi";
 import { ICategory } from "../../interfaces/adminInterface";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { ConfirmationModal } from "./ConfirmationModal";
+import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import { ArrowLeft } from "lucide-react";
 import Cropper from "react-easy-crop";
 import type { Area } from "react-easy-crop";

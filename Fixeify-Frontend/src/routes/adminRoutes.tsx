@@ -8,6 +8,8 @@ import AdminCategoryManagement from "../pages/Admin/AdminCategoryManagement";
 import ProProfileView from "../components/Admin/ProProfileView";
 import PublicRoute from "../components/ProtectedRoutes/PublicRoute";
 import AdminPrivateRoute from "../components/ProtectedRoutes/AdminPrivateRoute";
+import AdminBookingManagement from "@/pages/Admin/AdminBookingManagement";
+import AdminRevenueManagement from "@/pages/Admin/AdminRevenueManagement";
 
 const adminRoutes = (
   <>
@@ -21,6 +23,8 @@ const adminRoutes = (
       <Route path="/admin/pro-management" element={<AdminProManagement />} />
       <Route path="/admin/categories" element={<AdminCategoryManagement />} />
       <Route path="/pro-profile/:id" element={<ProProfileView />} />
+      <Route path="/admin/bookings" element={<AdminBookingManagement/>} />
+      <Route path="/admin/revenue" element={<AdminRevenueManagement/>} />
     </Route>
   </>
 );

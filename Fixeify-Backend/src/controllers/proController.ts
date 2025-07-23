@@ -4,10 +4,11 @@ import { TYPES } from "../types";
 import { IProService } from "../services/IProService";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "../middleware/errorMiddleware";
+import { ProResponse } from "../dtos/response/proDtos";
 
 @injectable()
 export class ProController {
-  constructor(@inject(TYPES.IProService) private _proService: IProService) {}
+  constructor(@inject(TYPES.IProService) private _proService: IProService) { }
 
   async applyPro(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -65,7 +66,17 @@ export class ProController {
   async updateAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const proId = req.params.id;
-      const { availability, isUnavailable } = req.body;
+      const { availability, isUnavailable } = req.body as { availability: ProResponse['availability']; isUnavailable: boolean };
+
+      if (isUnavailable) {
+        const hasBookedSlots = Object.values(availability).some(
+          (slots: any[] | undefined) => slots?.some((slot: any) => slot.booked)
+        );
+        if (hasBookedSlots) {
+          throw new HttpError(400, "Cannot mark as unavailable while there are booked slots");
+        }
+      }
+
       const updatedAvailability = await this._proService.updateAvailability(proId, { availability, isUnavailable });
       res.status(200).json(updatedAvailability);
     } catch (error) {
@@ -85,8 +96,11 @@ export class ProController {
   async fetchProBookings(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const proId = req.params.id;
-      const bookings = await this._proService.fetchProBookings(proId);
-      res.status(200).json(bookings);
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 5;
+      const status = req.query.status as string; // New status filter
+      const { bookings, total } = await this._proService.fetchProBookings(proId, page, limit, status);
+      res.status(200).json({ bookings, total });
     } catch (error) {
       next(error);
     }
@@ -134,4 +148,62 @@ export class ProController {
       next(error);
     }
   }
+
+  async getWallet(req: Request, res: Response) {
+    try {
+      const { proId } = req.params;
+      const wallet = await this._proService.getWallet(proId);
+      if (!wallet) throw new HttpError(404, "Wallet not found");
+      res.status(200).json(wallet);
+    } catch (error: any) {
+      res.status(error.status || 500).json({ message: error.message });
+    }
+  }
+
+  async getWalletWithPagenation(req: Request, res: Response) {
+    try {
+      const { proId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 5;
+      const { wallet, total } = await this._proService.getWalletWithPagination(proId, page, limit);
+      if (!wallet) throw new HttpError(404, "Wallet not found");
+      res.status(200).json({ wallet, total });
+    } catch (error: any) {
+      res.status(error.status || 500).json({ message: error.message });
+    }
+  }
+
+  async requestWithdrawal(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const proId = req.params.proId;
+      console.log('Logging in controller proId for requestWithdrawal:', proId);
+      console.log('Received request body:', req.body); // Add this log
+      const { amount, paymentMode, bankName, accountNumber, ifscCode, branchName, upiCode } = req.body;
+      if (!amount || amount < 200) throw new HttpError(400, "Minimum withdrawal amount is ₹200.");
+      const wallet = await this._proService.getWallet(proId);
+      if (!wallet) throw new HttpError(404, MESSAGES.WALLET_NOT_FOUND);
+      if (amount > wallet.balance) throw new HttpError(400, "Withdrawal amount cannot exceed wallet balance.");
+      if (paymentMode === "bank") {
+        if (!bankName || !accountNumber || !ifscCode || !branchName) {
+          throw new HttpError(400, "All bank details are required.");
+        }
+      } else if (paymentMode === "upi") {
+        if (!upiCode) throw new HttpError(400, "UPI code is required.");
+      }
+      const withdrawalRequest = await this._proService.requestWithdrawal(proId, { amount, paymentMode, bankName, accountNumber, ifscCode, branchName, upiCode });
+      res.status(201).json(withdrawalRequest);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPendingProById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const pendingProId = req.params.id;
+    const pendingPro = await this._proService.getPendingProById(pendingProId);
+    res.status(200).json(pendingPro);
+  } catch (error) {
+    next(error);
+  }
+}
 }
