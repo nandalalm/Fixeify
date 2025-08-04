@@ -1,6 +1,6 @@
-import { Model, Document,UpdateQuery } from "mongoose";
+import { Model, Document, UpdateQuery } from "mongoose";
 
-export abstract class BaseRepository<T extends Document> {
+export abstract class BaseRepository<T extends Document, P = T> {
   constructor(protected _model: Model<T>) {}
 
   async create(data: Partial<T>): Promise<T> {
@@ -11,8 +11,8 @@ export abstract class BaseRepository<T extends Document> {
     return this._model.findOne(query).exec();
   }
 
-  async findById(id: string): Promise<T | null> {
-    return this._model.findById(id).exec();
+  async findById(id: string): Promise<P | null> {
+    return this._model.findById(id).exec() as Promise<P | null>;
   }
 
   async delete(id: string): Promise<void> {

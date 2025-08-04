@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../api/axios";
+import { initializeSocket, disconnectSocket } from "../services/socket";
 import { RootState } from "../store/store";
 
 export enum UserRole {
@@ -14,7 +15,7 @@ export interface ILocation {
   state: string;
   coordinates: {
     type: "Point";
-    coordinates: [number, number]; // [longitude, latitude]
+    coordinates: [number, number]; 
   };
 }
 
@@ -32,7 +33,7 @@ export interface User {
 export interface BookingResponse {
   id: string;
   user: User;
-  pro: any; // Adjust to IApprovedPro
+  pro: any; 
   category: { id: string; name: string };
   location: ILocation;
   preferredDate: Date;
@@ -41,7 +42,7 @@ export interface BookingResponse {
   issueDescription: string;
   status: string;
   rejectedReason?: string;
-  paymentIntent?: any; // Adjust based on Stripe PaymentIntent type
+  paymentIntent?: any; 
 }
 
 interface AuthState {
@@ -53,7 +54,7 @@ interface AuthState {
   paymentSuccessData: {
     bookingDetails: BookingResponse | null;
     proId: string | null;
-    pro: any | null; // Adjust to IApprovedPro
+    pro: any | null; 
     categoryId: string | null;
     location: ILocation | null;
     totalCost: number | null;
@@ -157,6 +158,7 @@ const authSlice = createSlice({
       state.status = "succeeded";
       localStorage.setItem("isAuthenticated", "true");
       localStorage.setItem("isAuthenticatedManuallySet", "true");
+      initializeSocket(action.payload.accessToken);
     },
     updateUser: (state, action: PayloadAction<User>) => {
       state.user = action.payload;
@@ -168,6 +170,7 @@ const authSlice = createSlice({
       state.status = "idle";
       localStorage.removeItem("isAuthenticated");
       localStorage.removeItem("isAuthenticatedManuallySet");
+      disconnectSocket();
     },
     setError: (state, action: PayloadAction<string>) => {
       state.error = action.payload;
@@ -185,14 +188,14 @@ const authSlice = createSlice({
         bookingDetails: BookingResponse;
         proId: string;
         pro: any;
-        categoryId: string | null; // Updated to match state definition
+        categoryId: string | null; 
         location: ILocation;
         totalCost: number;
       }>
     ) => {
       state.paymentSuccessData = {
         ...action.payload,
-        categoryId: action.payload.categoryId || null, // Ensure null if undefined
+        categoryId: action.payload.categoryId || null, 
       };
     },
     clearPaymentSuccessData: (state) => {
@@ -211,6 +214,7 @@ const authSlice = createSlice({
         state.status = "succeeded";
         localStorage.setItem("isAuthenticated", "true");
         localStorage.setItem("isAuthenticatedManuallySet", "true");
+        initializeSocket(action.payload.accessToken);
       })
       .addCase(refreshToken.rejected, (state, action) => {
         state.isAuthenticated = false;
@@ -220,6 +224,7 @@ const authSlice = createSlice({
         state.error = action.payload as string;
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("isAuthenticatedManuallySet");
+        disconnectSocket();
       })
       .addCase(checkBanStatus.pending, (state) => {
         state.status = "loading";
@@ -241,6 +246,7 @@ const authSlice = createSlice({
         state.status = "idle";
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("isAuthenticatedManuallySet");
+        disconnectSocket();
       })
       .addCase(logoutUser.rejected, (state, action) => {
         state.user = null;
@@ -250,6 +256,7 @@ const authSlice = createSlice({
         localStorage.removeItem("isAuthenticated");
         localStorage.removeItem("isAuthenticatedManuallySet");
         state.error = action.payload as string;
+        disconnectSocket();
       });
   },
 });

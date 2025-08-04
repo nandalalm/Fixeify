@@ -281,6 +281,7 @@ const ProDetails = () => {
               </Link>
               <Link
                 to={`/chat/${pro._id}`}
+                state={{ pro, categoryId, location: selectedLocation }}
                 className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-md font-medium hover:bg-gray-300 dark:hover:bg-gray-600 text-center text-sm"
               >
                 Chat Now

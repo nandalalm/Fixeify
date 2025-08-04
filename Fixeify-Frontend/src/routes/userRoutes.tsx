@@ -14,6 +14,7 @@ import ProDetails from "../pages/User/ProDetails";
 import ResetPassword from "../pages/User/ResetPassword";
 import BookingForm from "../pages/User/BookingForm";
 import PaymentSuccess from "../components/User/PaymentSuccess";
+import ChatPage from "@/pages/User/ChatPage";
 
 const userRoutes = (
   <>
@@ -35,6 +36,7 @@ const userRoutes = (
       <Route path="/pro-details/:proId" element={<ProDetails />} />
       <Route path="/book/:proId" element={<BookingForm />} />
       <Route path="/payment-success" element={<PaymentSuccess/>} />
+      <Route path="/chat/:proId" element={<ChatPage/>} />
     </Route>
   </>
 );

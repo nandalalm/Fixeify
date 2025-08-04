@@ -35,6 +35,7 @@ const ProCard = ({ pro }: { pro: IApprovedPro }) => {
         </Link>
         <Link
           to={`/chat/${pro._id}`}
+          state={{ pro, categoryId: pro.category.id, location: pro.location }}
           className="flex-1 bg-white dark:bg-gray-800 border border-[#032B44] text-[#032B44] hover:bg-[#032B44] hover:text-white hover:border-white dark:text-gray-200 dark:border-gray-600 py-2 px-6 rounded-md dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-2 text-sm"
         >
           Chat

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { useNavigate } from "react-router-dom";
-import { Menu, Bell, X, RotateCcw } from "lucide-react";
+import { X, RotateCcw } from "lucide-react";
 import {
   fetchProBookings,
   acceptBooking,
@@ -14,6 +14,7 @@ import { BookingResponse } from "../../interfaces/bookingInterface";
 import { logoutUserSync } from "../../store/authSlice";
 import { UserRole } from "../../store/authSlice";
 import { ProNavbar } from "../../components/Pro/ProNavbar";
+import ProTopNavbar from "../../components/Pro/ProTopNavbar";
 import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
 import { QuotaResponse } from "../../interfaces/quotaInterface";
 import BookingTable from "../../components/Reuseable/BookingTable";
@@ -363,25 +364,7 @@ const JobManagementPage = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between z-30">
-        <div className="flex items-center">
-          <button onClick={toggleSidebar} className="p-2 rounded-md text-gray-600 hover:bg-gray-100">
-            <Menu className="h-6 w-6" />
-          </button>
-          <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Pro</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          <button className="relative p-1 text-gray-700 rounded-md hover:bg-gray-100">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
-              1
-            </span>
-          </button>
-          <div className="flex items-center">
-            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user.name}</span>
-          </div>
-        </div>
-      </header>
+      <ProTopNavbar toggleSidebar={toggleSidebar} />
 
       <div className="flex flex-1 overflow-hidden">
         <ProNavbar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />

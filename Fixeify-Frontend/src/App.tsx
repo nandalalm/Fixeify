@@ -5,6 +5,7 @@ import { AppDispatch } from "./store/store";
 import { BrowserRouter as Router, Routes } from "react-router-dom";
 import Loading from "./components/Loader/Loading";
 import allRoutes from "./routes";
+import { initializeSocket } from "./services/socket";
 
 function App() {
   const dispatch = useDispatch<AppDispatch>();
@@ -22,12 +23,15 @@ function App() {
       console.log("Attempting refresh due to manual set...");
       dispatch(refreshToken())
         .unwrap()
-        .then(() => {
+        .then((result) => {
           console.log("Refresh succeeded, setting isLoading to false");
+          if (result.accessToken) {
+            initializeSocket(result.accessToken);
+          }
           setIsLoading(false);
         })
         .catch((error) => {
-          console.log("Refresh failed, logging out...", error);
+          console.error("Refresh failed, logging out...", error);
           dispatch(logoutUserSync());
           setIsLoading(false);
         });

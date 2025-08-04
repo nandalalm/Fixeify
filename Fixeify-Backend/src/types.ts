@@ -16,4 +16,11 @@ export const TYPES = {
   IUserService: Symbol.for("IUserService"),
   UserController: Symbol.for("UserController"),
   ICategoryRepository: Symbol.for("ICategoryRepository"),
+  IChatService: Symbol.for("IChatService"),
+  INotificationService: Symbol.for("INotificationService"),
+  IChatRepository: Symbol.for("IChatRepository"),
+  INotificationRepository: Symbol.for("INotificationRepository"),
+  ChatController: Symbol.for("ChatController"),
+  NotificationController: Symbol.for("NotificationController"),
+  ChatGateway: Symbol.for("ChatGateway"),
 };

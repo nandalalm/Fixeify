@@ -6,6 +6,7 @@ import EditProfile from "../../components/User/EditProfile";
 import ChangePassword from "../../components/User/ChangePassword";
 import OngoingRequest from "../../components/User/OngoingRequest";
 import BookingHistory from "../../components/User/BookingHistory";
+import MessagingApp from "../../components/Messaging/MessasingApp";
 import { User, GitPullRequestDraft, ChevronLeft, ChevronRight, ListCollapse, LogOut, X, MessageCircleIcon } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
@@ -199,12 +200,7 @@ const Profile = () => {
           )}
           {activeTab === "Ongoing Request" && <OngoingRequest />}
           {activeTab === "Booking History" && <BookingHistory />}
-          {activeTab === "Messages" && (
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Messages</h2>
-              <p className="text-gray-700 dark:text-gray-300">Messages will be displayed here.</p>
-            </div>
-          )}
+          {activeTab === "Messages" && <MessagingApp role="user" />}
           {activeTab === "Notifications & Alerts" && (
             <div className="p-6">
               <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Notifications & Alerts</h2>

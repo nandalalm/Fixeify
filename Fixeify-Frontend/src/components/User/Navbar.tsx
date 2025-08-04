@@ -4,21 +4,27 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSelector, useDispatch } from "react-redux";
-import { RootState, AppDispatch } from "../../store/store";
+import { AppDispatch, RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, Bell } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
-import { ConfirmationModal } from "../Reuseable/ConfirmationModal"; 
+import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
+import NotificationPanel from "../Messaging/NotificationPanel";
+import { fetchAllNotifications, markNotificationRead, markAllNotificationsRead } from "../../store/chatSlice";
+import { getSocket } from "../../services/socket";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [showLogoutModal, setShowLogoutModal] = useState(false); 
-  const navigate = useNavigate();
-  const dispatch = useDispatch<AppDispatch>();
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
+  const notifications = useSelector((state: RootState) => state.chat.notifications);
   const { theme, toggleTheme } = useTheme();
+  const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
+
 
   useEffect(() => {
     const handleScroll = () => {
@@ -27,6 +33,23 @@ const Navbar = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    if (user && accessToken) {
+      dispatch(fetchAllNotifications({ userId: user.id, role: "user", page: 1, limit: 10 }));
+
+      const socket = getSocket();
+      if (socket) {
+        socket.on("newNotification", () => {
+          dispatch(fetchAllNotifications({ userId: user.id, role: "user", page: 1, limit: 10 }));
+        });
+
+        return () => {
+          socket.off("newNotification");
+        };
+      }
+    }
+  }, [user, accessToken, dispatch]);
 
   const handleLogout = () => {
     const role = user?.role === "admin" ? "admin" : "user";
@@ -50,6 +73,18 @@ const Navbar = () => {
     setShowLogoutModal(false);
   };
 
+  const handleMarkAsRead = async (notificationId: string) => {
+    await dispatch(markNotificationRead(notificationId));
+  };
+
+  const handleMarkAllAsRead = async () => {
+    if (user) {
+      await dispatch(markAllNotificationsRead({ userId: user.id, role: "user" }));
+    }
+  };
+
+  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
+
   return (
     <motion.header
       initial={{ y: -50, opacity: 0 }}
@@ -58,16 +93,15 @@ const Navbar = () => {
       className={`sticky top-0 left-0 w-full z-60 transition-all duration-300 ${
         isScrolled ? "shadow-md" : "shadow-none"
       } bg-white dark:bg-gray-900`}
-      style={{ top: 0, margin: 0, padding: 0, transform: "translateY(0)" }} // Force flush with top
+      style={{ top: 0, margin: 0, padding: 0, transform: "translateY(0)" }}
     >
       <div className="container flex justify-between items-center mx-auto px-4 py-3" style={{ margin: 0 }}>
         <img
           src="/logo.png"
           alt="Fixeify Logo"
           className="h-8 w-auto md:h-10 dark:filter dark:invert"
-          onClick={() => navigate('/home')}
+          onClick={() => navigate("/home")}
         />
-
         <nav className="gap-6 hidden items-center md:flex">
           <button
             onClick={toggleTheme}
@@ -82,18 +116,29 @@ const Navbar = () => {
           <Link to="#help" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
             Help
           </Link>
-
           <button
             onClick={() => navigate("/become-pro")}
-            className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+            className="bg-[#032b44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
           >
             Become a Fixeify Pro
           </button>
-
+          {accessToken && (
+            <button
+              onClick={() => setIsNotificationPanelOpen(true)}
+              className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadNotificationCount > 0 && (
+                <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
+                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                </span>
+              )}
+            </button>
+          )}
           {accessToken ? (
             <div className="relative">
               <button
-                className="border border-[#032B44] rounded-md text-[#032B44] hover:bg-[#032B44] hover:text-white text-sm font-medium px-4 py-1.5 flex items-center gap-2 dark:border-gray-600 dark:text-gray-300"
+                className="border border-[#032b44] rounded-md text-[#032b44] hover:bg-[#032b44] hover:text-white text-sm font-medium px-4 py-1.5 flex items-center gap-2 dark:border-gray-600 dark:text-gray-300"
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               >
                 {user?.name}
@@ -112,7 +157,6 @@ const Navbar = () => {
                   <path d="M6 9l6 6 6-6" />
                 </motion.svg>
               </button>
-
               <AnimatePresence>
                 {isDropdownOpen && (
                   <motion.div
@@ -141,17 +185,29 @@ const Navbar = () => {
           ) : (
             <button
               onClick={() => navigate("/login")}
-              className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+              className="bg-[#032b44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
             >
               Login
             </button>
           )}
         </nav>
-
         <div className="md:hidden flex items-center gap-4">
           <button onClick={toggleTheme} className="p-2">
             {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5 text-yellow-400" />}
           </button>
+          {accessToken && (
+            <button
+              onClick={() => setIsNotificationPanelOpen(true)}
+              className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadNotificationCount > 0 && (
+                <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
+                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                </span>
+              )}
+            </button>
+          )}
           <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
             <motion.svg
               initial={{ rotate: 0 }}
@@ -175,7 +231,6 @@ const Navbar = () => {
           </button>
         </div>
       </div>
-
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div
@@ -186,18 +241,27 @@ const Navbar = () => {
             className="fixed top-[60px] left-0 w-full bg-white shadow-md md:hidden pb-4 px-4 py-2 z-50 dark:bg-gray-900 dark:border-gray-700"
           >
             <nav className="flex flex-col space-y-3">
-              <Link to="#how-it-works" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
+              <Link
+                to="#how-it-works"
+                className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
+              >
                 How It Works
               </Link>
               <Link to="#help" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
                 Help
               </Link>
-              <Link to="/become-pro" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
+              <Link
+                to="/become-pro"
+                className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
+              >
                 Become a Fixeify Pro
               </Link>
               {accessToken ? (
                 <>
-                  <Link to="/profile" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
+                  <Link
+                    to="/profile"
+                    className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
+                  >
                     Profile
                   </Link>
                   <button
@@ -216,7 +280,13 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
+      <NotificationPanel
+        isOpen={isNotificationPanelOpen}
+        onClose={() => setIsNotificationPanelOpen(false)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkAsRead}
+        onMarkAllAsRead={handleMarkAllAsRead}
+      />
       <ConfirmationModal
         isOpen={showLogoutModal}
         onConfirm={handleLogoutConfirm}
