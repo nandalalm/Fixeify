@@ -25,7 +25,6 @@ const Navbar = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
-
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
@@ -103,38 +102,40 @@ const Navbar = () => {
           onClick={() => navigate("/home")}
         />
         <nav className="gap-6 hidden items-center md:flex">
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            aria-label="Toggle theme"
-          >
-            {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5 text-yellow-400" />}
-          </button>
           <Link to="#how-it-works" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
             How It Works
           </Link>
           <Link to="#help" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
             Help
           </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === "light" ? <Moon className="h-5 w-5 text-gray-700 dark:text-white" /> : <Sun className="h-5 w-5 text-yellow-400" />}
+            </button>
+            {accessToken && (
+              <button
+                onClick={() => setIsNotificationPanelOpen(true)}
+                className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
+              >
+                <Bell className="h-5 w-5" />
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
+                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
           <button
             onClick={() => navigate("/become-pro")}
             className="bg-[#032b44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
           >
             Become a Fixeify Pro
           </button>
-          {accessToken && (
-            <button
-              onClick={() => setIsNotificationPanelOpen(true)}
-              className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
-            >
-              <Bell className="h-5 w-5" />
-              {unreadNotificationCount > 0 && (
-                <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
-                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-                </span>
-              )}
-            </button>
-          )}
           {accessToken ? (
             <div className="relative">
               <button
@@ -193,12 +194,12 @@ const Navbar = () => {
         </nav>
         <div className="md:hidden flex items-center gap-4">
           <button onClick={toggleTheme} className="p-2">
-            {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5 text-yellow-400" />}
+            {theme === "light" ? <Moon className="h-5 w-5 text-gray-700 dark:text-white" /> : <Sun className="h-5 w-5 text-yellow-400" />}
           </button>
           {accessToken && (
             <button
               onClick={() => setIsNotificationPanelOpen(true)}
-              className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
+              className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
             >
               <Bell className="h-5 w-5" />
               {unreadNotificationCount > 0 && (
@@ -222,7 +223,7 @@ const Navbar = () => {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-6 w-6 dark:text-gray-300"
+              className="h-6 w-6 dark:text-white"
             >
               <line x1="4" x2="20" y1="12" y2="12" />
               <line x1="4" x2="20" y1="6" y2="6" />

@@ -3,7 +3,6 @@ export interface User {
   name: string;
   avatar?: string;
   isOnline?: boolean;
-  lastSeen?: string; 
   role: "user" | "pro" | "admin";
 }
 
@@ -17,7 +16,7 @@ export interface Message {
   receiverId: string;
   receiverModel: "User" | "ApprovedPro";
   content?: string;
-  timestamp: string; 
+  timestamp: string;
   isRead: boolean;
   attachments?: { url: string; mime: string; size: number }[];
   type: "text" | "image" | "file";
@@ -39,18 +38,18 @@ export interface Conversation {
     content?: string;
     senderId: string;
     senderModel: "User" | "ApprovedPro";
-    timestamp: string; 
+    timestamp: string;
     status: "sent" | "delivered" | "read";
   };
   unreadCount: number;
-  updatedAt: string; 
+  updatedAt: string;
 }
 
 export interface NotificationItem {
   id: string;
   title: string;
   description: string;
-  timestamp: string; 
+  timestamp: string;
   isRead: boolean;
   type: "message" | "booking" | "quota" | "wallet" | "general";
   userId?: string;

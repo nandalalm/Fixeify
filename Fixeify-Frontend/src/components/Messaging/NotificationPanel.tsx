@@ -1,7 +1,6 @@
 import { FC } from "react";
 import { X, Bell } from "lucide-react";
 import { NotificationItem } from "../../interfaces/messagesInterface";
-import { useTheme } from "../../context/ThemeContext";
 import { format } from "date-fns";
 
 interface NotificationPanelProps {
@@ -19,25 +18,23 @@ const NotificationPanel: FC<NotificationPanelProps> = ({
   onMarkAsRead,
   onMarkAllAsRead,
 }) => {
-  const { theme } = useTheme();
-
   const formatTimestamp = (timestamp: string) => {
     return format(new Date(timestamp), "MMM d, yyyy h:mm a");
   };
 
   return (
     <div
-      className={`fixed top-0 right-0 h-full w-full sm:w-96 bg-white shadow-lg z-50 transform transition-transform duration-300 ${
+      className={`fixed top-0 right-0 h-full w-full sm:w-96 bg-white dark:bg-gray-800 shadow-lg z-50 transform transition-transform duration-300 ${
         isOpen ? "translate-x-0" : "translate-x-full"
-      } ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}
+      }`}
     >
       <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Notifications</h2>
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Notifications</h2>
         <div className="flex items-center space-x-2">
           {notifications.length > 0 && (
             <button
               onClick={onMarkAllAsRead}
-              className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              className="text-sm text-blue-600 hover:text-blue-800 dark:text-white dark:hover:text-blue-300"
             >
               Mark all as read
             </button>
@@ -69,7 +66,7 @@ const NotificationPanel: FC<NotificationPanelProps> = ({
               <div className="flex items-start">
                 <Bell className="w-5 h-5 text-gray-600 dark:text-gray-300 mr-3" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  <p className="text-sm font-medium text-gray-800 dark:text-white">
                     {notification.title}
                   </p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -80,7 +77,7 @@ const NotificationPanel: FC<NotificationPanelProps> = ({
                   </p>
                 </div>
                 {!notification.isRead && (
-                  <div className="w-2 h-2 bg-blue-600 rounded-full mt-1"></div>
+                  <div className="w-2 h-2 bg-blue-600 dark:bg-blue-400 rounded-full mt-1"></div>
                 )}
               </div>
             </div>

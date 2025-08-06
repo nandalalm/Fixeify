@@ -3,7 +3,6 @@ import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { Check, CheckCheck, Send, ArrowLeft, ChevronDown } from "lucide-react";
 import { Message, User } from "../../interfaces/messagesInterface";
-import { useTheme } from "../../context/ThemeContext";
 import { getSocket, isSocketConnected } from "../../services/socket";
 import { fetchConversationMessages, markMessagesRead, addMessage, updateOnlineStatus } from "../../store/chatSlice";
 import { sendNewMessage } from "../../api/chatApi";
@@ -36,11 +35,10 @@ const MessageBox: FC<MessageBoxProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [otherUser, setOtherUser] = useState<User>(initialOtherUser);
+  const [otherUser, setOtherUser] = useState<User>({ ...initialOtherUser, isOnline: initialOtherUser.isOnline || false });
   const messagesPerPage = 10;
   const containerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { theme } = useTheme();
   const dispatch = useDispatch<AppDispatch>();
   const messages = useSelector((state: RootState) => state.chat.messages[conversationId] || []);
   const socket = getSocket();
@@ -81,7 +79,6 @@ const MessageBox: FC<MessageBoxProps> = ({
           participantId: currentUser.id,
           participantModel: role === Role.PRO ? "ApprovedPro" : "User",
         });
-        // Mark messages as read when joining the chat
         dispatch(markMessagesRead({ chatId: conversationId, userId: currentUser.id, role }));
       }
     }
@@ -146,7 +143,6 @@ const MessageBox: FC<MessageBoxProps> = ({
           if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
           }
-          // Mark messages as read if the current user is viewing the conversation
           if (message.senderId !== currentUser.id) {
             dispatch(markMessagesRead({ chatId: conversationId, userId: currentUser.id, role: currentUser.role as "user" | "pro" }));
           }
@@ -342,11 +338,11 @@ const MessageBox: FC<MessageBoxProps> = ({
   const renderReadReceipt = (status: "sent" | "delivered" | "read") => {
     switch (status) {
       case "sent":
-        return <Check className="w-3 h-3 text-gray-400" />;
+        return <Check className="w-3 h-3 text-gray-400 dark:text-gray-300" />;
       case "delivered":
-        return <CheckCheck className="w-3 h-3 text-gray-400" />;
+        return <CheckCheck className="w-3 h-3 text-gray-400 dark:text-gray-300" />;
       case "read":
-        return <CheckCheck className="w-3 h-3 text-blue-500" />;
+        return <CheckCheck className="w-3 h-3 text-blue-500 dark:text-blue-400" />;
       default:
         return null;
     }
@@ -365,17 +361,15 @@ const MessageBox: FC<MessageBoxProps> = ({
             max-w-xs lg:max-w-md px-4 py-2 rounded-lg
             ${
               isCurrentUser
-                ? "bg-[#032b44] text-white"
-                : theme === "dark"
-                ? "bg-gray-700 text-gray-200"
-                : "bg-gray-200 text-gray-800"
+                ? "bg-[#032b44] text-white dark:!text-white"
+                : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white"
             }
           `}
         >
           <p className="text-sm break-words">{message.content}</p>
           <div
             className={`flex items-center justify-end mt-1 space-x-1 ${
-              isCurrentUser ? "text-gray-300" : "text-gray-500"
+              isCurrentUser ? "text-gray-300 dark:text-gray-300" : "text-gray-500 dark:text-gray-300"
             }`}
           >
             <span className="text-xs">{formatTime(message.timestamp)}</span>
@@ -386,36 +380,46 @@ const MessageBox: FC<MessageBoxProps> = ({
     );
   };
 
+  const renderAvatar = () => {
+    if (otherUser.avatar) {
+      return (
+        <img
+          src={otherUser.avatar}
+          alt={otherUser.name}
+          className="w-10 h-10 rounded-full object-cover"
+        />
+      );
+    }
+    return (
+      <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
+        <span className="text-white text-lg font-medium">{otherUser.name.charAt(0).toUpperCase()}</span>
+      </div>
+    );
+  };
+
   if (error) {
     return (
-      <div className={`flex flex-col h-full ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}>
-        <div className="flex items-center p-4 border-b bg-[#032b44] text-white">
+      <div className="flex flex-col h-full bg-white dark:bg-gray-800">
+        <div className="flex items-center justify-between p-4 border-b bg-[#032b44] text-white dark:text-white">
+          <div className="flex items-center flex-1 justify-center md:justify-start">
+            <div className="relative">
+              {renderAvatar()}
+              {otherUser.isOnline && (
+                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+              )}
+            </div>
+            <div className="ml-3">
+              <h3 className="font-semibold text-white dark:!text-white">{otherUser.name}</h3>
+            </div>
+          </div>
           {onBack && (
             <button
               onClick={onBack}
-              className="mr-3 p-1 hover:bg-white/10 rounded md:hidden"
+              className="p-2 hover:bg-white/10 dark:hover:bg-gray-700 rounded transition-colors"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5 text-white dark:!text-white" />
             </button>
           )}
-          <div className="relative">
-            <img
-              src={otherUser.avatar || "/placeholder.svg"}
-              alt={otherUser.name}
-              className="w-10 h-10 rounded-full"
-            />
-            {otherUser.isOnline && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-            )}
-          </div>
-          <div className="ml-3 flex-1">
-            <h3 className="font-semibold">{otherUser.name}</h3>
-            <p className="text-sm text-gray-300">
-              {otherUser.isOnline
-                ? "Online"
-                : `Last seen ${otherUser.lastSeen ? formatTime(otherUser.lastSeen) : "recently"}`}
-            </p>
-          </div>
         </div>
         <div className="flex-1 flex items-center justify-center text-red-500 dark:text-red-400">
           {error}
@@ -425,36 +429,27 @@ const MessageBox: FC<MessageBoxProps> = ({
   }
 
   return (
-    <div className={`flex flex-col h-full ${theme === "dark" ? "bg-gray-800" : "bg-white"} rounded-lg shadow-lg`}>
-      <div className="flex items-center justify-between p-4 border-b bg-[#032b44] text-white">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+      <div className="flex items-center justify-between p-4 border-b bg-[#032b44] text-white dark:text-white">
+        <div className="flex items-center flex-1 justify-center md:justify-start">
+          <div className="relative">
+            {renderAvatar()}
+            {otherUser.isOnline && (
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+            )}
+          </div>
+          <div className="ml-3">
+            <h3 className="font-semibold text-white dark:!text-white">{otherUser.name}</h3>
+          </div>
+        </div>
         {onBack && (
           <button
             onClick={onBack}
-            className="p-2 hover:bg-white/10 rounded transition-colors"
+            className="p-2 hover:bg-white/10 dark:hover:bg-gray-700 rounded transition-colors"
           >
-            <ArrowLeft className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5 text-white dark:!text-white" />
           </button>
         )}
-        <div className="flex items-center flex-1">
-          <div className="relative">
-            <img
-              src={otherUser.avatar || "/placeholder.svg"}
-              alt={otherUser.name}
-              className="w-10 h-10 rounded-full"
-            />
-            {otherUser.isOnline && (
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-            )}
-          </div>
-          <div className="ml-3 flex-1">
-            <h3 className="font-semibold">{otherUser.name}</h3>
-            <p className="text-sm text-gray-300">
-              {otherUser.isOnline
-                ? "Online"
-                : `Last seen ${otherUser.lastSeen ? formatTime(otherUser.lastSeen) : "recently"}`}
-            </p>
-          </div>
-        </div>
       </div>
       <div
         ref={containerRef}
@@ -464,32 +459,32 @@ const MessageBox: FC<MessageBoxProps> = ({
       >
         {loading && page > 1 && (
           <div className="text-center py-4">
-            <div className="inline-flex items-center text-sm text-gray-500">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#032b44] mr-2"></div>
+            <div className="inline-flex items-center text-sm text-gray-500 dark:text-gray-300">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#032b44] dark:border-gray-300 mr-2"></div>
               Loading more messages...
             </div>
           </div>
         )}
         {memoizedMessages.map((message, index) => renderMessage(message, index))}
         {otherUserTyping && (
-          <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex items-center text-sm text-gray-500 dark:text-gray-300">
             <div className="flex space-x-1">
-              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-100"></div>
-              <div className="w-2 h-2 bg-gray-500 rounded-full animate-bounce delay-200"></div>
+              <div className="w-2 h-2 bg-gray-500 dark:bg-gray-300 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-gray-500 dark:bg-gray-300 rounded-full animate-bounce delay-100"></div>
+              <div className="w-2 h-2 bg-gray-500 dark:bg-gray-300 rounded-full animate-bounce delay-200"></div>
             </div>
           </div>
         )}
         {showScrollToBottom && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-4 right-4 p-2 bg-[#032b44] text-white rounded-full hover:bg-[#032b44]/90 transition-colors shadow-lg"
+            className="absolute bottom-4 right-4 p-2 bg-[#032b44] dark:bg-gray-700 text-white dark:text-white rounded-full hover:bg-[#032b44]/90 dark:hover:bg-gray-600 transition-colors shadow-lg"
           >
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className="w-5 h-5 text-white dark:text-white" />
           </button>
         )}
       </div>
-      <div className={`p-4 border-t ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+      <div className="p-4 border-t bg-gray-50 dark:bg-gray-700">
         <div className="flex items-center space-x-2">
           <input
             type="text"
@@ -501,16 +496,14 @@ const MessageBox: FC<MessageBoxProps> = ({
             onKeyPress={handleKeyPress}
             placeholder="Type a message..."
             disabled={isSending}
-            className={`flex-1 px-4 py-2 border ${
-              theme === "dark" ? "border-gray-600 bg-gray-800 text-gray-200" : "border-gray-300"
-            } rounded-full focus:outline-none focus:ring-2 focus:ring-[#032b44] focus:border-transparent disabled:opacity-50`}
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white rounded-full focus:outline-none focus:ring-2 focus:ring-[#032b44] dark:focus:ring-gray-50 focus:border-transparent disabled:opacity-50"
           />
           <button
             onClick={handleSendMessage}
             disabled={!newMessage.trim() || isSending}
-            className="p-2 bg-[#032b44] text-white rounded-full hover:bg-[#032b44]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-gray-700 dark:hover:bg-gray-600"
+            className="p-2 bg-[#032b44] dark:bg-gray-500 text-white dark:text-white rounded-full hover:bg-[#032b44]/90 dark:hover:bg-gray-600 transition-colors"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-5 h-5 text-white dark:!text-white"  />
           </button>
         </div>
       </div>

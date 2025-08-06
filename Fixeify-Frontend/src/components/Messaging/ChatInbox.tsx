@@ -1,9 +1,9 @@
-import { FC, useEffect } from "react";
+import { FC, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
-import { useTheme } from "../../context/ThemeContext";
 import { format } from "date-fns";
 import { fetchConversations } from "../../store/chatSlice";
+import { RotateCcw } from "lucide-react";
 import { getSocket, isSocketConnected } from "../../services/socket";
 
 interface ChatInboxProps {
@@ -15,10 +15,10 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
   const conversations = useSelector((state: RootState) => state.chat.conversations);
-  const { theme } = useTheme();
   const socket = getSocket();
   const isConnected = isSocketConnected();
   const role = user?.role as "user" | "pro";
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -40,7 +40,7 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
   }, [socket, isConnected, user?.id, role, dispatch]);
 
   const formatTimestamp = (timestamp: string) => {
-    return format(new Date(timestamp), "MMM d, h:mm a");
+    return format(new Date(timestamp), "MMM d");
   };
 
   const truncateMessage = (message: string) => {
@@ -50,12 +50,35 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     return message;
   };
 
+  // Filter conversations based on search query
+  const filteredConversations = conversations.filter((conversation) =>
+    (user?.role === "user"
+      ? conversation.participants.proName
+      : conversation.participants.userName
+    )
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase())
+  );
+
+  const handleClearSearch = () => {
+    setSearchQuery("");
+  };
+
   return (
-    <div className={`h-full flex flex-col ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
+    <div className="h-full flex flex-col bg-gray-100 dark:bg-gray-900">
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white text-center md:text-left">
           Conversations
         </h2>
+        {conversations.length > 0 && (
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name..."
+            className="w-full mt-2 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+          />
+        )}
       </div>
       <div className="flex-1 overflow-y-auto">
         <div className="p-4">
@@ -63,14 +86,26 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
             <div className="text-center text-gray-500 dark:text-gray-400">
               No conversations
             </div>
+          ) : filteredConversations.length === 0 && searchQuery ? (
+            <div className="text-center text-gray-500 dark:text-gray-400">
+              No user found with that name
+              <button
+                onClick={handleClearSearch}
+                className="ml-2 text-blue-500 dark:text-blue-400 hover:underline"
+              >
+                <a className="mt-2 inline-flex items-center text-blue-500 hover:text-blue-700" href="#">
+                  <RotateCcw className="h-4 w-4 mr-1" /> Clear Search
+                  </a>
+              </button>
+            </div>
           ) : (
-            conversations.map((conversation) => (
+            filteredConversations.map((conversation) => (
               <div
                 key={conversation.id}
                 onClick={() => onSelectConversation(conversation.id)}
                 className={`p-4 mb-2 rounded-lg cursor-pointer transition-colors ${
                   selectedConversationId === conversation.id
-                    ? "bg-blue-100 dark:bg-blue-900"
+                    ? "bg-blue-100 dark:bg-gray-700"
                     : "hover:bg-gray-200 dark:hover:bg-gray-700"
                 }`}
               >
@@ -92,7 +127,7 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
                   </div>
                   <div className="ml-3 flex-1">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                      <h3 className="text-sm font-medium text-gray-800 dark:text-white">
                         {user?.role === "user"
                           ? conversation.participants.proName
                           : conversation.participants.userName}
@@ -102,7 +137,7 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
                           formatTimestamp(conversation.lastMessage.timestamp)}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 truncate">
+                    <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
                       {conversation.lastMessage?.content
                         ? truncateMessage(conversation.lastMessage.content)
                         : "No messages yet"}
