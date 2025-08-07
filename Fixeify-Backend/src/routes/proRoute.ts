@@ -15,6 +15,7 @@ export default function createProRoutes(container: Container): Router {
   router.put("/updateAvailability/:id", proController.updateAvailability.bind(proController));
   router.get("/fetchCategories", proController.getAllCategories.bind(proController));
   router.get("/bookings/:id", proController.fetchProBookings.bind(proController));
+  router.get("/booking/:id",proController.getBookingById.bind(proController));
   router.put("/acceptBooking/:id", proController.acceptBooking.bind(proController));
   router.put("/rejectBooking/:id", proController.rejectBooking.bind(proController));
   router.post("/generateQuota/:id", proController.generateQuota.bind(proController));

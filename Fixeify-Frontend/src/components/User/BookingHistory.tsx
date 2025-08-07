@@ -1,13 +1,17 @@
 // components/BookingHistory.tsx
 import React, { useState, useEffect } from "react";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { AppDispatch } from "../../store/store";
 import { RootState } from "../../store/store";
+
 import { fetchBookingHistoryDetails } from "../../api/userApi";
 import { fetchQuotaByBookingId } from "../../api/proApi";
 import { BookingResponse } from "../../interfaces/bookingInterface";
 import { QuotaResponse } from "../../interfaces/quotaInterface";
 import BookingTable from "../../components/Reuseable/BookingTable";
+import RatingModal from "../Rating/RatingModal";
 import { RotateCcw } from "lucide-react";
+import { fetchReviewsByUser } from "../../store/ratingReviewSlice";
 import jsPDF from "jspdf";
 
 const formatTimeTo12Hour = (time: string): string => {
@@ -119,6 +123,11 @@ const BookingHistory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<BookingResponse | null>(null);
+  const [ratingModalBooking, setRatingModalBooking] = useState<BookingResponse | null>(null);
+
+  const dispatch = useDispatch<AppDispatch>();
+  // User's submitted reviews to determine if a booking is already rated
+  const { items: userReviews } = useSelector((state: RootState) => state.ratingReview);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "">("latest");
   const [currentPage, setCurrentPage] = useState(1);
@@ -159,6 +168,12 @@ const BookingHistory: React.FC = () => {
     };
     loadBookings();
   }, [userId, currentPage]);
+
+  useEffect(() => {
+    if (userId) {
+      dispatch(fetchReviewsByUser({ userId }));
+    }
+  }, [userId, dispatch]);
 
   const handleViewDetails = (booking: BookingResponse) => {
     setSelectedBooking(booking);
@@ -302,6 +317,8 @@ const BookingHistory: React.FC = () => {
         <BookingTable
           bookings={filteredAndSortedBookings}
           onViewDetails={handleViewDetails}
+          onRate={(booking) => setRatingModalBooking(booking)}
+          isRated={(bookingId) => userReviews.some((r: any) => r.booking && r.booking.id === bookingId)}
           totalPages={totalPages}
           currentPage={currentPage}
           onPageChange={setCurrentPage}
@@ -314,6 +331,44 @@ const BookingHistory: React.FC = () => {
         onClose={() => setSelectedBooking(null)}
         onDownloadInvoice={handleDownloadInvoice}
         quota={selectedBooking ? quotas[selectedBooking.id] : null}
+      />
+
+      <RatingModal
+        isOpen={!!ratingModalBooking}
+        onClose={() => setRatingModalBooking(null)}
+        userId={userId}
+        proId={ratingModalBooking?.pro.id || ""}
+        categoryId={ratingModalBooking?.category.id || ""}
+        bookingId={ratingModalBooking?.id}
+        onSuccess={() => {
+          setRatingModalBooking(null);
+          // Reload bookings to update isRated
+          (async () => {
+            if (!userId) return;
+            try {
+              setLoading(true);
+              const response = await fetchBookingHistoryDetails(userId, currentPage, 5);
+              setBookings(response.bookings || []);
+              setTotalPages(Math.ceil(response.total / 5));
+              const quotaPromises = response.bookings
+                .filter((booking) => booking.status.toLowerCase() === "completed")
+                .map(async (booking) => {
+                  const quota = await fetchQuotaByBookingId(booking.id);
+                  return { bookingId: booking.id, quota };
+                });
+              const quotaResults = await Promise.all(quotaPromises);
+              const quotasMap = quotaResults.reduce((acc, { bookingId, quota }) => ({
+                ...acc,
+                [bookingId]: quota,
+              }), {});
+              setQuotas(quotasMap);
+            } catch (err) {
+              setError("Failed to fetch booking history or quota details.");
+            } finally {
+              setLoading(false);
+            }
+          })();
+        }}
       />
     </div>
   );

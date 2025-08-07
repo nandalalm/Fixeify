@@ -50,6 +50,7 @@ export interface IBooking {
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
   cancelReason?: string;
+  isRated?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -74,7 +75,8 @@ const bookingSchema = new Schema<BookingDocument>(
       default: "pending",
     },
     rejectedReason: { type: String },
-    cancelReason: { type: String }, 
+    cancelReason: { type: String },
+    isRated: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },

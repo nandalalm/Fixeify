@@ -106,6 +106,15 @@ export class ProController {
     }
   }
 
+  async getBookingById(req: Request, res: Response, next: NextFunction) {
+    try {
+      const booking = await this._proService.getBookingById(req.params.id);
+      res.status(200).json(booking);
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async acceptBooking(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const bookingId = req.params.id;

@@ -1,8 +1,6 @@
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  ThumbsUp,
-  ThumbsDown,
   Briefcase,
   MapPin,
   Phone,
@@ -14,6 +12,10 @@ import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
 import { JSX, useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { AppDispatch, RootState } from "@/store/store";
+import { fetchReviewsByPro } from "@/store/ratingReviewSlice";
+import { Star } from "lucide-react";
 import { getProAvailability } from "../../api/proApi"; 
 
 const ProDetails = () => {
@@ -24,20 +26,21 @@ const ProDetails = () => {
   const selectedLocation = location.state?.location as ILocation | undefined;
 
   const [pro, setPro] = useState<IApprovedPro | undefined>(proFromState);
-  const dummyReviews = [
-    {
-      name: "John Doe",
-      date: "May 01, 2025",
-      rating: 4,
-      comment: "Great service! Very professional and on time.",
-    },
-    {
-      name: "Jane Smith",
-      date: "April 15, 2025",
-      rating: 5,
-      comment: "Amazing work! Highly recommend.",
-    },
-  ];
+  const [visibleCount, setVisibleCount] = useState(5);
+  const dispatch = useDispatch<AppDispatch>();
+  const { items: reviews, loading } = useSelector((state: RootState) => state.ratingReview);
+
+  useEffect(() => {
+    if (proFromState?._id) {
+      dispatch(fetchReviewsByPro({ proId: proFromState._id, page: 1 }));
+    }
+  }, [dispatch, proFromState?._id]);
+
+  const handleLoadMore = () => {
+    if (visibleCount < reviews.length) {
+      setVisibleCount((prev) => prev + 5);
+    }
+  };
 
   const formatTimeTo12Hour = (time: string) => {
     const [hour, minute] = time.split(":").map(Number);
@@ -104,7 +107,7 @@ const ProDetails = () => {
     <div className="flex flex-col min-h-screen dark:bg-gray-900">
       <Navbar />
       <main className="flex-1 py-8">
-        <section className="container mx-auto px-2 max-w-6xl">
+        <section className="container mx-auto px-4 max-w-6xl">
           <button
             onClick={() =>
               navigate(`/nearby-pros?categoryId=${categoryId || ""}`, {
@@ -112,7 +115,7 @@ const ProDetails = () => {
                 replace: true,
               })
             }
-            className="inline-block p-1 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            className="inline-block p-1 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors mb-4"
           >
             <ArrowLeft className="w-6 h-6 text-gray-700 dark:text-gray-200" />
           </button>
@@ -219,76 +222,86 @@ const ProDetails = () => {
                 </div>
               </div>
 
-              <div>
-                <h2 className="text-xl font-medium mb-3 text-gray-900 dark:text-gray-200">Reviews</h2>
-                {dummyReviews.map((review, index) => (
-                  <div
-                    key={index}
-                    className="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
-                  >
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
-                        <img
-                          src="/placeholder.svg?height=40&width=40"
-                          alt={review.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      <div>
-                        <div className="font-medium text-base text-gray-900 dark:text-gray-200">{review.name}</div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">{review.date}</div>
-                      </div>
-                    </div>
-                    <div className="flex mb-2">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <span key={i} className="text-yellow-400 text-base">
-                          {i < review.rating ? "★" : "☆"}
-                        </span>
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-xl font-medium mb-3 text-gray-900 dark:text-gray-200">Reviews</h2>
+                  {loading ? (
+                    <p className="text-base text-gray-900 dark:text-gray-300">Loading reviews...</p>
+                  ) : reviews.length === 0 ? (
+                    <p className="text-base text-gray-900 dark:text-gray-300">No reviews yet.</p>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {reviews.slice(0, visibleCount).map((review, index) => (
+                        <div
+                          key={index}
+                          className="pb-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
+                        >
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
+                              <img
+                                src="/placeholder.svg?height=40&width=40"
+                                alt={review.user.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div>
+                              <div className="font-medium text-base text-gray-900 dark:text-gray-200">{review.user.name}</div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                          <div className="flex mb-2">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`w-4 h-4 ${i < review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-300"}`}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-base text-gray-900 dark:text-gray-300 mb-2">{review.review}</p>
+                        </div>
                       ))}
                     </div>
-                    <p className="text-base text-gray-900 dark:text-gray-300 mb-2">{review.comment}</p>
-                    <div className="flex gap-4">
-                      <button className="flex items-center gap-1 text-gray-600 dark:text-gray-400 text-sm">
-                        <ThumbsUp size={14} />
-                      </button>
-                      <button className="flex items-center gap-1 text-gray-600 dark:text-gray-400 text-sm">
-                        <ThumbsDown size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )}
+                  {visibleCount < reviews.length && (
+                    <button
+                      onClick={handleLoadMore}
+                      className="mt-4 w-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-md font-medium hover:bg-gray-200 dark:hover:bg-gray-600 text-sm text-center"
+                    >
+                      Load More
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              <div>
-                <h2 className="text-xl font-medium mb-3 text-gray-900 dark:text-gray-200">About Me</h2>
-                <p className="text-base text-gray-900 dark:text-gray-300 whitespace-pre-line">
-                  {pro.about ||
-                    `Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.category.name} works, and if you have any questions, feel free to message me.`}
-                </p>
+            <div>
+              <div className="flex flex-col gap-6">
+                <div>
+                  <h2 className="text-xl font-medium mb-3 text-gray-900 dark:text-gray-200">About Me</h2>
+                  <p className="text-base text-gray-900 dark:text-gray-300 whitespace-pre-line">
+                    {`Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.category.name} works. If you have any questions, feel free to message me.`}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-3">
+                  <h2 className="text-base font-medium text-gray-600 dark:text-gray-400">
+                    {pro.category.name} Expert
+                  </h2>
+                  <Link
+                    to={`/book/${pro._id}`}
+                    state={{ pro, categoryId, location: selectedLocation }}
+                    className="w-full bg-[#032B44] text-white py-2 px-4 rounded-md font-medium hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white text-center text-sm"
+                  >
+                    Book Now
+                  </Link>
+                  <Link
+                    to={`/chat/${pro._id}`}
+                    state={{ pro, categoryId, location: selectedLocation }}
+                    className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-md font-medium hover:bg-gray-300 dark:hover:bg-gray-600 text-center text-sm"
+                  >
+                    Chat Now
+                  </Link>
+                </div>
               </div>
-
-              <h2 className="text-base font-medium mb-2 text-gray-600 dark:text-gray-400">
-                {pro.category.name} Expert
-              </h2>
-              <Link
-                to={`/book/${pro._id}`}
-                state={{ pro, categoryId, location: selectedLocation }}
-                className="w-full bg-[#032B44] text-white py-2 px-4 rounded-md font-medium hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white text-center text-sm"
-              >
-                Book Now
-              </Link>
-              <Link
-                to={`/chat/${pro._id}`}
-                state={{ pro, categoryId, location: selectedLocation }}
-                className="w-full bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-md font-medium hover:bg-gray-300 dark:hover:bg-gray-600 text-center text-sm"
-              >
-                Chat Now
-              </Link>
-              <button className="w-full bg-white dark:bg-gray-800 text-[#032B44] dark:text-gray-200 py-2 px-4 rounded-md font-medium border border-[#032B44] dark:border-gray-600 hover:bg-[#032B44] hover:text-white dark:hover:bg-gray-700 text-sm">
-                Report
-              </button>
             </div>
           </div>
         </section>
