@@ -159,8 +159,8 @@ const ChatPage = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-gray-900">
       <Navbar />
-      <main className="flex-1 overflow-hidden">
-        <div className="w-full h-full">
+      <main className="flex-1">
+       <div className="w-full h-[calc(100vh-5rem)]">
           <MessageBox
             key={conversationId}
             conversationId={conversationId}

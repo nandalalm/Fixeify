@@ -75,8 +75,9 @@ export default function MessagingApp({ role }: MessagingAppProps) {
     };
 
     const handleNewNotification = () => {
-      dispatch(fetchAllNotifications({ userId: user?.id || "", role, page: 1, limit: 10 }));
+      dispatch(fetchAllNotifications({ userId: user?.id || "", role, page: 1, limit: 10, filter: "all" }));
     };
+
 
     socket.on("newMessage", handleNewMessage);
     socket.on("newNotification", handleNewNotification);
@@ -154,7 +155,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
   };
 
   return (
-    <div className={`h-screen flex flex-col ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
+   <div className={`h-[calc(100vh-5rem)] flex flex-col ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
       <div className="flex flex-1 overflow-hidden">
         <div
           className={`w-full md:w-1/3 border-r ${

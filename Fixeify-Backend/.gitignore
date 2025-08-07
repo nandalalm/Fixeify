@@ -1,5 +1,7 @@
 node_modules
 dist
 .env
-Fixeify-Backend/src/logs/
+logs/
 *.log
+Fixeify-Backend/src/logs/
+Fixeify-Backend/src/logs/access.log

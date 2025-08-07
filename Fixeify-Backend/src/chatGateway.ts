@@ -88,13 +88,21 @@ export class ChatGateway {
     this.io.on("connection", (socket: AuthenticatedSocket) => {
       
       if (socket.userId && socket.userRole) {
+        // Add user to connected users map
         this.connectedUsers.set(socket.userId, {
           socketId: socket.id,
           userId: socket.userId,
           userRole: socket.userRole
         });
         
-        this.io.emit("onlineStatus", { userId: socket.userId, isOnline: true });
+        // Send current online users list to the newly connected client
+        const onlineUserIds = Array.from(this.connectedUsers.keys());
+        for (const userId of onlineUserIds) {
+          socket.emit("onlineStatus", { userId, isOnline: true });
+        }
+        
+        // Broadcast that this user is now online to all other clients
+        socket.broadcast.emit("onlineStatus", { userId: socket.userId, isOnline: true });
       }
 
       socket.on("joinChat", async ({ chatId, participantId, participantModel }: { chatId: string; participantId: string; participantModel: "User" | "ApprovedPro" }) => {

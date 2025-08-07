@@ -135,13 +135,13 @@ export const markMessagesRead = createAsyncThunk<
 
 export const fetchAllNotifications = createAsyncThunk<
   NotificationItem[],
-  { userId: string; role: "user" | "pro"; page: number; limit: number },
+  { userId: string; role: "user" | "pro"; page: number; limit: number; filter: 'all' | 'unread' },
   { rejectValue: string }
 >(
   "chat/fetchAllNotifications",
-  async ({ userId, role, page, limit }, { rejectWithValue }) => {
+  async ({ userId, role, page, limit, filter }, { rejectWithValue }) => {
     try {
-      const { notifications } = await fetchUserNotifications(userId, role, page, limit);
+      const { notifications } = await fetchUserNotifications(userId, role, page, limit, filter);
       return notifications;
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || "Failed to fetch notifications");
@@ -186,6 +186,13 @@ const chatSlice = createSlice({
   reducers: {
     addMessage: (state, action: PayloadAction<Message>) => {
       const message = action.payload;
+      console.log('🔄 addMessage reducer called:', {
+        chatId: message.chatId,
+        senderId: message.senderId,
+        content: message.content?.substring(0, 50),
+        isRead: message.isRead
+      });
+      
       if (!state.messages[message.chatId]) {
         state.messages[message.chatId] = [];
       }
@@ -203,6 +210,10 @@ const chatSlice = createSlice({
       
       const conversation = state.conversations.find((conv) => conv.id === message.chatId);
       if (conversation) {
+        const prevUnreadCount = conversation.unreadCount;
+        const prevLastMessage = conversation.lastMessage?.content;
+        
+        // Create new lastMessage object to ensure immutability
         conversation.lastMessage = {
           id: message.id,
           content: message.content,
@@ -212,12 +223,21 @@ const chatSlice = createSlice({
           status: message.status,
         };
         
-        const isFromOtherUser = message.senderId !== state.messages[message.chatId][0]?.senderId;
-        if (isFromOtherUser && !message.isRead) {
+        // Fix: We need the current user's ID to properly determine if message is from other user
+        // For now, we'll increment unread count for any unread message (will be refined with user context)
+        if (!message.isRead) {
           conversation.unreadCount += 1;
         }
         
         conversation.updatedAt = new Date().toISOString();
+        
+        console.log('📊 Conversation updated:', {
+          chatId: message.chatId,
+          prevUnreadCount,
+          newUnreadCount: conversation.unreadCount,
+          prevLastMessage: prevLastMessage?.substring(0, 30),
+          newLastMessage: conversation.lastMessage.content?.substring(0, 30)
+        });
       }
     },
     addNotification: (state, action: PayloadAction<NotificationItem>) => {
@@ -244,6 +264,22 @@ const chatSlice = createSlice({
     clearMessages: (state, action: PayloadAction<string>) => {
       const chatId = action.payload;
       delete state.messages[chatId];
+    },
+    updateConversationReadStatus: (state, action: PayloadAction<{ chatId: string }>) => {
+      const { chatId } = action.payload;
+      const conversation = state.conversations.find((conv) => conv.id === chatId);
+      if (conversation) {
+        // Reset unread count for this conversation
+        conversation.unreadCount = 0;
+      }
+      // Also update message read status in the messages array
+      if (state.messages[chatId]) {
+        state.messages[chatId] = state.messages[chatId].map((msg) => ({
+          ...msg,
+          isRead: true,
+          status: "read" as "read",
+        }));
+      }
     },
   },
   extraReducers: (builder) => {
@@ -296,12 +332,14 @@ const chatSlice = createSlice({
         }
         
         if (action.meta.arg.page === 1) {
-          state.messages[chatId] = messages;
+          // Initial load: messages come sorted newest first, reverse for display (oldest first)
+          state.messages[chatId] = [...messages].reverse();
         } else {
-          state.messages[chatId] = [...messages, ...state.messages[chatId]];
+          // Load more: prepend older messages (they come sorted newest first, so reverse and prepend)
+          const olderMessages = [...messages].reverse();
+          state.messages[chatId] = [...olderMessages, ...state.messages[chatId]];
         }
         
-        state.messages[chatId].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
         state.status = "succeeded";
       })
       .addCase(fetchConversationMessages.rejected, (state, action) => {
@@ -365,7 +403,15 @@ const chatSlice = createSlice({
       })
       .addCase(fetchAllNotifications.fulfilled, (state, action) => {
         state.status = "succeeded";
-        state.notifications = action.payload;
+        const page = action.meta.arg.page;
+        if (page === 1) {
+          state.notifications = action.payload;
+        } else {
+          // Append new notifications, avoiding duplicates
+          const existingIds = new Set(state.notifications.map(n => n.id));
+          const newNotifs = action.payload.filter(n => !existingIds.has(n.id));
+          state.notifications = [...state.notifications, ...newNotifs];
+        }
       })
       .addCase(fetchAllNotifications.rejected, (state, action) => {
         state.status = "failed";
@@ -407,6 +453,7 @@ export const {
   clearChatError,
   updateMessageStatus,
   clearMessages,
+  updateConversationReadStatus,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

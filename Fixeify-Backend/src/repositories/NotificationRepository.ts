@@ -38,19 +38,23 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
     });
   }
 
-  async findNotificationsByUser(userId: string, page: number, limit: number): Promise<{ notifications: NotificationResponse[]; total: number }> {
+  async findNotificationsByUser(userId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new Error("Invalid userId");
     }
     const skip = (page - 1) * limit;
+    const query: any = { userId: new mongoose.Types.ObjectId(userId) };
+    if (filter === 'unread') {
+      query.isRead = false;
+    }
     const notifications = await this._model
-      .find({ userId: new mongoose.Types.ObjectId(userId) })
+      .find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .exec();
 
-    const total = await this._model.countDocuments({ userId: new mongoose.Types.ObjectId(userId) });
+    const total = await this._model.countDocuments(query);
 
     return {
       notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
@@ -58,19 +62,23 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
     };
   }
 
-  async findNotificationsByPro(proId: string, page: number, limit: number): Promise<{ notifications: NotificationResponse[]; total: number }> {
+  async findNotificationsByPro(proId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
     if (!mongoose.Types.ObjectId.isValid(proId)) {
       throw new Error("Invalid proId");
     }
     const skip = (page - 1) * limit;
+    const query: any = { proId: new mongoose.Types.ObjectId(proId) };
+    if (filter === 'unread') {
+      query.isRead = false;
+    }
     const notifications = await this._model
-      .find({ proId: new mongoose.Types.ObjectId(proId) })
+      .find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .exec();
 
-    const total = await this._model.countDocuments({ proId: new mongoose.Types.ObjectId(proId) });
+    const total = await this._model.countDocuments(query);
 
     return {
       notifications: notifications.map((n) => this.mapToNotificationResponse(n)),

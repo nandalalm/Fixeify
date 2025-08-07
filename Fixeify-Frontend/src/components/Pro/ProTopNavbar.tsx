@@ -1,4 +1,4 @@
-import { FC, useState, useEffect } from "react";
+import { FC, useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
@@ -6,10 +6,12 @@ import { Menu, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
+import { NotificationItem } from "../../interfaces/messagesInterface";
 import {
   fetchAllNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  addNotification,
 } from "../../store/chatSlice";
 import { getSocket } from "../../services/socket";
 
@@ -22,27 +24,68 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
   const notifications = useSelector((state: RootState) => state.chat.notifications);
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
-  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
+  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const unreadNotificationCount = useMemo(
+    () => notifications.filter((n) => !n.isRead).length,
+    [notifications]
+  );
 
   useEffect(() => {
-    if (user && accessToken) {
-      dispatch(fetchAllNotifications({ userId: user.id, role: "pro", page: 1, limit: 10 }));
+    if (!user || !accessToken) return;
+    dispatch(fetchAllNotifications({ userId: user.id, role: "pro", page: 1, limit: 10, filter }));
+  }, [user, accessToken, filter, dispatch]);
 
-      const socket = getSocket();
-      if (socket) {
-        socket.on("newNotification", () => {
-          dispatch(fetchAllNotifications({ userId: user.id, role: "pro", page: 1, limit: 10 }));
-        });
-
-        return () => {
-          socket.off("newNotification");
-        };
-      }
+  const handleLoadMore = async () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+    await new Promise(res => setTimeout(res, 1000));
+    try {
+      const nextPage = page + 1;
+      const result = await dispatch(
+        fetchAllNotifications({ userId: user.id, role: "pro", page: nextPage, limit: 10, filter })
+      ).unwrap();
+      setPage(nextPage);
+      setHasMore(result.length === 10);
+    } catch {
+      setHasMore(false);
     }
-  }, [user, accessToken, dispatch]);
+    setLoading(false);
+  };
+
+  const handleToggleFilter = (newFilter: 'all' | 'unread') => {
+    if (filter !== newFilter) {
+      setFilter(newFilter);
+      setPage(1);
+      setHasMore(true);
+    }
+  };
+
+  useEffect(() => {
+    if (!user || !accessToken) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handler = (notif: NotificationItem & { receiverId?: string }) => {
+      if ((notif.proId || notif.receiverId) === user.id) {
+        const isValid = notif.title || notif.description;
+        if (!isValid) return;
+        dispatch(addNotification(notif));
+        setTimeout(() => {
+          dispatch(fetchAllNotifications({ userId: user.id, role: "pro", page: 1, limit: 10, filter }));
+        }, 1000);
+      }
+    };
+
+    socket.on("newNotification", handler);
+    return () => socket.off("newNotification", handler);
+  }, [user, accessToken, filter, dispatch]);
 
   const handleLogout = () => {
     dispatch(logoutUser("pro")).then(() => {
@@ -69,6 +112,8 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
     }
   };
 
+  if (!user) return null;
+
   return (
     <header className="sticky top-0 z-50 w-full bg-white dark:bg-gray-900 shadow-md transition-colors duration-300">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
@@ -86,6 +131,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
             onClick={() => navigate("/pro-dashboard")}
           />
         </div>
+
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsNotificationPanelOpen(true)}
@@ -98,20 +144,25 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
               </span>
             )}
           </button>
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-medium text-gray-700 dark:text-white hidden sm:inline">
-              {user?.name || "Pro User"}
-            </span>
-          </div>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {user.name}
+          </span>
         </div>
       </div>
+
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
         onClose={() => setIsNotificationPanelOpen(false)}
         notifications={notifications}
         onMarkAsRead={handleMarkAsRead}
         onMarkAllAsRead={handleMarkAllAsRead}
+        loading={loading}
+        filter={filter}
+        onToggleFilter={handleToggleFilter}
+        onLoadMore={handleLoadMore}
+        hasMore={hasMore}
       />
+
       <ConfirmationModal
         isOpen={showLogoutModal}
         onConfirm={handleLogoutConfirm}

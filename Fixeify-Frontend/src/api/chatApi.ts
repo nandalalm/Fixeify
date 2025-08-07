@@ -204,13 +204,14 @@ export const fetchUserNotifications = async (
   userId: string,
   role: "user" | "pro",
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  filter: 'all' | 'unread' = 'all'
 ): Promise<{ notifications: NotificationItem[]; total: number }> => {
   if (!userId || !["user", "pro"].includes(role)) {
     throw new Error("Invalid userId or role");
   }
   const response = await api.get(`/notifications/${role}/${userId}`, {
-    params: { page, limit },
+    params: { page, limit, filter },
     withCredentials: true,
   });
   if (!response.data?.notifications) {

@@ -14,7 +14,7 @@ export class NotificationService implements INotificationService {
       throw new Error("type, title, and description are required");
     }
     const notification = await this.notificationRepository.createNotification(data);
-    return {
+    const response = {
       id: notification._id.toString(),
       type: notification.type,
       title: notification.title,
@@ -29,19 +29,39 @@ export class NotificationService implements INotificationService {
       isRead: notification.isRead,
       timestamp: notification.createdAt.toISOString(),
     };
+
+    // Emit real-time notification to recipient using global io instance
+    const recipientId = response.userId || response.proId;
+    const receiverModel = response.userId ? 'User' : 'ApprovedPro';
+    if (recipientId && (global as any).io) {
+      const io = (global as any).io;
+      // Find the connected user's socket and emit to them
+      const connectedUsers = (global as any).connectedUsers || new Map();
+      const user = connectedUsers.get(recipientId);
+      if (user) {
+        io.to(user.socketId).emit("newNotification", {
+          ...response,
+          receiverId: recipientId,
+          receiverModel
+        });
+      }
+    }
+
+    return response;
   }
 
   async getNotifications(
     participantId: string,
     participantModel: "User" | "ApprovedPro",
     page: number,
-    limit: number
+    limit: number,
+    filter: 'all' | 'unread' = 'all'
   ): Promise<{ notifications: NotificationResponse[]; total: number }> {
     if (!participantId) throw new Error("participantId is required");
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new Error("Invalid participantId");
     return participantModel === "User"
-      ? this.notificationRepository.findNotificationsByUser(participantId, page, limit)
-      : this.notificationRepository.findNotificationsByPro(participantId, page, limit);
+      ? this.notificationRepository.findNotificationsByUser(participantId, page, limit, filter)
+      : this.notificationRepository.findNotificationsByPro(participantId, page, limit, filter);
   }
 
   async markNotificationAsRead(notificationId: string): Promise<void> {
