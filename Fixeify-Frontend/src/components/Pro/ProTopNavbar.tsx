@@ -43,7 +43,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
   }, [user, accessToken, filter, dispatch]);
 
   const handleLoadMore = async () => {
-    if (loading || !hasMore) return;
+    if (loading || !hasMore || !user) return;
     setLoading(true);
     await new Promise(res => setTimeout(res, 1000));
     try {
@@ -73,18 +73,21 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
     if (!socket) return;
 
     const handler = (notif: NotificationItem & { receiverId?: string }) => {
-      if ((notif.proId || notif.receiverId) === user.id) {
-        const isValid = notif.title || notif.description;
-        if (!isValid) return;
-        dispatch(addNotification(notif));
-        setTimeout(() => {
+      if (!user || (notif.proId || notif.receiverId) !== user.id) return;
+      const isValid = notif.title || notif.description;
+      if (!isValid) return;
+      dispatch(addNotification(notif));
+      setTimeout(() => {
+        if (user) {
           dispatch(fetchAllNotifications({ userId: user.id, role: "pro", page: 1, limit: 10, filter }));
-        }, 1000);
-      }
+        }
+      }, 1000);
     };
 
     socket.on("newNotification", handler);
-    return () => socket.off("newNotification", handler);
+    return () => {
+      socket.off("newNotification", handler);
+    };
   }, [user, accessToken, filter, dispatch]);
 
   const handleLogout = () => {
