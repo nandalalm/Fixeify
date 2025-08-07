@@ -2,7 +2,7 @@ import { FC, useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
-import {  Menu, Bell } from "lucide-react";
+import { Menu, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
@@ -70,9 +70,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
   };
 
   return (
-    <header
-      className={`sticky top-0 z-50 w-full bg-white dark:bg-gray-900 shadow-md transition-colors duration-300`}
-    >
+    <header className="sticky top-0 z-50 w-full bg-white dark:bg-gray-900 shadow-md transition-colors duration-300">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center gap-4">
           <button
@@ -84,7 +82,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
           <img
             src="/logo.png"
             alt="Fixeify Logo"
-            className="h-8 w-auto md:h-8 dark:filter dark:invert"
+            className="h-8 w-auto md:h-8 dark:filter dark:invert cursor-pointer"
             onClick={() => navigate("/pro-dashboard")}
           />
         </div>
@@ -100,8 +98,10 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
               </span>
             )}
           </button>
-          <div className="flex items-center">
-            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user?.name || "Pro User"}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-medium text-gray-700 dark:text-white hidden sm:inline">
+              {user?.name || "Pro User"}
+            </span>
           </div>
         </div>
       </div>
