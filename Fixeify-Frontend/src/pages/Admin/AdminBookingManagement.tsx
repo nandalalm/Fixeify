@@ -1,6 +1,6 @@
 import { type FC, useState, useEffect } from "react";
 import { AdminNavbar } from "../../components/Admin/AdminNavbar";
-import { Menu, Bell, X, RotateCcw } from "lucide-react";
+import { Menu, X, RotateCcw } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
@@ -161,12 +161,7 @@ const AdminBookingManagement: FC = () => {
           <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
         </div>
         <div className="flex items-center space-x-4">
-          <button className="relative p-1 text-gray-700 rounded-md hover:bg-gray-100">
-            <Bell className="h-5 w-5" />
-            <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
-              1
-            </span>
-          </button>
+          
           <div className="flex items-center">
             <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user.name}</span>
           </div>

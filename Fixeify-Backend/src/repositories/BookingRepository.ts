@@ -38,6 +38,7 @@ interface PopulatedBookingDocument {
   cancelReason?:string;
   createdAt: Date;
   updatedAt: Date;
+  isRated?:boolean;
 }
 
 interface PopulatedLeanBooking {
@@ -55,6 +56,7 @@ interface PopulatedLeanBooking {
   cancelReason?:string;
   createdAt: Date;
   updatedAt: Date;
+  isRated?:boolean;
 }
 
 @injectable()
@@ -328,6 +330,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
       cancelReason: booking.cancelReason, // Include new field
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
+      isRated: booking.isRated,
     });
   }
 }

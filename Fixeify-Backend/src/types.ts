@@ -23,4 +23,7 @@ export const TYPES = {
   ChatController: Symbol.for("ChatController"),
   NotificationController: Symbol.for("NotificationController"),
   ChatGateway: Symbol.for("ChatGateway"),
+  IRatingReviewRepository: Symbol.for("IRatingReviewRepository"),
+  IRatingReviewService: Symbol.for("IRatingReviewService"),
+  RatingReviewController: Symbol.for("RatingReviewController"),
 };

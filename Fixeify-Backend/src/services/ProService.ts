@@ -149,6 +149,12 @@ export class ProService implements IProService {
   return this._bookingRepository.fetchProBookings(proId, page, limit, status);
 }
 
+ async getBookingById(id: string): Promise<BookingResponse> {
+  const booking = await this._bookingRepository.findBookingById(id);
+  if (!booking) throw new HttpError(404, "Booking not found");
+  return booking as unknown as BookingResponse;
+}
+
   async acceptBooking(bookingId: string): Promise<{ message: string }> {
     const session = await mongoose.startSession();
     session.startTransaction();

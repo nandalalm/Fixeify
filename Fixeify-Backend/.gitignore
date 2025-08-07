@@ -3,4 +3,5 @@ dist
 .env
 logs/
 *.log
+Fixeify-Backend/src/logs/
 Fixeify-Backend/src/logs/access.log

@@ -36,6 +36,7 @@ export interface IProService {
   updateAvailability(proId: string, data: { availability: IAvailability; isUnavailable: boolean }): Promise<{ availability: IAvailability; isUnavailable: boolean }>;
   getAllCategories(): Promise<CategoryResponse[]>;
   fetchProBookings(proId: string, page?: number, limit?: number, status?: string): Promise<{ bookings: BookingResponse[]; total: number }>;
+  getBookingById(id: string): Promise<BookingResponse>;
   acceptBooking(bookingId: string): Promise<{ message: string }>;
   rejectBooking(bookingId: string, rejectedReason: string): Promise<{ message: string }>;
   generateQuota(bookingId: string, data: QuotaRequest): Promise<QuotaResponse>;

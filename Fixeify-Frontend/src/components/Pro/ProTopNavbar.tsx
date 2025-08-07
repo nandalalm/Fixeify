@@ -1,8 +1,10 @@
 import { FC, useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
-import { User } from "../../store/authSlice";
+import { logoutUser } from "../../store/authSlice";
 import { Menu, Bell } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
 import { NotificationItem } from "../../interfaces/messagesInterface";
 import {
@@ -12,34 +14,29 @@ import {
   addNotification,
 } from "../../store/chatSlice";
 import { getSocket } from "../../services/socket";
-import { useNavigate } from "react-router-dom";
 
 interface ProTopNavbarProps {
   toggleSidebar: () => void;
 }
 
 const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
-  const auth = useSelector((state: RootState) => state.auth);
-  const user = auth.user as User;
-  const accessToken = auth.accessToken;
+  const { user, accessToken } = useSelector((state: RootState) => state.auth);
+  const notifications = useSelector((state: RootState) => state.chat.notifications);
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
-  if (!user) return null;
-
-  const notifications = useSelector((state: RootState) => state.chat.notifications);
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const dispatch = useDispatch<AppDispatch>();
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const unreadNotificationCount = useMemo(
     () => notifications.filter((n) => !n.isRead).length,
     [notifications]
   );
 
-  // Fetch notifications
   useEffect(() => {
     if (!user || !accessToken) return;
     dispatch(fetchAllNotifications({ userId: user.id, role: "pro", page: 1, limit: 10, filter }));
@@ -70,11 +67,11 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
     }
   };
 
-  // Socket real-time notifications
   useEffect(() => {
     if (!user || !accessToken) return;
     const socket = getSocket();
     if (!socket) return;
+
     const handler = (notif: NotificationItem & { receiverId?: string }) => {
       if ((notif.proId || notif.receiverId) === user.id) {
         const isValid = notif.title || notif.description;
@@ -85,11 +82,25 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
         }, 1000);
       }
     };
+
     socket.on("newNotification", handler);
-    return () => {
-      socket.off("newNotification", handler);
-    };
+    return () => socket.off("newNotification", handler);
   }, [user, accessToken, filter, dispatch]);
+
+  const handleLogout = () => {
+    dispatch(logoutUser("pro")).then(() => {
+      navigate("/home");
+    });
+  };
+
+  const handleLogoutConfirm = () => {
+    handleLogout();
+    setShowLogoutModal(false);
+  };
+
+  const handleLogoutCancel = () => {
+    setShowLogoutModal(false);
+  };
 
   const handleMarkAsRead = async (notificationId: string) => {
     await dispatch(markNotificationRead(notificationId));
@@ -101,10 +112,11 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
     }
   };
 
+  if (!user) return null;
+
   return (
     <header className="sticky top-0 z-50 w-full bg-white dark:bg-gray-900 shadow-md transition-colors duration-300">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-        {/* Left side: Sidebar toggle + Logo */}
         <div className="flex items-center gap-4">
           <button
             onClick={toggleSidebar}
@@ -120,7 +132,6 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
           />
         </div>
 
-        {/* Right side: Notification bell + Pro name */}
         <div className="flex items-center gap-4">
           <button
             onClick={() => setIsNotificationPanelOpen(true)}
@@ -133,7 +144,6 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
               </span>
             )}
           </button>
-
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
             {user.name}
           </span>
@@ -151,6 +161,14 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
         onToggleFilter={handleToggleFilter}
         onLoadMore={handleLoadMore}
         hasMore={hasMore}
+      />
+
+      <ConfirmationModal
+        isOpen={showLogoutModal}
+        onConfirm={handleLogoutConfirm}
+        onCancel={handleLogoutCancel}
+        action="logout"
+        isProcessing={false}
       />
     </header>
   );
