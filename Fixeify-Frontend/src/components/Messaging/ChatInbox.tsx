@@ -2,7 +2,7 @@ import { FC, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { format } from "date-fns";
-import { fetchConversations } from "../../store/chatSlice";
+import { fetchConversations, updateOnlineStatus, addMessage, updateConversationReadStatus } from "../../store/chatSlice";
 import { RotateCcw } from "lucide-react";
 import { getSocket, isSocketConnected } from "../../services/socket";
 
@@ -12,9 +12,13 @@ interface ChatInboxProps {
 }
 
 const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversationId }) => {
+  // DEBUG: Log on every render
+  const conversationsDebug = useSelector((state: RootState) => state.chat.conversations);
+  console.log('[ChatInbox Render] conversations:', conversationsDebug.map(c => ({id: c.id, unreadCount: c.unreadCount, lastMessage: c.lastMessage?.content?.slice(0, 30)})), 'selectedConversationId:', selectedConversationId);
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
   const conversations = useSelector((state: RootState) => state.chat.conversations);
+  const onlineUsers = useSelector((state: RootState) => state.chat.onlineUsers);
   const socket = getSocket();
   const isConnected = isSocketConnected();
   const role = user?.role as "user" | "pro";
@@ -25,17 +29,58 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     dispatch(fetchConversations({ userId: user.id, role }));
   }, [user, role, dispatch]);
 
+  // Auto-join all chat rooms for real-time inbox updates
+  useEffect(() => {
+    if (!socket || !isConnected || !user || !conversations.length) return;
+    const participantId = user.id;
+    const participantModel = role === "pro" ? "ApprovedPro" : "User";
+    // Join all chat rooms
+    conversations.forEach(conv => {
+      socket.emit("joinChat", { chatId: conv.id, participantId, participantModel });
+      console.log(`[SOCKET][ChatInbox] joinChat emitted for chatId: ${conv.id}, participantId: ${participantId}, participantModel: ${participantModel}`);
+    });
+    // Cleanup: leave all chats on unmount
+    return () => {
+      conversations.forEach(conv => {
+        socket.emit("leaveChat", { chatId: conv.id });
+        console.log(`[SOCKET][ChatInbox] leaveChat emitted for chatId: ${conv.id}`);
+      });
+    };
+  }, [socket, isConnected, user?.id, role, conversations.length]);
+
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    const handleNewMessage = () => {
-      dispatch(fetchConversations({ userId: user?.id || "", role }));
+    const handleNewMessage = (message: any) => {
+      console.log('[SOCKET][ChatInbox] newMessage received:', message);
+      // Directly update Redux state for instant UI updates
+      dispatch(addMessage(message));
+    };
+
+    const handleMessageRead = ({ chatId }: { chatId: string }) => {
+      // Directly update conversation read status for instant unread count updates
+      dispatch(updateConversationReadStatus({ chatId }));
+    };
+
+    const handleMessagesRead = ({ chatId }: { chatId: string }) => {
+      // Handle bulk message read events
+      dispatch(updateConversationReadStatus({ chatId }));
+    };
+
+    const handleOnlineStatus = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
+      dispatch(updateOnlineStatus({ userId, isOnline }));
     };
 
     socket.on("newMessage", handleNewMessage);
+    socket.on("messageRead", handleMessageRead);
+    socket.on("messagesRead", handleMessagesRead);
+    socket.on("onlineStatus", handleOnlineStatus);
 
     return () => {
       socket.off("newMessage", handleNewMessage);
+      socket.off("messageRead", handleMessageRead);
+      socket.off("messagesRead", handleMessagesRead);
+      socket.off("onlineStatus", handleOnlineStatus);
     };
   }, [socket, isConnected, user?.id, role, dispatch]);
 
@@ -95,7 +140,7 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
               >
                 <a className="mt-2 inline-flex items-center text-blue-500 hover:text-blue-700" href="#">
                   <RotateCcw className="h-4 w-4 mr-1" /> Clear Search
-                  </a>
+                </a>
               </button>
             </div>
           ) : (
@@ -124,6 +169,14 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
                       }
                       className="w-10 h-10 rounded-full object-cover"
                     />
+                    {/* Online status indicator */}
+                    {onlineUsers[
+                      user?.role === "user"
+                        ? conversation.participants.proId
+                        : conversation.participants.userId
+                    ] && (
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                    )}
                   </div>
                   <div className="ml-3 flex-1">
                     <div className="flex justify-between items-center">
@@ -132,10 +185,18 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
                           ? conversation.participants.proName
                           : conversation.participants.userName}
                       </h3>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {conversation.lastMessage &&
-                          formatTimestamp(conversation.lastMessage.timestamp)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {/* Unread count badge */}
+                        {conversation.unreadCount > 0 && (
+                          <div className="bg-green-500 text-white text-xs font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                            {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
+                          </div>
+                        )}
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {conversation.lastMessage &&
+                            formatTimestamp(conversation.lastMessage.timestamp)}
+                        </span>
+                      </div>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
                       {conversation.lastMessage?.content

@@ -30,39 +30,49 @@ const MessageBox: FC<MessageBoxProps> = ({
   const [newMessage, setNewMessage] = useState("");
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [otherUser, setOtherUser] = useState<User>({ ...initialOtherUser, isOnline: initialOtherUser.isOnline || false });
   const messagesPerPage = 10;
   const containerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dispatch = useDispatch<AppDispatch>();
   const messages = useSelector((state: RootState) => state.chat.messages[conversationId] || []);
+  const onlineUsers = useSelector((state: RootState) => state.chat.onlineUsers);
   const socket = getSocket();
+
+  // Get online status from Redux state
+  const isOtherUserOnline = onlineUsers[initialOtherUser.id] || false;
 
   // Memoize messages to prevent unnecessary re-renders
   const memoizedMessages = useMemo(() => messages, [messages]);
 
-  // Auto-scroll to bottom when new messages are added
+  // Auto-scroll to bottom when new messages are added or on initial load
   useEffect(() => {
-    if (containerRef.current && memoizedMessages.length > 0) {
+    if (containerRef.current && memoizedMessages.length > 0 && !loadingMore) {
       const container = containerRef.current;
-      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
-      if (isAtBottom) {
+
+      // Auto-scroll on initial load or when shouldAutoScroll is true
+      if (isInitialLoad || shouldAutoScroll) {
         container.scrollTop = container.scrollHeight;
+        if (isInitialLoad) {
+          setIsInitialLoad(false);
+        }
+        setShouldAutoScroll(false);
+      } else {
+        // For existing messages, only auto-scroll if user is already at bottom
+        const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
+        if (isAtBottom) {
+          container.scrollTop = container.scrollHeight;
+        }
       }
     }
-  }, [memoizedMessages.length]);
-
-  // Scroll to bottom on initial load
-  useEffect(() => {
-    if (containerRef.current && memoizedMessages.length > 0 && !loading) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight;
-    }
-  }, [memoizedMessages.length, loading]);
+  }, [memoizedMessages.length, loadingMore, isInitialLoad, shouldAutoScroll]);
 
   // Type guard for role
   const isValidChatRole = (role: Role): role is Role.USER | Role.PRO => {
@@ -90,48 +100,69 @@ const MessageBox: FC<MessageBoxProps> = ({
     };
   }, [socket, conversationId, currentUser.id, currentUser.role, dispatch]);
 
-  const loadMessages = useCallback(async () => {
-    if (loading || !hasMore) return;
+  const loadMessages = useCallback(async (isLoadingMore = false) => {
+    if ((isLoadingMore ? loadingMore : loading) || !hasMore) return;
     const role = currentUser.role as Role;
     if (!isValidChatRole(role)) {
       setError("Admins cannot access chat functionality.");
-      setLoading(false);
       return;
     }
 
-    setLoading(true);
+    if (isLoadingMore) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
+      const currentPage = isLoadingMore ? page : 1;
+
+      // Add a 1-second delay for loading more messages to show loading indicator
+      if (isLoadingMore) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
       const result = await dispatch(
         fetchConversationMessages({
           chatId: conversationId,
-          page,
+          page: currentPage,
           limit: messagesPerPage,
           role,
         })
       ).unwrap();
-      
+
       if (result.messages.length < messagesPerPage) {
         setHasMore(false);
-      } else {
+      }
+
+      if (isLoadingMore) {
         setPage((prev) => prev + 1);
+      } else {
+        setPage(2); // Next page for future loads
+        setIsInitialLoad(false);
       }
     } catch (error) {
       console.error("Failed to load messages:", error);
       setError("Failed to load messages.");
     } finally {
-      setLoading(false);
+      if (isLoadingMore) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
-  }, [conversationId, dispatch, currentUser, loading, hasMore, page, messagesPerPage]);
+  }, [conversationId, dispatch, currentUser, loading, loadingMore, hasMore, page, messagesPerPage]);
 
   useEffect(() => {
     setPage(1);
     setHasMore(true);
     setError(null);
+    setIsInitialLoad(true);
     const timer = setTimeout(() => {
-      loadMessages();
+      loadMessages(false);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [conversationId, currentUser.id, currentUser.role, loadMessages]);
+  }, [conversationId, currentUser.id, currentUser.role]);
 
   // Socket event handlers
   useEffect(() => {
@@ -143,6 +174,8 @@ const MessageBox: FC<MessageBoxProps> = ({
           if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
           }
+          // Auto-scroll to bottom when new message arrives
+          setShouldAutoScroll(true);
           if (message.senderId !== currentUser.id) {
             dispatch(markMessagesRead({ chatId: conversationId, userId: currentUser.id, role: currentUser.role as "user" | "pro" }));
           }
@@ -161,25 +194,8 @@ const MessageBox: FC<MessageBoxProps> = ({
         }
       };
 
-      const handleUserJoined = ({ chatId, participantId }: { chatId: string; participantId: string }) => {
-        if (chatId === conversationId && participantId === otherUser.id) {
-          setOtherUser((prev) => ({ ...prev, isOnline: true }));
-          dispatch(updateOnlineStatus({ userId: participantId, isOnline: true }));
-        }
-      };
-
-      const handleUserLeft = ({ chatId, participantId }: { chatId: string; participantId: string }) => {
-        if (chatId === conversationId && participantId === otherUser.id) {
-          setOtherUser((prev) => ({ ...prev, isOnline: false }));
-          dispatch(updateOnlineStatus({ userId: participantId, isOnline: false }));
-        }
-      };
-
       const handleOnlineStatus = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
-        if (userId === otherUser.id) {
-          setOtherUser((prev) => ({ ...prev, isOnline }));
-          dispatch(updateOnlineStatus({ userId, isOnline }));
-        }
+        dispatch(updateOnlineStatus({ userId, isOnline }));
       };
 
       const handleError = (error: { message: string; error: string }) => {
@@ -190,8 +206,6 @@ const MessageBox: FC<MessageBoxProps> = ({
       socket.on("newMessage", handleNewMessage);
       socket.on("typing", handleTyping);
       socket.on("stopTyping", handleStopTyping);
-      socket.on("userJoined", handleUserJoined);
-      socket.on("userLeft", handleUserLeft);
       socket.on("onlineStatus", handleOnlineStatus);
       socket.on("error", handleError);
 
@@ -199,53 +213,37 @@ const MessageBox: FC<MessageBoxProps> = ({
         socket.off("newMessage", handleNewMessage);
         socket.off("typing", handleTyping);
         socket.off("stopTyping", handleStopTyping);
-        socket.off("userJoined", handleUserJoined);
-        socket.off("userLeft", handleUserLeft);
         socket.off("onlineStatus", handleOnlineStatus);
         socket.off("error", handleError);
       };
     }
-  }, [socket, conversationId, currentUser.id, otherUser.id, dispatch]);
+  }, [socket, conversationId, currentUser.id, dispatch]);
 
   const handleScroll = useCallback(() => {
     if (containerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
       const isAtBottom = scrollHeight - scrollTop <= clientHeight + 100;
       setShowScrollToBottom(!isAtBottom);
-      if (scrollTop < 100 && hasMore && !loading) {
-        const loadMoreMessages = async () => {
-          const role = currentUser.role as Role;
-          if (!isValidChatRole(role)) {
-            setError("Admins cannot access chat functionality.");
-            return;
-          }
 
-          setLoading(true);
-          try {
-            const result = await dispatch(
-              fetchConversationMessages({
-                chatId: conversationId,
-                page: page + 1,
-                limit: messagesPerPage,
-                role,
-              })
-            ).unwrap();
-            if (result.messages.length < messagesPerPage) {
-              setHasMore(false);
-            } else {
-              setPage((prev) => prev + 1);
+      // Load more messages when scrolling near the top (pagination should load older messages)
+      if (scrollTop < 100 && hasMore && !loadingMore && !isInitialLoad) {
+        const currentScrollHeight = scrollHeight;
+        const currentScrollTop = scrollTop;
+
+        loadMessages(true).then(() => {
+          // Maintain scroll position after loading more messages
+          requestAnimationFrame(() => {
+            if (containerRef.current) {
+              const newScrollHeight = containerRef.current.scrollHeight;
+              const scrollDiff = newScrollHeight - currentScrollHeight;
+              // Set scroll position to maintain user's view
+              containerRef.current.scrollTop = currentScrollTop + scrollDiff;
             }
-          } catch (error) {
-            console.error("Failed to load more messages:", error);
-            setError("Failed to load more messages.");
-          } finally {
-            setLoading(false);
-          }
-        };
-        loadMoreMessages();
+          });
+        });
       }
     }
-  }, [containerRef, hasMore, loading, currentUser.role, dispatch, conversationId, page, messagesPerPage]);
+  }, [containerRef, hasMore, loadingMore, isInitialLoad, loadMessages]);
 
   const handleSendMessage = async () => {
     if (newMessage.trim() && currentUser && !isSending) {
@@ -358,41 +356,48 @@ const MessageBox: FC<MessageBoxProps> = ({
       >
         <div
           className={`
-            max-w-xs lg:max-w-md px-4 py-2 rounded-lg
-            ${
-              isCurrentUser
-                ? "bg-[#032b44] text-white dark:!text-white"
-                : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white"
+      px-4 py-2 rounded-lg
+      max-w-[75%] sm:max-w-[60%]
+      ${isCurrentUser
+              ? "bg-[#032b44] text-white dark:!text-white"
+              : "bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-white"
             }
-          `}
+    `}
         >
-          <p className="text-sm break-words">{message.content}</p>
+          {/* Message text */}
+          <p className="text-sm break-words break-all">{message.content}</p>
+
+          {/* Time + Read Receipts */}
           <div
-            className={`flex items-center justify-end mt-1 space-x-1 ${
-              isCurrentUser ? "text-gray-300 dark:text-gray-300" : "text-gray-500 dark:text-gray-300"
-            }`}
+            className={`flex items-center justify-end mt-1 space-x-1 ${isCurrentUser
+                ? "text-gray-300 dark:text-gray-300"
+                : "text-gray-500 dark:text-gray-300"
+              }`}
           >
             <span className="text-xs">{formatTime(message.timestamp)}</span>
-            {isCurrentUser && <div className="flex">{renderReadReceipt(message.status)}</div>}
+            {isCurrentUser && (
+              <div className="flex">{renderReadReceipt(message.status)}</div>
+            )}
           </div>
         </div>
       </div>
+
     );
   };
 
   const renderAvatar = () => {
-    if (otherUser.avatar) {
+    if (initialOtherUser.avatar) {
       return (
         <img
-          src={otherUser.avatar}
-          alt={otherUser.name}
+          src={initialOtherUser.avatar}
+          alt={initialOtherUser.name}
           className="w-10 h-10 rounded-full object-cover"
         />
       );
     }
     return (
       <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
-        <span className="text-white text-lg font-medium">{otherUser.name.charAt(0).toUpperCase()}</span>
+        <span className="text-white text-lg font-medium">{initialOtherUser.name.charAt(0).toUpperCase()}</span>
       </div>
     );
   };
@@ -404,12 +409,12 @@ const MessageBox: FC<MessageBoxProps> = ({
           <div className="flex items-center flex-1 justify-center md:justify-start">
             <div className="relative">
               {renderAvatar()}
-              {otherUser.isOnline && (
+              {isOtherUserOnline && (
                 <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
               )}
             </div>
             <div className="ml-3">
-              <h3 className="font-semibold text-white dark:!text-white">{otherUser.name}</h3>
+              <h3 className="font-semibold text-white dark:!text-white">{initialOtherUser.name}</h3>
             </div>
           </div>
           {onBack && (
@@ -434,12 +439,12 @@ const MessageBox: FC<MessageBoxProps> = ({
         <div className="flex items-center flex-1 justify-center md:justify-start">
           <div className="relative">
             {renderAvatar()}
-            {otherUser.isOnline && (
+            {isOtherUserOnline && (
               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
             )}
           </div>
           <div className="ml-3">
-            <h3 className="font-semibold text-white dark:!text-white">{otherUser.name}</h3>
+            <h3 className="font-semibold text-white dark:!text-white">{initialOtherUser.name}</h3>
           </div>
         </div>
         {onBack && (
@@ -457,7 +462,7 @@ const MessageBox: FC<MessageBoxProps> = ({
         style={{ minHeight: '200px' }}
         onScroll={handleScroll}
       >
-        {loading && page > 1 && (
+        {loadingMore && (
           <div className="text-center py-4">
             <div className="inline-flex items-center text-sm text-gray-500 dark:text-gray-300">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#032b44] dark:border-gray-300 mr-2"></div>
@@ -478,9 +483,9 @@ const MessageBox: FC<MessageBoxProps> = ({
         {showScrollToBottom && (
           <button
             onClick={scrollToBottom}
-            className="absolute bottom-4 right-4 p-2 bg-[#032b44] dark:bg-gray-700 text-white dark:text-white rounded-full hover:bg-[#032b44]/90 dark:hover:bg-gray-600 transition-colors shadow-lg"
+            className="absolute bottom-4 right-4 p-2 bg-gray-300 dark:bg-gray-500 text-white dark:text-white rounded-full hover:bg-gray-400 dark:hover:bg-gray-600 transition-colors shadow-lg"
           >
-            <ChevronDown className="w-5 h-5 text-white dark:text-white" />
+            <ChevronDown className="w-5 h-5 text-black dark:text-white" />
           </button>
         )}
       </div>
@@ -503,7 +508,7 @@ const MessageBox: FC<MessageBoxProps> = ({
             disabled={!newMessage.trim() || isSending}
             className="p-2 bg-[#032b44] dark:bg-gray-500 text-white dark:text-white rounded-full hover:bg-[#032b44]/90 dark:hover:bg-gray-600 transition-colors"
           >
-            <Send className="w-5 h-5 text-white dark:!text-white"  />
+            <Send className="w-5 h-5 text-white dark:!text-white" />
           </button>
         </div>
       </div>

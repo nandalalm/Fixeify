@@ -75,8 +75,9 @@ export default function MessagingApp({ role }: MessagingAppProps) {
     };
 
     const handleNewNotification = () => {
-      dispatch(fetchAllNotifications({ userId: user?.id || "", role, page: 1, limit: 10 }));
+      dispatch(fetchAllNotifications({ userId: user?.id || "", role, page: 1, limit: 10, filter: "all" }));
     };
+
 
     socket.on("newMessage", handleNewMessage);
     socket.on("newNotification", handleNewNotification);

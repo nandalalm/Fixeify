@@ -14,8 +14,8 @@ export interface INotificationRepository {
     walletId?: string;
     messageId?: string;
   }): Promise<INotification>;
-  findNotificationsByUser(userId: string, page: number, limit: number): Promise<{ notifications: NotificationResponse[]; total: number }>;
-  findNotificationsByPro(proId: string, page: number, limit: number): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findNotificationsByUser(userId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findNotificationsByPro(proId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
   markNotificationAsRead(notificationId: string): Promise<void>;
   markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;
 }

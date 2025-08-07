@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSelector, useDispatch } from "react-redux";
@@ -10,7 +10,8 @@ import { Sun, Moon, Bell } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
-import { fetchAllNotifications, markNotificationRead, markAllNotificationsRead } from "../../store/chatSlice";
+import { fetchAllNotifications, markNotificationRead, markAllNotificationsRead, addNotification } from "../../store/chatSlice";
+import { NotificationItem } from "../../interfaces/messagesInterface";
 import { getSocket } from "../../services/socket";
 
 const Navbar = () => {
@@ -19,11 +20,29 @@ const Navbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
-  const { user, accessToken } = useSelector((state: RootState) => state.auth);
-  const notifications = useSelector((state: RootState) => state.chat.notifications);
+
+  // When opening the panel, always set filter to 'all'
+  useEffect(() => {
+    if (isNotificationPanelOpen) {
+      setFilter('all');
+    }
+  }, [isNotificationPanelOpen]);
+  const auth = useSelector((state: RootState) => state.auth);
+  const user = auth.user as import("../../interfaces/messagesInterface").User;
+  const accessToken = auth.accessToken;
+  // Do NOT return null for the whole navbar. Only guard user-specific features below.
   const { theme, toggleTheme } = useTheme();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
+
+    // Use Redux notifications state
+  const notifications = useSelector((state: RootState) => state.chat.notifications);
+  const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  // Remove setInitialLoad and initialLoad (not implemented)
+
 
   useEffect(() => {
     const handleScroll = () => {
@@ -34,21 +53,60 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    if (user && accessToken) {
-      dispatch(fetchAllNotifications({ userId: user.id, role: "user", page: 1, limit: 10 }));
+    if (!user || !accessToken) return;
+    dispatch(fetchAllNotifications({ userId: user.id, role: "user", page: 1, limit: 10, filter }));
+  }, [user, accessToken, filter, dispatch]);
 
-      const socket = getSocket();
-      if (socket) {
-        socket.on("newNotification", () => {
-          dispatch(fetchAllNotifications({ userId: user.id, role: "user", page: 1, limit: 10 }));
-        });
-
-        return () => {
-          socket.off("newNotification");
-        };
-      }
+  const handleLoadMore = async () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+    await new Promise(res => setTimeout(res, 1000));
+    try {
+      const nextPage = page + 1;
+      const result = await dispatch(
+        fetchAllNotifications({ userId: user.id, role: "user", page: nextPage, limit: 10, filter })
+      ).unwrap();
+      setPage(nextPage);
+      // If fewer than 10 notifications returned, no more to fetch
+      setHasMore(result.length === 10);
+    } catch {
+      setHasMore(false);
     }
-  }, [user, accessToken, dispatch]);
+    setLoading(false);
+  };
+
+  const handleToggleFilter = (newFilter: 'all' | 'unread') => {
+    if (filter !== newFilter) {
+      setFilter(newFilter);
+      setPage(1);
+      setHasMore(true);
+    }
+  };
+
+
+  useEffect(() => {
+    if (!user || !accessToken) return;
+    const socket = getSocket();
+    if (!socket) return;
+    const handler = (notif: NotificationItem & { receiverId?: string }) => {
+      console.log('[SOCKET] newNotification received:', notif);
+      if ((notif.userId || notif.receiverId) === user.id) {
+        const isValid = notif.title || notif.description;
+        if (!isValid) return;
+        dispatch(addNotification(notif));
+        // After 1s, fetch notifications from backend to ensure badge is correct
+        setTimeout(() => {
+          dispatch(fetchAllNotifications({ userId: user.id, role: "user", page: 1, limit: 10, filter }));
+        }, 1000);
+      }
+    };
+
+
+    socket.on("newNotification", handler);
+    return () => {
+      socket.off("newNotification", handler);
+    };
+  }, [user, accessToken]);
 
   const handleLogout = () => {
     const role = user?.role === "admin" ? "admin" : "user";
@@ -82,7 +140,11 @@ const Navbar = () => {
     }
   };
 
-  const unreadNotificationCount = notifications.filter((n) => !n.isRead).length;
+  const unreadNotificationCount = useMemo(() => {
+    const count = notifications.filter((n: NotificationItem) => !n.isRead).length;
+    console.log('[SOCKET][DEBUG] unreadNotificationCount recalculated:', count);
+    return count;
+  }, [notifications]);
 
   return (
     <motion.header
@@ -287,6 +349,11 @@ const Navbar = () => {
         notifications={notifications}
         onMarkAsRead={handleMarkAsRead}
         onMarkAllAsRead={handleMarkAllAsRead}
+        loading={loading}
+        filter={filter}
+        onToggleFilter={handleToggleFilter}
+        onLoadMore={handleLoadMore}
+        hasMore={hasMore}
       />
       <ConfirmationModal
         isOpen={showLogoutModal}

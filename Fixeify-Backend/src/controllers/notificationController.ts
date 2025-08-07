@@ -17,7 +17,7 @@ export class NotificationController {
   async getNotifications(req: Request, res: Response): Promise<void> {
     const authReq = req as AuthRequest;
     const { role, participantId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, filter = 'all' } = req.query;
 
     try {
       if (!participantId) throw new Error(MESSAGES.UNAUTHORIZED);
@@ -25,7 +25,13 @@ export class NotificationController {
         throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
       const participantModel = role === UserRole.PRO ? "ApprovedPro" : "User";
-      const result = await this.notificationService.getNotifications(participantId, participantModel, Number(page), Number(limit));
+      const result = await this.notificationService.getNotifications(
+        participantId,
+        participantModel,
+        Number(page),
+        Number(limit),
+        filter === 'unread' ? 'unread' : 'all'
+      );
       res.status(200).json(result);
     } catch (error) {
       console.error("Error in getNotifications:", {

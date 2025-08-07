@@ -173,9 +173,11 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
     try {
       const skip = (page - 1) * limit;
       
+      // Always sort by newest first (descending) for proper pagination
+      // Skip the appropriate number of messages to get older messages for subsequent pages
       const messages = await MessageModel
         .find({ chatId })
-        .sort(page === 1 ? [["createdAt", -1]] : [["createdAt", 1]])
+        .sort([["createdAt", -1]])
         .skip(skip)
         .limit(limit)
         .exec();
