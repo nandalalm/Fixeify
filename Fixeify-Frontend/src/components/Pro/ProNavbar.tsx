@@ -51,7 +51,7 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
     { icon: Briefcase, label: "Jobs", path: "/pro/jobs" },
     { icon: Wallet, label: "Wallet", path: `/pro/wallet/${proId}` },
     { icon: MessageSquare, label: "Messages", path: "/pro/messages" },
-    { icon: Star, label: "Ratings", path: "/pro/ratings" },
+    { icon: Star, label: "Rating", path: "/pro/ratings" },
     { icon: Calendar1, label: "Slots", path: "/pro/slot-management" },
     { icon: User, label: "Profile", path: "/pro/profile" },
     { icon: LogOut, label: "Log Out", path: "/login", onClick: handleLogoutClick },

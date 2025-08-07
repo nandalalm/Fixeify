@@ -10,6 +10,7 @@ import PublicRoute from "../components/ProtectedRoutes/PublicRoute";
 import AdminPrivateRoute from "../components/ProtectedRoutes/AdminPrivateRoute";
 import AdminBookingManagement from "@/pages/Admin/AdminBookingManagement";
 import AdminRevenueManagement from "@/pages/Admin/AdminRevenueManagement";
+import AdminReviewManagement from "@/pages/Admin/AdminReviewManagement";
 
 const adminRoutes = (
   <>
@@ -25,6 +26,7 @@ const adminRoutes = (
       <Route path="/pro-profile/:id" element={<ProProfileView />} />
       <Route path="/admin/bookings" element={<AdminBookingManagement/>} />
       <Route path="/admin/revenue" element={<AdminRevenueManagement/>} />
+      <Route path="/admin/reviews" element={<AdminReviewManagement />} />
     </Route>
   </>
 );

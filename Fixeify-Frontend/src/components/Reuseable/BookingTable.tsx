@@ -6,12 +6,14 @@ import { useState, useEffect } from "react";
 interface BookingTableProps {
   bookings: BookingResponse[];
   onViewDetails: (booking: BookingResponse) => void;
+  onRate?: (booking: BookingResponse) => void;
+  isRated?: (bookingId: string) => boolean;
   totalPages: number;
   currentPage: number;
   onPageChange: (page: number) => void;
 }
 
-const BookingTable: React.FC<BookingTableProps> = ({ bookings, onViewDetails, totalPages, currentPage, onPageChange }) => {
+const BookingTable: React.FC<BookingTableProps> = ({ bookings, onViewDetails, onRate, isRated, totalPages, currentPage, onPageChange }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   useEffect(() => {
@@ -113,6 +115,14 @@ const BookingTable: React.FC<BookingTableProps> = ({ bookings, onViewDetails, to
                 </td>
                 <td className="py-3 px-4 text-sm border-b">
                   <div className="flex gap-2">
+                      {booking.status === "completed" && booking.isRated === false && onRate && isRated && !isRated(booking.id) && (
+                        <button
+                          onClick={() => onRate && onRate(booking)}
+                          className="border border-gray-500 text-gray-600 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-1.5 transition-colors"
+                        >
+                          Rate
+                        </button>
+                      )}
                     <button
                       onClick={() => onViewDetails(booking)}
                       className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"

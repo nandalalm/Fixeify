@@ -20,6 +20,7 @@ interface ConfirmationModalProps {
     | "cancel"
     | "acceptWithdrawal"
     | "rejectWithdrawal"
+    | "rating"
     | null;
   entityType?: "pro" | "user" | "booking" | "wallet";
   reason?: string;
@@ -104,6 +105,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           {action === "cancel" && (customTitle || "Cancel Booking")}
           {action === "acceptWithdrawal" && "Confirm Accept Withdrawal"}
           {action === "rejectWithdrawal" && "Reject Withdrawal Request"}
+          {action === "rating" && "Rate/Review Professional"}
         </h3>
         <p className={`mb-4 ${action === "logout" ? "dark:text-white" : ""}`}>
           {action === null && customReason
@@ -125,6 +127,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
             : "Are you sure you want to cancel this booking?")}
           {action === "acceptWithdrawal" && "Are you sure you want to accept this withdrawal request?"}
           {action === "rejectWithdrawal" && "Please select a reason for rejecting this withdrawal request:"}
+           {action === "rating" && "Are you sure you want to rate/review this professional?"}
         </p>
         {(action === "reject" || action === "rejectBooking" || action === "rejectWithdrawal" || (action === "cancel" && customTitle === "Select Cancellation Reason")) && setReason && setCustomReason && (
           <div className="mb-4">

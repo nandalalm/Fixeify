@@ -102,6 +102,11 @@ export const requestWithdrawal = async (proId: string, data: { amount: number; p
   return response.data;
 };
 
+export const fetchBookingById = async (bookingId: string): Promise<BookingResponse> => {
+  const response = await api.get(`/pro/booking/${bookingId}`, { withCredentials: true });
+  return response.data;
+};
+
 export const getPendingProById = async (pendingProId: string): Promise<PendingProResponse> => {
   const response = await api.get(`/pro/pending/${pendingProId}`);
   return response.data;

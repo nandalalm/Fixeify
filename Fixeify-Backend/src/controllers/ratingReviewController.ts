@@ -1,0 +1,70 @@
+import { Request, Response, NextFunction, Router } from "express";
+import { inject, injectable } from "inversify";
+import { TYPES } from "../types";
+import { IRatingReviewService } from "../services/IRatingReviewService";
+import { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
+
+@injectable()
+export class RatingReviewController {
+  constructor(
+    @inject(TYPES.IRatingReviewService)
+    private _ratingReviewService: IRatingReviewService
+  ) {}
+
+  createRatingReview = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = req.body as CreateRatingReviewRequest;
+      const result = await this._ratingReviewService.createRatingReview(body);
+      res.status(201).json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getRatingReviewsByPro = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { proId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 5;
+      const result = await this._ratingReviewService.getRatingReviewsByPro(proId, page, limit);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getRatingReviewsByUser = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { userId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 5;
+      const result = await this._ratingReviewService.getRatingReviewsByUser(userId, page, limit);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  // Admin: get paginated list of all reviews
+  getAllRatingReviews = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 5;
+      const result = await this._ratingReviewService.getAllRatingReviews(page, limit);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getRatingReviewById = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const result = await this._ratingReviewService.getRatingReviewById(id);
+      if (!result) return res.status(404).json({ message: "Not found" });
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  };
+}

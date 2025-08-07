@@ -2,8 +2,7 @@ import { FC, useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
-import { Sun, Moon, Menu, Bell } from "lucide-react";
-import { useTheme } from "../../context/ThemeContext";
+import {  Menu, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
@@ -19,7 +18,6 @@ interface ProTopNavbarProps {
 }
 
 const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
-  const { theme, toggleTheme } = useTheme();
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const notifications = useSelector((state: RootState) => state.chat.notifications);
   const dispatch = useDispatch<AppDispatch>();
@@ -50,10 +48,6 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
     dispatch(logoutUser("pro")).then(() => {
       navigate("/home");
     });
-  };
-
-  const handleLogoutClick = () => {
-    setShowLogoutModal(true);
   };
 
   const handleLogoutConfirm = () => {
@@ -90,7 +84,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
           <img
             src="/logo.png"
             alt="Fixeify Logo"
-            className="h-8 w-auto md:h-10 dark:filter dark:invert"
+            className="h-8 w-auto md:h-8 dark:filter dark:invert"
             onClick={() => navigate("/pro-dashboard")}
           />
         </div>
@@ -106,23 +100,9 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
               </span>
             )}
           </button>
-          <button
-            onClick={toggleTheme}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-            aria-label="Toggle theme"
-          >
-            {theme === "light" ? (
-              <Moon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-            ) : (
-              <Sun className="h-5 w-5 text-yellow-400" />
-            )}
-          </button>
-          <button
-            onClick={handleLogoutClick}
-            className="text-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-500"
-          >
-            Logout
-          </button>
+          <div className="flex items-center">
+            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user?.name || "Pro User"}</span>
+          </div>
         </div>
       </div>
       <NotificationPanel

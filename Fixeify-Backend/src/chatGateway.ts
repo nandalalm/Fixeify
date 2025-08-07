@@ -70,7 +70,6 @@ export class ChatGateway {
           socket.userRole = "pro";
           socket.userModel = "ApprovedPro";
         } else {
-          console.error(`User not found in database: ${decoded.userId}`);
           throw new Error("User not found");
         }
 
@@ -82,10 +81,6 @@ export class ChatGateway {
 
         next();
       } catch (error) {
-        console.error("Socket authentication error:", {
-          message: (error as Error).message,
-          token: socket.handshake.auth.token?.substring(0, 10) + '...' || 'No token',
-        });
         next(new Error("Authentication failed"));
       }
     });

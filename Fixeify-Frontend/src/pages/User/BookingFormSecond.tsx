@@ -48,7 +48,19 @@ const BookingFormSecond = ({ formData, setFormData, proId, setErrors, handleTime
         const selectedDate = formData.preferredDate ? new Date(formData.preferredDate) : today;
         const dayOfWeek = selectedDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
         const slots = response.availability[dayOfWeek as keyof typeof response.availability] || [];
-        setAvailableTimeSlots(slots);
+        
+        // Filter out past time slots if the selected date is today
+        const now = new Date();
+        const isToday = selectedDate.toDateString() === now.toDateString();
+        
+        const filteredSlots = isToday ? slots.filter(slot => {
+          const [hours, minutes] = slot.startTime.split(':').map(Number);
+          const slotTime = new Date();
+          slotTime.setHours(hours, minutes, 0, 0);
+          return slotTime > now;
+        }) : slots;
+        
+        setAvailableTimeSlots(filteredSlots);
       } catch (error) {
         console.error("Failed to fetch availability:", error);
         setErrors({ general: "Failed to fetch availability." });
@@ -59,12 +71,72 @@ const BookingFormSecond = ({ formData, setFormData, proId, setErrors, handleTime
     fetchAvailability();
   }, [proId, formData.preferredDate, setErrors]);
 
+  // Re-filter slots when component mounts or time changes
+  useEffect(() => {
+    const filterPastSlots = () => {
+      if (!formData.preferredDate) return;
+      
+      const selectedDate = new Date(formData.preferredDate);
+      const now = new Date();
+      const isToday = selectedDate.toDateString() === now.toDateString();
+      
+      if (isToday) {
+        setAvailableTimeSlots(prevSlots => 
+          prevSlots.filter(slot => {
+            const [hours, minutes] = slot.startTime.split(':').map(Number);
+            const slotTime = new Date();
+            slotTime.setHours(hours, minutes, 0, 0);
+            return slotTime > now;
+          })
+        );
+      }
+    };
+
+    // Filter immediately on mount
+    filterPastSlots();
+    
+    // Set up interval to check every minute
+    const interval = setInterval(filterPastSlots, 60000);
+    
+    return () => clearInterval(interval);
+  }, [formData.preferredDate]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
 
     if (name === "preferredDate") {
-      setFormData((prev) => ({ ...prev, preferredTime: [] })); 
+      setFormData((prev) => ({ ...prev, preferredTime: [] }));
+      // Trigger availability refetch when date changes
+      const fetchAvailability = async () => {
+        if (!proId) return;
+        try {
+          setIsLoadingAvailability(true);
+          const response = await getProAvailability(proId);
+          const selectedDate = new Date(value);
+          const dayOfWeek = selectedDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+          const slots = response.availability[dayOfWeek as keyof typeof response.availability] || [];
+          
+          // Filter out past time slots if the selected date is today
+          const now = new Date();
+          const isToday = selectedDate.toDateString() === now.toDateString();
+          
+          const filteredSlots = isToday ? slots.filter(slot => {
+            const [hours, minutes] = slot.startTime.split(':').map(Number);
+            const slotTime = new Date();
+            slotTime.setHours(hours, minutes, 0, 0);
+            return slotTime > now;
+          }) : slots;
+          
+          setAvailableTimeSlots(filteredSlots);
+        } catch (error) {
+          console.error("Failed to fetch availability:", error);
+          setErrors({ general: "Failed to fetch availability." });
+        } finally {
+          setIsLoadingAvailability(false);
+        }
+      };
+      fetchAvailability();
     }
   };
 

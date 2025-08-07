@@ -25,6 +25,7 @@ export class BookingResponse {
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
   cancelReason?: string;
+  isRated?: boolean;
   createdAt: Date;
   updatedAt: Date;
 
@@ -41,6 +42,7 @@ export class BookingResponse {
     status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
     rejectedReason?: string;
     cancelReason?: string;
+    isRated?: boolean;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -55,7 +57,8 @@ export class BookingResponse {
     this.preferredTime = data.preferredTime;
     this.status = data.status;
     this.rejectedReason = data.rejectedReason;
-    this.cancelReason = data.cancelReason
+    this.cancelReason = data.cancelReason;
+    this.isRated = data.isRated;
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
   }
