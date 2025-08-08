@@ -46,4 +46,13 @@ export interface IProService {
   requestWithdrawal(proId: string, data: { amount: number; paymentMode: "bank" | "upi"; bankName?: string; accountNumber?: string; ifscCode?: string; branchName?: string; upiCode?: string }): Promise<WithdrawalRequestResponse>;
   getWithdrawalRequestsByProId(proId: string): Promise<WithdrawalRequestResponse[]>;
   getPendingProById(pendingProId: string): Promise<PendingProResponse>;
+  getDashboardMetrics(proId: string): Promise<{
+    totalRevenue: number;
+    monthlyRevenue: number;
+    completedJobs: number;
+    pendingJobs: number;
+    averageRating: number;
+    walletBalance: number;
+    totalWithdrawn: number;
+  }>;
 }

@@ -1,5 +1,5 @@
 import { FC, useEffect, useRef } from "react";
-import { X, Bell, CheckCheck } from "lucide-react";
+import { X, Bell, CheckCheck, MessageCircle, Calendar, IndianRupee, Wallet } from "lucide-react";
 import { NotificationItem } from "../../interfaces/messagesInterface";
 import { format } from "date-fns";
 
@@ -167,7 +167,22 @@ const NotificationPanel: FC<NotificationPanelProps> = ({
                 }}
               >
                 <div className="flex items-start">
-                  <Bell className="w-4 h-4 text-gray-600 dark:text-gray-300 mr-2 mt-1" />
+                  {(() => {
+                    const iconClass = "w-4 h-4 text-gray-600 dark:text-gray-300 mr-2 mt-1";
+                    switch (notification.type) {
+                      case 'message':
+                        return <MessageCircle className={iconClass} />;
+                      case 'booking':
+                        return <Calendar className={iconClass} />;
+                      case 'quota':
+                        return <IndianRupee className={iconClass} />;
+                      case 'wallet':
+                        return <Wallet className={iconClass} />;
+                      case 'general':
+                      default:
+                        return <Bell className={iconClass} />;
+                    }
+                  })()}
                   <div className="flex-1">
                     <p className="text-xs font-medium text-gray-800 dark:text-white">
                       {notification.title}

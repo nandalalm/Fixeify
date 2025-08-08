@@ -8,7 +8,7 @@ import { IWalletRepository } from "../repositories/IWalletRepository";
 import { IUserService } from "./IUserService";
 import { UserResponse } from "../dtos/response/userDtos";
 import { ProResponse } from "../dtos/response/proDtos";
-import { BookingResponse } from "../dtos/response/bookingDtos";
+import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
 import { UserRole } from "../enums/roleEnum";
 import { IUser } from "../models/userModel";
 import { IApprovedPro, ITimeSlot } from "../models/approvedProModel";
@@ -21,10 +21,19 @@ import mongoose from "mongoose";
 import Stripe from "stripe";
 import { ApprovedProDocument } from "../models/approvedProModel";
 import { UpdateQuery } from "mongoose";
-import { IAdminRepository } from "../repositories/IAdminRepository"; 
+import { IAdminRepository } from "../repositories/IAdminRepository";
+import { INotificationService } from "./INotificationService";
 
 @injectable()
 export class UserService implements IUserService {
+  async getBookingById(bookingId: string): Promise<BookingCompleteResponse | null> {
+    return this._bookingRepository.findBookingByIdComplete(bookingId);
+  }
+
+  async getQuotaByBookingId(bookingId: string) {
+    return this._quotaRepository.findQuotaByBookingId(bookingId);
+  }
+
   private stripe: Stripe;
 
   constructor(
@@ -33,7 +42,8 @@ export class UserService implements IUserService {
     @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository,
     @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
     @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
-    @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
+    @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository,
+    @inject(TYPES.INotificationService) private _notificationService: INotificationService
   ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2025-06-30.basil",
@@ -74,6 +84,18 @@ export class UserService implements IUserService {
     const updatedUser = await this._userRepository.updateUser(userId, updateData);
     if (!updatedUser) return null;
 
+    // Send profile update notification
+    try {
+      await this._notificationService.createNotification({
+        type: "general",
+        title: "Profile Updated Successfully",
+        description: "Your profile information has been updated successfully. Your changes are now active.",
+        userId: userId
+      });
+    } catch (error) {
+      console.error("Failed to send profile update notification:", error);
+    }
+
     return this.mapToUserResponse(updatedUser);
   }
 
@@ -98,11 +120,31 @@ export class UserService implements IUserService {
     const updatedUser = await this._userRepository.updateUser(userId, updateData);
     if (!updatedUser) return null;
 
+    // Send password change notification
+    try {
+      await this._notificationService.createNotification({
+        type: "general",
+        title: "Password Changed Successfully",
+        description: "Your password has been changed successfully. If you didn't make this change, please contact support immediately.",
+        userId: userId
+      });
+    } catch (error) {
+      console.error("Failed to send password change notification:", error);
+    }
+
     return this.mapToUserResponse(updatedUser);
   }
 
-  async getNearbyPros(categoryId: string, longitude: number, latitude: number): Promise<ProResponse[]> {
-    return this._proRepository.findNearbyPros(categoryId, longitude, latitude);
+  async getNearbyPros(
+    categoryId: string, 
+    longitude: number, 
+    latitude: number, 
+    skip: number = 0, 
+    limit: number = 5, 
+    sortBy: string = 'nearest', 
+    availabilityFilter?: string
+  ): Promise<{ pros: ProResponse[]; total: number; hasMore: boolean }> {
+    return this._proRepository.findNearbyPros(categoryId, longitude, latitude, skip, limit, sortBy, availabilityFilter);
   }
 
  async createBooking(
@@ -184,7 +226,22 @@ export class UserService implements IUserService {
       status: "pending",
     };
 
-    return await this._bookingRepository.createBooking(booking);
+    const createdBooking = await this._bookingRepository.createBooking(booking);
+
+    // Send booking notification to pro
+    try {
+      await this._notificationService.createNotification({
+        type: "booking",
+        title: "New Booking Request",
+        description: `You have received a new booking request from ${user.name}. Please review and respond promptly.`,
+        proId: proId,
+        bookingId: createdBooking.id
+      });
+    } catch (error) {
+      console.error("Failed to send booking creation notification:", error);
+    }
+
+    return createdBooking;
   }
 
  async fetchBookingDetails(userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> {
@@ -249,12 +306,11 @@ export class UserService implements IUserService {
 
     const adminRevenue = Math.round(quota.totalCost * 0.3);
 
-    const admin = await this._adminRepository.find();
-    if (admin) {
-      await this._adminRepository.updateRevenue(admin.id, adminRevenue);
-    } else {
-      throw new HttpError(404, "Admin not found");
-    }
+
+    await this._bookingRepository.updateBooking(booking.id, {
+      adminRevenue: adminRevenue,
+      proRevenue: proAmount
+    });
 
     const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
     if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
@@ -279,6 +335,29 @@ export class UserService implements IUserService {
       status: "completed",
       preferredTime: updatedSlots.map((slot) => ({ ...slot })),
     });
+
+    try {
+    
+      await this._notificationService.createNotification({
+        type: "wallet",
+        title: "Payment Successful! ",
+        description: `Your payment of ₹${quota.totalCost} has been processed successfully. Your booking is now confirmed!`,
+        userId: booking.userId.toString(),
+        quotaId: quota.id,
+        bookingId: bookingId
+      });
+
+      await this._notificationService.createNotification({
+        type: "wallet",
+        title: "Payment Received! ",
+        description: `Great news! You've received ₹${proAmount} for your completed service. The amount has been added to your wallet.`,
+        proId: booking.proId.toString(),
+        walletId: wallet.id,
+        quotaId: quota.id
+      });
+    } catch (error) {
+      console.error("Failed to send payment completion notifications:", error);
+    }
   }
 
  async cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }> {
@@ -291,6 +370,32 @@ export class UserService implements IUserService {
       status: "cancelled",
       cancelReason: cancelReason,
     });
+
+    // Send cancellation notification to user
+    try {
+      await this._notificationService.createNotification({
+        type: "booking",
+        title: "Booking Cancelled Successfully",
+        description: "Your booking has been cancelled successfully.",
+        userId: userId,
+        bookingId: bookingId
+      });
+    } catch (error) {
+      console.error("Failed to send booking cancellation notification to user:", error);
+    }
+
+    // Send cancellation notification to pro
+    try {
+      await this._notificationService.createNotification({
+        type: "booking",
+        title: "Booking Cancelled",
+        description: "Unfortunately, the user has decided to cancel the booking.",
+        proId: booking.proId.toString(),
+        bookingId: bookingId
+      });
+    } catch (error) {
+      console.error("Failed to send booking cancellation notification to pro:", error);
+    }
 
     return { message: "Booking cancelled successfully" };
   }

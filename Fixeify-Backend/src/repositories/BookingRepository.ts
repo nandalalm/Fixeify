@@ -2,7 +2,7 @@ import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
 import { IBookingRepository } from "./IBookingRepository";
 import Booking, { BookingDocument, ITimeSlot, ILocation } from "../models/bookingModel";
-import { BookingResponse } from "../dtos/response/bookingDtos";
+import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
 import mongoose, { Types } from "mongoose";
 
 interface PopulatedUser {
@@ -35,10 +35,12 @@ interface PopulatedBookingDocument {
   preferredTime: ITimeSlot[];
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
-  cancelReason?:string;
+  cancelReason?: string;
   createdAt: Date;
   updatedAt: Date;
-  isRated?:boolean;
+  isRated?: boolean;
+  adminRevenue?: number;
+  proRevenue?: number;
 }
 
 interface PopulatedLeanBooking {
@@ -178,6 +180,72 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
 
   async findBookingById(bookingId: string): Promise<BookingDocument | null> {
     return this._model.findById(bookingId).exec();
+  }
+
+  async findBookingByIdPopulated(bookingId: string): Promise<BookingResponse | null> {
+    const booking = await this._model
+      .findById(bookingId)
+      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+        { path: "userId", select: "name email" },
+        { path: "proId", select: "firstName lastName" },
+        { path: "categoryId", select: "name image" },
+      ])
+      .lean()
+      .exec() as PopulatedLeanBooking | null;
+
+    return booking ? this.mapToBookingResponse(booking as PopulatedBookingDocument) : null;
+  }
+
+  async findBookingByIdComplete(bookingId: string): Promise<BookingCompleteResponse | null> {
+    const booking = await this._model
+      .findById(bookingId)
+      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+        { path: "userId", select: "name email photo" },
+        { path: "proId", select: "firstName lastName profilePhoto email phoneNumber" },
+        { path: "categoryId", select: "name image" },
+      ])
+      .lean()
+      .exec() as PopulatedLeanBooking | null;
+
+    return booking ? this.mapToBookingCompleteResponse(booking as PopulatedBookingDocument) : null;
+  }
+
+  private mapToBookingCompleteResponse(booking: PopulatedBookingDocument): BookingCompleteResponse {
+    return new BookingCompleteResponse({
+      id: booking._id.toString(),
+      user: {
+        id: booking.userId._id.toString(),
+        name: booking.userId.name,
+        email: booking.userId.email,
+        photo: (booking.userId as any).photo,
+      },
+      pro: {
+        id: booking.proId._id.toString(),
+        firstName: booking.proId.firstName,
+        lastName: booking.proId.lastName,
+        profilePhoto: (booking.proId as any).profilePhoto,
+        email: (booking.proId as any).email,
+        phoneNumber: (booking.proId as any).phoneNumber,
+      },
+      category: {
+        id: booking.categoryId._id.toString(),
+        name: booking.categoryId.name,
+        image: booking.categoryId.image,
+      },
+      issueDescription: booking.issueDescription,
+      location: booking.location,
+      phoneNumber: booking.phoneNumber,
+      preferredDate: booking.preferredDate,
+      preferredTime: booking.preferredTime,
+      status: booking.status,
+      rejectedReason: booking.rejectedReason,
+      cancelReason: booking.cancelReason,
+      createdAt: booking.createdAt,
+      updatedAt: booking.updatedAt,
+      isRated: booking.isRated,
+      adminRevenue: booking.adminRevenue,
+      proRevenue: booking.proRevenue,
+    });
   }
 
   async cancelBooking(bookingId: string, updateData: { status: string; cancelReason: string }): Promise<void> {
@@ -327,10 +395,140 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
       preferredTime: booking.preferredTime,
       status: booking.status,
       rejectedReason: booking.rejectedReason,
-      cancelReason: booking.cancelReason, // Include new field
+      cancelReason: booking.cancelReason,
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
       isRated: booking.isRated,
+      adminRevenue: booking.adminRevenue,
+      proRevenue: booking.proRevenue,
     });
+  }
+
+  async getAdminRevenueMetrics(): Promise<{ totalRevenue: number; monthlyRevenue: number }> {
+    const currentDate = new Date();
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+
+    const [totalResult, monthlyResult] = await Promise.all([
+      this._model.aggregate([
+        { $match: { status: "completed", adminRevenue: { $exists: true, $ne: null } } },
+        { $group: { _id: null, totalRevenue: { $sum: "$adminRevenue" } } }
+      ]),
+      this._model.aggregate([
+        { 
+          $match: { 
+            status: "completed", 
+            adminRevenue: { $exists: true, $ne: null },
+            createdAt: { $gte: startOfMonth }
+          } 
+        },
+        { $group: { _id: null, monthlyRevenue: { $sum: "$adminRevenue" } } }
+      ])
+    ]);
+
+    return {
+      totalRevenue: totalResult[0]?.totalRevenue || 0,
+      monthlyRevenue: monthlyResult[0]?.monthlyRevenue || 0
+    };
+  }
+
+  async getProDashboardMetrics(proId: string): Promise<{
+    totalRevenue: number;
+    monthlyRevenue: number;
+    completedJobs: number;
+    pendingJobs: number;
+    averageRating: number;
+  }> {
+    const currentDate = new Date();
+    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const proObjectId = new mongoose.Types.ObjectId(proId);
+
+    const [revenueResult, monthlyRevenueResult, completedJobs, pendingJobs, ratingResult] = await Promise.all([
+      this._model.aggregate([
+        { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null } } },
+        { $group: { _id: null, totalRevenue: { $sum: "$proRevenue" } } }
+      ]),
+      this._model.aggregate([
+        { 
+          $match: { 
+            proId: proObjectId, 
+            status: "completed", 
+            proRevenue: { $exists: true, $ne: null },
+            createdAt: { $gte: startOfMonth }
+          } 
+        },
+        { $group: { _id: null, monthlyRevenue: { $sum: "$proRevenue" } } }
+      ]),
+      this._model.countDocuments({ proId: proObjectId, status: "completed" }),
+      this._model.countDocuments({ proId: proObjectId, status: { $in: ["pending", "accepted"] } }),
+      mongoose.model("RatingReview").aggregate([
+        { $match: { proId: proObjectId } },
+        { $group: { _id: null, averageRating: { $avg: "$rating" } } }
+      ])
+    ]);
+
+    return {
+      totalRevenue: revenueResult[0]?.totalRevenue || 0,
+      monthlyRevenue: monthlyRevenueResult[0]?.monthlyRevenue || 0,
+      completedJobs,
+      pendingJobs,
+      averageRating: ratingResult[0]?.averageRating || 0
+    };
+  }
+
+  async getTopPerformingPros(): Promise<{
+    mostRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
+    highestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
+    leastRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
+    lowestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
+  }> {
+    const [mostRated, leastRated, highestEarning, lowestEarning] = await Promise.all([
+      // Most rated pro
+      mongoose.model("RatingReview").aggregate([
+        { $group: { _id: "$proId", averageRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+        { $match: { count: { $gte: 1 } } },
+        { $sort: { averageRating: -1 } },
+        { $limit: 1 },
+        { $lookup: { from: "approvedpros", localField: "_id", foreignField: "_id", as: "pro" } },
+        { $unwind: "$pro" },
+        { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", rating: "$averageRating" } }
+      ]),
+      // Least rated pro
+      mongoose.model("RatingReview").aggregate([
+        { $group: { _id: "$proId", averageRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+        { $match: { count: { $gte: 1 } } },
+        { $sort: { averageRating: 1 } },
+        { $limit: 1 },
+        { $lookup: { from: "approvedpros", localField: "_id", foreignField: "_id", as: "pro" } },
+        { $unwind: "$pro" },
+        { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", rating: "$averageRating" } }
+      ]),
+      // Highest earning pro
+      this._model.aggregate([
+        { $match: { status: "completed", proRevenue: { $exists: true, $ne: null } } },
+        { $group: { _id: "$proId", totalRevenue: { $sum: "$proRevenue" } } },
+        { $sort: { totalRevenue: -1 } },
+        { $limit: 1 },
+        { $lookup: { from: "approvedpros", localField: "_id", foreignField: "_id", as: "pro" } },
+        { $unwind: "$pro" },
+        { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", revenue: "$totalRevenue" } }
+      ]),
+      // Lowest earning pro
+      this._model.aggregate([
+        { $match: { status: "completed", proRevenue: { $exists: true, $ne: null } } },
+        { $group: { _id: "$proId", totalRevenue: { $sum: "$proRevenue" } } },
+        { $sort: { totalRevenue: 1 } },
+        { $limit: 1 },
+        { $lookup: { from: "approvedpros", localField: "_id", foreignField: "_id", as: "pro" } },
+        { $unwind: "$pro" },
+        { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", revenue: "$totalRevenue" } }
+      ])
+    ]);
+
+    return {
+      mostRated: mostRated[0] || null,
+      highestEarning: highestEarning[0] || null,
+      leastRated: leastRated[0] || null,
+      lowestEarning: lowestEarning[0] || null
+    };
   }
 }

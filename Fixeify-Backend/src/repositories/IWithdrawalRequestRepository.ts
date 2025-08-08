@@ -8,4 +8,5 @@ export interface IWithdrawalRequestRepository {
   updateWithdrawalRequest(id: string, data: Partial<WithdrawalRequestDocument>): Promise<WithdrawalRequestResponse | null>;
   getAllWithdrawalRequests(skip: number, limit: number): Promise<WithdrawalRequestResponse[]>;
   getTotalWithdrawalRequestsCount(): Promise<number>;
+  getTotalWithdrawnByProId(proId: string): Promise<number>;
 }

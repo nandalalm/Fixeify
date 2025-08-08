@@ -47,7 +47,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     return pro;
   }
 
-  async approvePro(id: string, password: string, about: string): Promise<{ email: string; firstName: string; lastName: string }> {
+  async approvePro(id: string, password: string, about: string): Promise<{ email: string; firstName: string; lastName: string; approvedProId: string }> {
     const pendingPro = await this.findById(id);
     if (!pendingPro) throw new Error("Pending pro not found");
 
@@ -66,6 +66,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       email: approvedPro.email,
       firstName: approvedPro.firstName,
       lastName: approvedPro.lastName,
+      approvedProId: approvedPro._id.toString(),
     };
   }
 
@@ -138,9 +139,18 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     return ApprovedProModel.findByIdAndUpdate(id, data, { new: true }).exec();
   }
 
-  async findNearbyPros(categoryId: string, longitude: number, latitude: number): Promise<ProResponse[]> {
+  async findNearbyPros(
+    categoryId: string, 
+    longitude: number, 
+    latitude: number, 
+    skip: number = 0, 
+    limit: number = 5, 
+    sortBy: string = 'nearest', 
+    availabilityFilter?: string
+  ): Promise<{ pros: ProResponse[]; total: number; hasMore: boolean }> {
     try {
-      const pros = await ApprovedProModel.aggregate([
+     
+      let pipeline: any[] = [
         {
           $geoNear: {
             near: {
@@ -168,8 +178,90 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
         {
           $unwind: "$category",
         },
-      ]);
-      return pros.map((pro: any) =>
+        {
+          $lookup: {
+            from: "ratingreviews",
+            localField: "_id",
+            foreignField: "proId",
+            as: "ratings",
+          },
+        },
+        {
+          $addFields: {
+            averageRating: {
+              $cond: {
+                if: { $gt: [{ $size: "$ratings" }, 0] },
+                then: { $avg: "$ratings.rating" },
+                else: 0
+              }
+            },
+            totalRatings: { $size: "$ratings" }
+          }
+        }
+      ];
+
+      if (availabilityFilter && availabilityFilter.length > 0) {
+        try {
+          const selectedDays = JSON.parse(availabilityFilter);
+          if (Array.isArray(selectedDays) && selectedDays.length > 0) {
+            const dayConditions = selectedDays.map(day => ({
+              [`availability.${day.toLowerCase()}`]: { $exists: true, $ne: [] }
+            }));
+            
+            pipeline.push({
+              $match: {
+                $and: dayConditions
+              }
+            });
+          }
+        } catch (error) {
+         
+          if (availabilityFilter === 'all7days') {
+            pipeline.push({
+              $match: {
+                $and: [
+                  { "availability.monday": { $exists: true, $ne: [] } },
+                  { "availability.tuesday": { $exists: true, $ne: [] } },
+                  { "availability.wednesday": { $exists: true, $ne: [] } },
+                  { "availability.thursday": { $exists: true, $ne: [] } },
+                  { "availability.friday": { $exists: true, $ne: [] } },
+                  { "availability.saturday": { $exists: true, $ne: [] } },
+                  { "availability.sunday": { $exists: true, $ne: [] } }
+                ]
+              }
+            });
+          }
+        }
+      }
+
+      // Add sorting
+      let sortStage: any = {};
+      switch (sortBy) {
+        case 'highest_rated':
+          sortStage = { $sort: { averageRating: -1, distance: 1 } };
+          break;
+        case 'lowest_rated':
+          sortStage = { $sort: { averageRating: 1, distance: 1 } };
+          break;
+        case 'nearest':
+        default:
+          sortStage = { $sort: { distance: 1 } };
+          break;
+      }
+      pipeline.push(sortStage);
+
+      // Get total count before pagination
+      const countPipeline = [...pipeline, { $count: "total" }];
+      const countResult = await ApprovedProModel.aggregate(countPipeline);
+      const total = countResult.length > 0 ? countResult[0].total : 0;
+
+      // Add pagination
+      pipeline.push({ $skip: skip });
+      pipeline.push({ $limit: limit });
+
+      const pros = await ApprovedProModel.aggregate(pipeline);
+      
+      const prosWithRatings = pros.map((pro: any) =>
         new ProResponse({
           _id: pro._id.toString(),
           firstName: pro.firstName,
@@ -206,8 +298,18 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
           isBanned: pro.isBanned,
           about: pro.about ?? null,
           isUnavailable: pro.isUnavailable,
+          averageRating: pro.averageRating || 0,
+          totalRatings: pro.totalRatings || 0,
         })
       );
+
+      const hasMore = skip + limit < total;
+
+      return {
+        pros: prosWithRatings,
+        total,
+        hasMore
+      };
     } catch (error) {
       console.error("findNearbyPros error:", error);
       throw error;

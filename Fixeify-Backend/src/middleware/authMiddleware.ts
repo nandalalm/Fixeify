@@ -2,9 +2,11 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "./errorMiddleware";
+import { JwtPayload, verifyAccessToken } from "../utils/jwtUtils";
 
 export interface AuthRequest extends Request {
   userId?: string;
+  userRole?: "user" | "pro" | "admin";
 }
 
 export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -17,13 +19,39 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     const token = authHeader.split(" ")[1];
     if (!token) throw new HttpError(401, MESSAGES.ACCESS_DENIED);
 
-    const secret = process.env.ACCESS_TOKEN_SECRET;
-    if (!secret) throw new HttpError(500, "Server configuration error: ACCESS_TOKEN_SECRET not set");
-
-    const decoded = jwt.verify(token, secret) as { userId: string };
+    const decoded = verifyAccessToken(token);
     req.userId = decoded.userId;
+    req.userRole = decoded.role;
     next();
   } catch (err) {
     next(err instanceof HttpError ? err : new HttpError(403, MESSAGES.INVALID_TOKEN));
   }
+};
+
+export const requireRole = (...allowedRoles: ("user" | "pro" | "admin")[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.userRole) {
+      return next(new HttpError(401, "Authentication required"));
+    }
+
+    if (!allowedRoles.includes(req.userRole)) {
+      return next(new HttpError(403, `Access denied. Required roles: ${allowedRoles.join(", ")}`));
+    }
+
+    next();
+  };
+};
+
+export const requireUser = requireRole("user");
+export const requirePro = requireRole("pro");
+export const requireAdmin = requireRole("admin");
+export const requireUserOrPro = requireRole("user", "pro");
+export const requireProOrAdmin = requireRole("pro", "admin");
+export const requireAnyRole = requireRole("user", "pro", "admin");
+
+export const authenticateAndAuthorize = (...allowedRoles: ("user" | "pro" | "admin")[]) => {
+  return [
+    authenticateToken,
+    requireRole(...allowedRoles)
+  ];
 };

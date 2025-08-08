@@ -1,7 +1,7 @@
 import api from "./axios";
 import { UserProfile } from "../interfaces/userInterface";
 import { IApprovedPro, ILocation, ITimeSlot } from "../interfaces/adminInterface";
-import { BookingResponse } from "../interfaces/bookingInterface";
+import { BookingResponse, BookingCompleteResponse } from "../interfaces/bookingInterface";
 
 export const getUserProfile = async (userId: string): Promise<UserProfile> => {
   const response = await api.get(`/user/fetchProfile/${userId}`, { withCredentials: true });
@@ -21,9 +21,22 @@ export const changeUserPassword = async (
   return response.data;
 };
 
-export const getNearbyPros = async (categoryId: string, longitude: number, latitude: number): Promise<IApprovedPro[]> => {
+export const getNearbyPros = async (
+  categoryId: string, 
+  longitude: number, 
+  latitude: number, 
+  page: number = 1, 
+  limit: number = 5, 
+  sortBy: string = 'nearest', 
+  availabilityFilter?: string
+): Promise<{ pros: IApprovedPro[]; total: number; hasMore: boolean }> => {
+  const params: any = { categoryId, longitude, latitude, page, limit, sortBy };
+  if (availabilityFilter) {
+    params.availabilityFilter = availabilityFilter;
+  }
+  
   const response = await api.get("/user/nearbyPros", {
-    params: { categoryId, longitude, latitude },
+    params,
     withCredentials: true,
   });
   return response.data;
@@ -76,5 +89,15 @@ export const createPaymentIntent = async (bookingId: string, amount: number): Pr
 
 export const cancelBooking = async (userId: string, bookingId: string, cancelReason: string): Promise<BookingResponse> => {
   const response = await api.post(`/user/bookings/${userId}/cancel`, { bookingId, cancelReason }, { withCredentials: true });
+  return response.data;
+};
+
+export const fetchBookingById = async (bookingId: string): Promise<BookingCompleteResponse> => {
+  const response = await api.get(`/user/booking/${bookingId}`, { withCredentials: true });
+  return response.data;
+};
+
+export const fetchQuotaByBookingId = async (bookingId: string): Promise<any> => {
+  const response = await api.get(`/user/quota/by-booking/${bookingId}`, { withCredentials: true });
   return response.data;
 };

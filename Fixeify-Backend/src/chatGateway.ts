@@ -95,13 +95,13 @@ export class ChatGateway {
           userRole: socket.userRole
         });
         
-        // Send current online users list to the newly connected client
+   
         const onlineUserIds = Array.from(this.connectedUsers.keys());
         for (const userId of onlineUserIds) {
           socket.emit("onlineStatus", { userId, isOnline: true });
         }
         
-        // Broadcast that this user is now online to all other clients
+      
         socket.broadcast.emit("onlineStatus", { userId: socket.userId, isOnline: true });
       }
 

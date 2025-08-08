@@ -21,6 +21,7 @@ import mongoose from "mongoose";
 import { IWalletRepository } from "../repositories/IWalletRepository";
 import { WalletResponseDTO } from "../dtos/response/walletDtos";
 import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
+import { INotificationService } from "./INotificationService";
 
 @injectable()
 export class ProService implements IProService {
@@ -30,7 +31,8 @@ export class ProService implements IProService {
     @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository,
     @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
     @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
-    @inject(TYPES.IWithdrawalRequestRepository) private _withdrawalRequestRepository: IWithdrawalRequestRepository
+    @inject(TYPES.IWithdrawalRequestRepository) private _withdrawalRequestRepository: IWithdrawalRequestRepository,
+    @inject(TYPES.INotificationService) private _notificationService: INotificationService
   ) {}
 
   async applyPro(proData: Partial<IPendingPro>): Promise<{ message: string; pendingPro: IPendingPro }> {
@@ -87,6 +89,19 @@ export class ProService implements IProService {
 
     const profile = await this._proRepository.findApprovedProByIdAsProfile(proId);
     if (!profile) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+
+    // Send profile update notification
+    try {
+      await this._notificationService.createNotification({
+        type: "general",
+        title: "Profile Updated Successfully",
+        description: "Your professional profile has been updated successfully. Your changes are now visible to customers.",
+        proId: proId
+      });
+    } catch (error) {
+      console.error("Failed to send pro profile update notification:", error);
+    }
+
     return profile;
   }
 
@@ -110,6 +125,17 @@ export class ProService implements IProService {
 
     const updatedPro = await this._proRepository.updateApprovedPro(proId, updateData);
     if (!updatedPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+
+    try {
+      await this._notificationService.createNotification({
+        type: "general",
+        title: "Password Changed Successfully",
+        description: "Your password has been changed successfully. If you didn't make this change, please contact support immediately.",
+        proId: proId
+      });
+    } catch (error) {
+      console.error("Failed to send pro password change notification:", error);
+    }
 
     return this.mapToUserResponse(updatedPro);
   }
@@ -237,6 +263,18 @@ export class ProService implements IProService {
         preferredTime: updatedSlots.map((slot) => ({ ...slot })),
       });
 
+      try {
+        await this._notificationService.createNotification({
+          type: "booking",
+          title: "Booking Accepted! ",
+          description: `Great news! ${pro.firstName} ${pro.lastName} has accepted your booking request. You'll receive a quote soon.`,
+          userId: booking.userId.toString(),
+          bookingId: bookingId
+        });
+      } catch (error) {
+        console.error("Failed to send booking acceptance notification:", error);
+      }
+
       await session.commitTransaction();
       return { message: MESSAGES.BOOKING_ACCEPTED_SUCCESSFULLY };
     } catch (error) {
@@ -256,6 +294,19 @@ export class ProService implements IProService {
       status: "rejected",
       rejectedReason: reason,
     });
+
+    // Send booking rejection notification to user
+    try {
+      await this._notificationService.createNotification({
+        type: "booking",
+        title: "Booking Request Declined",
+        description: `Unfortunately, your booking request has been declined. Reason: ${reason}. Please try booking with another professional.`,
+        userId: booking.userId.toString(),
+        bookingId: bookingId
+      });
+    } catch (error) {
+      console.error("Failed to send booking rejection notification:", error);
+    }
 
     return { message: MESSAGES.BOOKING_REJECTED_SUCCESSFULLY };
   }
@@ -278,6 +329,21 @@ export class ProService implements IProService {
     };
 
     const quota = await this._quotaRepository.createQuota(quotaData);
+
+    // Send quota generation notification to user
+    try {
+      await this._notificationService.createNotification({
+        type: "quota",
+        title: "Quote Ready! 💰",
+        description: `Your quote is ready! Total cost: ₹${quotaData.totalCost}. Please review and proceed with payment to confirm your booking.`,
+        userId: booking.userId.toString(),
+        quotaId: quota.id,
+        bookingId: bookingId
+      });
+    } catch (error) {
+      console.error("Failed to send quota generation notification:", error);
+    }
+
     return quota;
   }
 
@@ -378,6 +444,32 @@ async getPendingProById(pendingProId: string): Promise<PendingProResponse> {
     bankName: pendingPro.bankName,
     availability: pendingPro.availability,
     createdAt: pendingPro.createdAt,
+  };
+}
+
+async getDashboardMetrics(proId: string): Promise<{
+  totalRevenue: number;
+  monthlyRevenue: number;
+  completedJobs: number;
+  pendingJobs: number;
+  averageRating: number;
+  walletBalance: number;
+  totalWithdrawn: number;
+}> {
+  const [bookingMetrics, wallet, totalWithdrawn] = await Promise.all([
+    this._bookingRepository.getProDashboardMetrics(proId),
+    this._walletRepository.findWalletByProId(proId),
+    this._withdrawalRequestRepository.getTotalWithdrawnByProId(proId),
+  ]);
+
+  return {
+    totalRevenue: bookingMetrics.totalRevenue,
+    monthlyRevenue: bookingMetrics.monthlyRevenue,
+    completedJobs: bookingMetrics.completedJobs,
+    pendingJobs: bookingMetrics.pendingJobs,
+    averageRating: bookingMetrics.averageRating,
+    walletBalance: wallet?.balance || 0,
+    totalWithdrawn: totalWithdrawn || 0,
   };
 }
 }

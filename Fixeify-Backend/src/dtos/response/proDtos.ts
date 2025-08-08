@@ -76,6 +76,8 @@ export class ProResponse {
   public isBanned: boolean;
   public about: string | null;
   public isUnavailable: boolean;
+  public averageRating?: number;
+  public totalRatings?: number;
 
   constructor({
     _id,
@@ -96,6 +98,8 @@ export class ProResponse {
     isBanned,
     about = null,
     isUnavailable = false,
+    averageRating = 0,
+    totalRatings = 0,
   }: {
     _id: string;
     firstName: string;
@@ -123,6 +127,8 @@ export class ProResponse {
     isBanned: boolean;
     about?: string | null;
     isUnavailable: boolean;
+    averageRating?: number;
+    totalRatings?: number;
   }) {
     this._id = _id;
     this.firstName = firstName;
@@ -142,6 +148,8 @@ export class ProResponse {
     this.isBanned = isBanned;
     this.about = about;
     this.isUnavailable = isUnavailable;
+    this.averageRating = averageRating;
+    this.totalRatings = totalRatings;
   }
 }
 

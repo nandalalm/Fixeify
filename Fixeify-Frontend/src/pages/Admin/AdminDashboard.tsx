@@ -31,9 +31,16 @@ const AdminDashboard: FC = () => {
   const [metrics, setMetrics] = useState<{
     userCount: number;
     proCount: number;
-    revenue: number;
+    totalRevenue: number;
+    monthlyRevenue: number;
     categoryCount: number;
     trendingService: { categoryId: string; name: string; bookingCount: number } | null;
+    topPerformingPros: {
+      mostRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
+      highestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
+      leastRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
+      lowestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
+    };
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,13 +123,38 @@ const AdminDashboard: FC = () => {
                   </div>
                 </section>
 
-                <section>
-                  <h3 className="text-lg font-medium text-gray-800 mb-4">Insights</h3>
+                <section className="mb-8">
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">Revenue</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <StatCard value={`₹${metrics.revenue.toLocaleString()}`} subtitle="Revenue" />
+                    <StatCard value={`₹${metrics.totalRevenue?.toLocaleString() || '0'}`} subtitle="Total Revenue" />
+                    <StatCard value={`₹${metrics.monthlyRevenue?.toLocaleString() || '0'}`} subtitle="This Month's Revenue" />
+                  </div>
+                </section>
+
+                <section className="mb-8">
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">Top Performing Pros</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <StatCard 
+                      value={metrics.topPerformingPros?.mostRated ? `${metrics.topPerformingPros.mostRated.firstName} ${metrics.topPerformingPros.mostRated.lastName}` : "N/A"}
+                      subtitle={`Most Rated (${metrics.topPerformingPros?.mostRated?.rating?.toFixed(1) || 0}★)`}
+                    />
+                    <StatCard 
+                      value={metrics.topPerformingPros?.highestEarning ? `${metrics.topPerformingPros.highestEarning.firstName} ${metrics.topPerformingPros.highestEarning.lastName}` : "N/A"}
+                      subtitle={`Highest Earning (₹${metrics.topPerformingPros?.highestEarning?.revenue?.toLocaleString() || 0})`}
+                    />
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-lg font-medium text-gray-800 mb-4">Service Insights</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <StatCard
                       value={metrics.trendingService?.name || "None"}
                       subtitle={`Trending Service (${metrics.trendingService?.bookingCount || 0} bookings)`}
+                    />
+                    <StatCard
+                      value={metrics.topPerformingPros?.leastRated ? `${metrics.topPerformingPros.leastRated.firstName} ${metrics.topPerformingPros.leastRated.lastName}` : "N/A"}
+                      subtitle={`Needs Improvement (${metrics.topPerformingPros?.leastRated?.rating?.toFixed(1) || 0}★)`}
                     />
                   </div>
                 </section>

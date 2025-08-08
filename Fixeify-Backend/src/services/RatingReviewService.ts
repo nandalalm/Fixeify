@@ -39,7 +39,6 @@ export class RatingReviewService implements IRatingReviewService {
       review: data.review,
     });
 
-    // Set isRated to true for the booking if bookingId exists
     if (data.bookingId) {
       const bookingRepo = require("../repositories/BookingRepository");
       const repoInstance = new bookingRepo.MongoBookingRepository();

@@ -22,6 +22,7 @@ import jwt from "jsonwebtoken";
 import { Request, Response } from "express";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
+import { INotificationService } from "./INotificationService";
 
 @injectable()
 export class AuthService implements IAuthService {
@@ -44,7 +45,8 @@ export class AuthService implements IAuthService {
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository,
-    @inject(TYPES.IProRepository) private _proRepository: IProRepository
+    @inject(TYPES.IProRepository) private _proRepository: IProRepository,
+    @inject(TYPES.INotificationService) private _notificationService: INotificationService
   ) {
     this._redisClient.connect().catch((err) => logger.error("Failed to connect to Redis:", err));
     this._redisClient.on("error", (err) => logger.error("Redis error:", err));
@@ -92,8 +94,24 @@ export class AuthService implements IAuthService {
   async register(name: string, email: string, password: string, role: UserRole): Promise<IUser | IAdmin> {
     const hashedPassword = await bcrypt.hash(password, 10);
     const userData = mapUserDtoToModel({ name, email, password: hashedPassword });
+    let newUser: IUser | IAdmin;
+    
     if (role === UserRole.USER) {
-      return this._userRepository.createUser(userData);
+      newUser = await this._userRepository.createUser(userData);
+      
+      // Send welcome notification to new user
+      try {
+        await this._notificationService.createNotification({
+          type: "general",
+          title: "Welcome to Fixeify!",
+          description: "Welcome to Fixeify! We're excited to have you on board. Start exploring our services and connect with skilled professionals.",
+          userId: newUser.id
+        });
+      } catch (error) {
+        logger.error("Failed to send welcome notification:", error);
+      }
+      
+      return newUser;
     } else if (role === UserRole.ADMIN) {
       return this._adminRepository.createAdmin(userData);
     } else {
@@ -153,8 +171,8 @@ export class AuthService implements IAuthService {
       throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
     }
 
-    const accessToken = generateAccessToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
+    const accessToken = generateAccessToken(user.id, role);
+    const refreshToken = generateRefreshToken(user.id, role);
 
     await this._redisClient.setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
 
@@ -226,14 +244,26 @@ export class AuthService implements IAuthService {
       });
       user = await this._userRepository.createUser(userData);
       created = true;
+      
+      // Send welcome notification to new Google user
+      try {
+        await this._notificationService.createNotification({
+          type: "general",
+          title: "Welcome to Fixeify!",
+          description: "Welcome to Fixeify! Your Google account has been successfully linked. Start exploring our services and connect with skilled professionals.",
+          userId: user.id
+        });
+      } catch (error) {
+        logger.error("Failed to send welcome notification:", error);
+      }
     }
 
     if ("isBanned" in user && user.isBanned) {
       throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
     }
 
-    const accessToken = generateAccessToken(user.id);
-    const refreshToken = generateRefreshToken(user.id);
+    const accessToken = generateAccessToken(user.id, role);
+    const refreshToken = generateRefreshToken(user.id, role);
 
     await this._redisClient.setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
 
@@ -282,17 +312,33 @@ export class AuthService implements IAuthService {
       throw new HttpError(401, MESSAGES.INVALID_TOKEN);
     }
 
-    let user: IUser | IAdmin | ApprovedProDocument | null = await this._userRepository.findUserById(decoded.userId);
-    if (!user) user = await this._adminRepository.findAdminById(decoded.userId);
-    if (!user) user = await this._proRepository.findApprovedProById(decoded.userId);
-    if (!user) throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+    let user: IUser | IAdmin | ApprovedProDocument | null = null;
+    let userRole: "user" | "pro" | "admin";
+    
+    // Determine user and role based on which repository finds the user
+    user = await this._userRepository.findUserById(decoded.userId);
+    if (user) {
+      userRole = "user";
+    } else {
+      user = await this._adminRepository.findAdminById(decoded.userId);
+      if (user) {
+        userRole = "admin";
+      } else {
+        user = await this._proRepository.findApprovedProById(decoded.userId);
+        if (user) {
+          userRole = "pro";
+        } else {
+          throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+        }
+      }
+    }
 
     if ("isBanned" in user && user.isBanned) {
       throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
     }
 
-    const newAccessToken = generateAccessToken(user.id);
-    const newRefreshToken = generateRefreshToken(user.id);
+    const newAccessToken = generateAccessToken(user.id, userRole);
+    const newRefreshToken = generateRefreshToken(user.id, userRole);
 
     await this._redisClient.setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, newRefreshToken);
 

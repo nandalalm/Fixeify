@@ -30,12 +30,10 @@ export class NotificationService implements INotificationService {
       timestamp: notification.createdAt.toISOString(),
     };
 
-    // Emit real-time notification to recipient using global io instance
     const recipientId = response.userId || response.proId;
     const receiverModel = response.userId ? 'User' : 'ApprovedPro';
     if (recipientId && (global as any).io) {
       const io = (global as any).io;
-      // Find the connected user's socket and emit to them
       const connectedUsers = (global as any).connectedUsers || new Map();
       const user = connectedUsers.get(recipientId);
       if (user) {

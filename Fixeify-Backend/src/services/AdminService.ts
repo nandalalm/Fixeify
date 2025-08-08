@@ -23,6 +23,7 @@ import { getApprovalEmailTemplate, getRejectionEmailTemplate } from "../utils/em
 import { createClient } from "redis";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "../middleware/errorMiddleware";
+import { INotificationService } from "./INotificationService";
 
 @injectable()
 export class AdminService implements IAdminService {
@@ -42,6 +43,7 @@ export class AdminService implements IAdminService {
     @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
     @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
     @inject(TYPES.IWithdrawalRequestRepository) private _withdrawalRequestRepository: IWithdrawalRequestRepository,
+    @inject(TYPES.INotificationService) private _notificationService: INotificationService,
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
   ) {
     this._redisClient.connect().catch((err) => console.error("Failed to connect to Redis:", err));
@@ -223,8 +225,20 @@ export class AdminService implements IAdminService {
 
   async approvePro(id: string, about: string | null): Promise<void> {
     const { plainPassword, hashedPassword } = await this.generatePassword();
-    const { email, firstName, lastName } = await this._proRepository.approvePro(id, hashedPassword, about || "");
+    const { email, firstName, lastName, approvedProId } = await this._proRepository.approvePro(id, hashedPassword, about || "");
     await this.sendApprovalEmail(email, `${firstName} ${lastName}`, plainPassword);
+    
+    // Send welcome notification to newly approved pro
+    try {
+      await this._notificationService.createNotification({
+        type: "general",
+        title: "🎉 Welcome to Fixeify Pro!",
+        description: `Congratulations ${firstName}! Your professional application has been approved. You can now start receiving bookings and grow your business with Fixeify.`,
+        proId: approvedProId
+      });
+    } catch (error) {
+      console.error("Failed to send pro approval notification:", error);
+    }
   }
 
   async getApprovedPros(page: number, limit: number): Promise<{ pros: ProResponse[]; total: number }> {
@@ -367,24 +381,34 @@ export class AdminService implements IAdminService {
   async getDashboardMetrics(adminId: string): Promise<{
     userCount: number;
     proCount: number;
-    revenue: number;
+    totalRevenue: number;
+    monthlyRevenue: number;
     categoryCount: number;
     trendingService: { categoryId: string; name: string; bookingCount: number } | null;
+    topPerformingPros: {
+      mostRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
+      highestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
+      leastRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
+      lowestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
+    };
   }> {
-    const [userCount, proCount, categoryCount, revenue, trendingService] = await Promise.all([
+    const [userCount, proCount, categoryCount, revenueMetrics, trendingService, topPerformingPros] = await Promise.all([
       this._userRepository.getTotalUsersCount(),
       this._proRepository.getTotalApprovedProsCount(),
       this._categoryRepository.getTotalCategoriesCount(),
-      this._adminRepository.getAdminRevenue(adminId),
+      this._bookingRepository.getAdminRevenueMetrics(),
       this._bookingRepository.getTrendingService(),
+      this._bookingRepository.getTopPerformingPros(),
     ]);
 
     return {
       userCount,
       proCount,
-      revenue,
+      totalRevenue: revenueMetrics.totalRevenue,
+      monthlyRevenue: revenueMetrics.monthlyRevenue,
       categoryCount,
       trendingService,
+      topPerformingPros,
     };
   }
 

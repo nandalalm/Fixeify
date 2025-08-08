@@ -193,11 +193,21 @@ export class ChatService implements IChatService {
         ? (sender as PopulatedUser).name
         : `${(sender as PopulatedPro).firstName} ${(sender as PopulatedPro).lastName || ""}`.trim();
 
+    // Create appropriate description based on message type
+    let description: string;
+    if (data.body && data.body.trim()) {
+      description = data.body.slice(0, 100);
+    } else if (data.attachments && data.attachments.length > 0) {
+      description = "📷 Image";
+    } else {
+      description = "New message";
+    }
+
     const notification = await this.notificationService.createNotification({
       userId: receiverModel === "User" ? receiverId : undefined,
       proId: receiverModel === "ApprovedPro" ? receiverId : undefined,
       title: `New message from ${senderName}`,
-      description: data.body?.slice(0, 100) || "New message",
+      description,
       type: "message",
       chatId: data.chatId,
       messageId: message._id.toString(),

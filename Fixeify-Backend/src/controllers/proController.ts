@@ -207,12 +207,25 @@ export class ProController {
   }
 
   async getPendingProById(req: Request, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const pendingProId = req.params.id;
-    const pendingPro = await this._proService.getPendingProById(pendingProId);
-    res.status(200).json(pendingPro);
-  } catch (error) {
-    next(error);
+    try {
+      const pendingProId = req.params.id;
+      const pendingPro = await this._proService.getPendingProById(pendingProId);
+      res.status(200).json(pendingPro);
+    } catch (error) {
+      next(error);
+    }
   }
-}
+
+  async getDashboardMetrics(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const proId = req.params.proId;
+      if (!proId) {
+        throw new HttpError(400, "Pro ID is required");
+      }
+      const metrics = await this._proService.getDashboardMetrics(proId);
+      res.status(200).json(metrics);
+    } catch (error) {
+      next(error);
+    }
+  }
 }

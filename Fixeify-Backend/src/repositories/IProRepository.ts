@@ -9,7 +9,7 @@ export interface IProRepository {
   getPendingProsWithPagination(skip: number, limit: number): Promise<PendingProDocument[]>;
   getTotalPendingProsCount(): Promise<number>;
   findById(id: string): Promise<PendingProDocument | null>;
-  approvePro(id: string, password: string, about: string): Promise<{ email: string; firstName: string; lastName: string }>;
+  approvePro(id: string, password: string, about: string): Promise<{ email: string; firstName: string; lastName: string; approvedProId: string }>;
   rejectPro(id: string): Promise<void>;
   getApprovedProsWithPagination(skip: number, limit: number): Promise<ProResponse[]>;
   findApprovedProById(id: string): Promise<ApprovedProDocument | null>;
@@ -20,6 +20,14 @@ export interface IProRepository {
   deletePendingPro(id: string): Promise<void>;
   updatePendingPro(id: string, data: Partial<PendingProDocument>): Promise<PendingProDocument | null>;
   updateApprovedPro(id: string, data: Partial<ApprovedProDocument>): Promise<ApprovedProDocument | null>;
-  findNearbyPros(categoryId: string, longitude: number, latitude: number): Promise<ProResponse[]>;
+  findNearbyPros(
+    categoryId: string, 
+    longitude: number, 
+    latitude: number, 
+    skip?: number, 
+    limit?: number, 
+    sortBy?: string, 
+    availabilityFilter?: string
+  ): Promise<{ pros: ProResponse[]; total: number; hasMore: boolean }>;
   updateAvailability(proId: string, dayOfWeek: string, timeSlots: ITimeSlot[],booked: boolean ): Promise<ApprovedProDocument | null>;
 }

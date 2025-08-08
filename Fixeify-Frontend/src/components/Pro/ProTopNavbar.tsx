@@ -76,19 +76,17 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
       if (!user || (notif.proId || notif.receiverId) !== user.id) return;
       const isValid = notif.title || notif.description;
       if (!isValid) return;
+      
+      // Immediately add the notification to update the count in real-time
       dispatch(addNotification(notif));
-      setTimeout(() => {
-        if (user) {
-          dispatch(fetchAllNotifications({ userId: user.id, role: "pro", page: 1, limit: 10, filter }));
-        }
-      }, 1000);
+      // Real-time update - no need to fetch from backend
     };
 
     socket.on("newNotification", handler);
     return () => {
       socket.off("newNotification", handler);
     };
-  }, [user, accessToken, filter, dispatch]);
+  }, [user, accessToken, filter, dispatch, isNotificationPanelOpen]);
 
   const handleLogout = () => {
     dispatch(logoutUser("pro")).then(() => {

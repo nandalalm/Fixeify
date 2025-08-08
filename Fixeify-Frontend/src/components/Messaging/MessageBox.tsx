@@ -1,11 +1,21 @@
 import { FC, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
-import { Check, CheckCheck, Send, ArrowLeft, ChevronDown } from "lucide-react";
+import { Check, CheckCheck, Send, ArrowLeft, ChevronDown, X, Image as ImageIcon } from "lucide-react";
 import { Message, User } from "../../interfaces/messagesInterface";
 import { getSocket, isSocketConnected } from "../../services/socket";
-import { fetchConversationMessages, markMessagesRead, addMessage, updateOnlineStatus } from "../../store/chatSlice";
+import { fetchConversationMessages, markMessagesRead, addMessage, updateOnlineStatus, updateMessageStatus } from "../../store/chatSlice";
 import { sendNewMessage } from "../../api/chatApi";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+
+// S3 Client configuration
+const s3Client = new S3Client({
+  region: import.meta.env.VITE_AWS_REGION,
+  credentials: {
+    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
+    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
+  },
+});
 
 // Define Role enum locally
 enum Role {
@@ -38,6 +48,10 @@ const MessageBox: FC<MessageBoxProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesPerPage = 10;
   const containerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -48,6 +62,52 @@ const MessageBox: FC<MessageBoxProps> = ({
 
   // Get online status from Redux state
   const isOtherUserOnline = onlineUsers[initialOtherUser.id] || false;
+
+  // S3 Upload function
+  const uploadToS3 = async (file: File, folder: string): Promise<string> => {
+    const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const params = {
+      Bucket: import.meta.env.VITE_S3_BUCKET_NAME as string,
+      Key: `${folder}/${Date.now()}-${file.name}`,
+      Body: uint8Array,
+      ContentType: file.type,
+    };
+    const command = new PutObjectCommand(params);
+    await s3Client.send(command);
+    return `https://${params.Bucket}.s3.${import.meta.env.VITE_AWS_REGION}.amazonaws.com/${params.Key}`;
+  };
+
+  // Handle image selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError('Only image files are allowed');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setError('Image size must be less than 5MB');
+        return;
+      }
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+      setError(null);
+    }
+  };
+
+  // Clear selected image
+  const clearSelectedImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   // Memoize messages to prevent unnecessary re-renders
   const memoizedMessages = useMemo(() => messages, [messages]);
@@ -203,10 +263,28 @@ const MessageBox: FC<MessageBoxProps> = ({
         setError(error.message);
       };
 
+      const handleMessagesRead = ({ chatId, participantId }: { chatId: string; participantId: string }) => {
+        if (chatId === conversationId && participantId !== currentUser.id) {
+          // Update message status to 'read' for all messages sent by current user
+          // Get current messages for this chat and update each one sent by current user
+          const currentMessages = messages;
+          currentMessages.forEach(message => {
+            if (message.senderId === currentUser.id && message.status !== 'read') {
+              dispatch(updateMessageStatus({
+                chatId: conversationId,
+                messageId: message.id,
+                status: 'read'
+              }));
+            }
+          });
+        }
+      };
+
       socket.on("newMessage", handleNewMessage);
       socket.on("typing", handleTyping);
       socket.on("stopTyping", handleStopTyping);
       socket.on("onlineStatus", handleOnlineStatus);
+      socket.on("messagesRead", handleMessagesRead);
       socket.on("error", handleError);
 
       return () => {
@@ -214,6 +292,7 @@ const MessageBox: FC<MessageBoxProps> = ({
         socket.off("typing", handleTyping);
         socket.off("stopTyping", handleStopTyping);
         socket.off("onlineStatus", handleOnlineStatus);
+        socket.off("messagesRead", handleMessagesRead);
         socket.off("error", handleError);
       };
     }
@@ -246,7 +325,7 @@ const MessageBox: FC<MessageBoxProps> = ({
   }, [containerRef, hasMore, loadingMore, isInitialLoad, loadMessages]);
 
   const handleSendMessage = async () => {
-    if (newMessage.trim() && currentUser && !isSending) {
+    if ((newMessage.trim() || selectedImage) && currentUser && !isSending) {
       const role = currentUser.role as Role;
       if (!isValidChatRole(role)) {
         setError("Admins cannot send messages.");
@@ -254,7 +333,23 @@ const MessageBox: FC<MessageBoxProps> = ({
       }
 
       setIsSending(true);
+      setIsUploadingImage(!!selectedImage);
+      
       try {
+        let attachments: { url: string; mime: string; size: number }[] = [];
+        let messageType: "text" | "image" = "text";
+        
+        // Upload image to S3 if selected
+        if (selectedImage) {
+          const imageUrl = await uploadToS3(selectedImage, "chat-images");
+          attachments = [{
+            url: imageUrl,
+            mime: selectedImage.type,
+            size: selectedImage.size
+          }];
+          messageType = "image";
+        }
+
         if (socket && isSocketConnected()) {
           socket.emit("stopTyping", { chatId: conversationId });
           socket.emit("sendMessage", {
@@ -262,24 +357,32 @@ const MessageBox: FC<MessageBoxProps> = ({
             senderId: currentUser.id,
             senderModel: role === Role.PRO ? "ApprovedPro" : "User",
             body: newMessage.trim(),
+            attachments: attachments.length > 0 ? attachments : undefined,
+            type: messageType,
             role: role,
           });
           setNewMessage("");
+          clearSelectedImage();
         } else {
+          // For API call, we need to update the sendNewMessage function to accept attachments
           const message = await sendNewMessage(
             conversationId,
             currentUser.id,
             role === Role.PRO ? "ApprovedPro" : "User",
-            newMessage.trim()
+            newMessage.trim(),
+            messageType,
+            attachments.length > 0 ? attachments : undefined
           );
           dispatch(addMessage(message));
           setNewMessage("");
+          clearSelectedImage();
         }
       } catch (error) {
         console.error("Failed to send message:", error);
         setError("Failed to send message. Please check your connection.");
       } finally {
         setIsSending(false);
+        setIsUploadingImage(false);
       }
     }
   };
@@ -364,8 +467,29 @@ const MessageBox: FC<MessageBoxProps> = ({
             }
     `}
         >
-          {/* Message text */}
-          <p className="text-sm break-words break-all">{message.content}</p>
+          {/* Message content */}
+          {message.content && (
+            <p className="text-sm break-words break-all">{message.content}</p>
+          )}
+          
+          {/* Image attachments */}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {message.attachments.map((attachment, index) => (
+                attachment.mime.startsWith('image/') && (
+                  <div key={index} className="relative">
+                    <img
+                      src={attachment.url}
+                      alt="Attachment"
+                      className="max-w-full max-h-64 rounded-lg object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                      onClick={() => window.open(attachment.url, '_blank')}
+                      loading="lazy"
+                    />
+                  </div>
+                )
+              ))}
+            </div>
+          )}
 
           {/* Time + Read Receipts */}
           <div
@@ -490,26 +614,71 @@ const MessageBox: FC<MessageBoxProps> = ({
         )}
       </div>
       <div className="p-4 border-t bg-gray-50 dark:bg-gray-700">
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => {
-              setNewMessage(e.target.value);
-              handleTyping();
-            }}
-            onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
-            disabled={isSending}
-            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white rounded-full focus:outline-none focus:ring-2 focus:ring-[#032b44] dark:focus:ring-gray-50 focus:border-transparent disabled:opacity-50"
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={!newMessage.trim() || isSending}
-            className="p-2 bg-[#032b44] dark:bg-gray-500 text-white dark:text-white rounded-full hover:bg-[#032b44]/90 dark:hover:bg-gray-600 transition-colors"
-          >
-            <Send className="w-5 h-5 text-white dark:!text-white" />
-          </button>
+        <div className="border-t border-gray-200 dark:border-gray-700">
+          {/* Image Preview */}
+          {imagePreview && (
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="relative inline-block">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="max-w-xs max-h-32 rounded-lg object-cover"
+                />
+                <button
+                  onClick={clearSelectedImage}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+          
+          <div className="flex items-center space-x-2 p-4">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            
+            {/* Image attachment button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isSending || isUploadingImage}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-[#032b44] dark:hover:text-gray-300 transition-colors disabled:opacity-50"
+              title="Attach image"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </button>
+            
+            <textarea
+              value={newMessage}
+              onChange={(e) => {
+                setNewMessage(e.target.value);
+                handleTyping();
+              }}
+              onKeyPress={handleKeyPress}
+              placeholder="Type a message..."
+              disabled={isSending || isUploadingImage}
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white rounded-full focus:outline-none focus:ring-2 focus:ring-[#032b44] dark:focus:ring-gray-50 focus:border-transparent disabled:opacity-50 resize-none"
+              rows={1}
+            />
+            
+            <button
+              onClick={handleSendMessage}
+              disabled={(!newMessage.trim() && !selectedImage) || isSending || isUploadingImage}
+              className="p-2 bg-[#032b44] dark:bg-gray-500 text-white dark:text-white rounded-full hover:bg-[#032b44]/90 dark:hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              {isUploadingImage ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Send className="w-5 h-5 text-white dark:!text-white" />
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

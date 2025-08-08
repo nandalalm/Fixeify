@@ -94,10 +94,7 @@ const Navbar = () => {
         const isValid = notif.title || notif.description;
         if (!isValid) return;
         dispatch(addNotification(notif));
-        // After 1s, fetch notifications from backend to ensure badge is correct
-        setTimeout(() => {
-          dispatch(fetchAllNotifications({ userId: user.id, role: "user", page: 1, limit: 10, filter }));
-        }, 1000);
+        // Real-time update - no need to fetch from backend
       }
     };
 

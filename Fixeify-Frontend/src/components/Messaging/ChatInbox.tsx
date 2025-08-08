@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { format } from "date-fns";
 import { fetchConversations, updateOnlineStatus, addMessage, updateConversationReadStatus } from "../../store/chatSlice";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Image as ImageIcon } from "lucide-react";
 import { getSocket, isSocketConnected } from "../../services/socket";
 
 interface ChatInboxProps {
@@ -12,7 +12,7 @@ interface ChatInboxProps {
 }
 
 const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversationId }) => {
-  // DEBUG: Log on every render
+
   const conversationsDebug = useSelector((state: RootState) => state.chat.conversations);
   console.log('[ChatInbox Render] conversations:', conversationsDebug.map(c => ({id: c.id, unreadCount: c.unreadCount, lastMessage: c.lastMessage?.content?.slice(0, 30)})), 'selectedConversationId:', selectedConversationId);
   const dispatch = useDispatch<AppDispatch>();
@@ -29,17 +29,17 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     dispatch(fetchConversations({ userId: user.id, role }));
   }, [user, role, dispatch]);
 
-  // Auto-join all chat rooms for real-time inbox updates
+
   useEffect(() => {
     if (!socket || !isConnected || !user || !conversations.length) return;
     const participantId = user.id;
     const participantModel = role === "pro" ? "ApprovedPro" : "User";
-    // Join all chat rooms
+
     conversations.forEach(conv => {
       socket.emit("joinChat", { chatId: conv.id, participantId, participantModel });
       console.log(`[SOCKET][ChatInbox] joinChat emitted for chatId: ${conv.id}, participantId: ${participantId}, participantModel: ${participantModel}`);
     });
-    // Cleanup: leave all chats on unmount
+   
     return () => {
       conversations.forEach(conv => {
         socket.emit("leaveChat", { chatId: conv.id });
@@ -53,17 +53,17 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
 
     const handleNewMessage = (message: any) => {
       console.log('[SOCKET][ChatInbox] newMessage received:', message);
-      // Directly update Redux state for instant UI updates
+     
       dispatch(addMessage(message));
     };
 
     const handleMessageRead = ({ chatId }: { chatId: string }) => {
-      // Directly update conversation read status for instant unread count updates
+     
       dispatch(updateConversationReadStatus({ chatId }));
     };
 
     const handleMessagesRead = ({ chatId }: { chatId: string }) => {
-      // Handle bulk message read events
+     
       dispatch(updateConversationReadStatus({ chatId }));
     };
 
@@ -95,15 +95,21 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     return message;
   };
 
-  // Filter conversations based on search query
-  const filteredConversations = conversations.filter((conversation) =>
-    (user?.role === "user"
-      ? conversation.participants.proName
-      : conversation.participants.userName
+  const filteredConversations = conversations
+    .filter((conversation) =>
+      (user?.role === "user"
+        ? conversation.participants.proName
+        : conversation.participants.userName
+      )
+        .toLowerCase()
+        .includes(searchQuery.toLowerCase())
     )
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase())
-  );
+    .sort((a, b) => {
+      // Sort by latest message timestamp (most recent first)
+      const aTimestamp = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+      const bTimestamp = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+      return bTimestamp - aTimestamp;
+    });
 
   const handleClearSearch = () => {
     setSearchQuery("");
@@ -198,11 +204,20 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
                         </span>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
-                      {conversation.lastMessage?.content
-                        ? truncateMessage(conversation.lastMessage.content)
-                        : "No messages yet"}
-                    </p>
+                    <div className="text-sm text-gray-600 dark:text-gray-300 truncate">
+                      {conversation.lastMessage ? (
+                        conversation.lastMessage.content ? (
+                          truncateMessage(conversation.lastMessage.content)
+                        ) : (
+                          <div className="flex items-center space-x-1">
+                            <ImageIcon className="w-4 h-4" />
+                            <span>Image</span>
+                          </div>
+                        )
+                      ) : (
+                        "No messages yet"
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

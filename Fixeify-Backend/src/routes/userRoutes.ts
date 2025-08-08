@@ -17,6 +17,8 @@ export default function createUserRoutes(container: Container): Router {
   router.get("/bookings/:userId", authenticateToken, userController.fetchBookingDetails.bind(userController));
   router.get("/bookings/history/:userId", authenticateToken, userController.fetchBookingHistoryDetails.bind(userController));
   router.post("/create-payment-intent", authenticateToken, userController.createPaymentIntent.bind(userController));
+  router.get("/booking/:bookingId", authenticateToken, userController.getBookingById.bind(userController));
+  router.get("/quota/by-booking/:bookingId", authenticateToken, userController.getQuotaByBookingId.bind(userController));
   router.post("/bookings/:userId/cancel", authenticateToken, userController.cancelBooking.bind(userController));
 
   return router;

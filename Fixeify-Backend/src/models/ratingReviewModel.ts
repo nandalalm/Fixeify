@@ -7,8 +7,8 @@ export interface IRatingReview extends Document {
   categoryId: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
   quotaId?: mongoose.Types.ObjectId;
-  rating: number; // 1-5 stars (required)
-  review?: string; // Optional review text
+  rating: number; 
+  review?: string; 
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,15 +57,12 @@ const ratingReviewSchema = new Schema<IRatingReview>(
   }
 );
 
-// Compound index to prevent duplicate reviews for same booking/quota
-// Unique review per booking
 ratingReviewSchema.index(
   { userId: 1, proId: 1, bookingId: 1 },
   { unique: true, partialFilterExpression: { bookingId: { $exists: true, $ne: null } } }
 );
 
 
-// Index for efficient queries
 ratingReviewSchema.index({ proId: 1, createdAt: -1 });
 ratingReviewSchema.index({ userId: 1, createdAt: -1 });
 

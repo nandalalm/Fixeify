@@ -27,8 +27,15 @@ export interface IAdminService {
   getDashboardMetrics(adminId: string): Promise<{
     userCount: number;
     proCount: number;
-    revenue: number;
+    totalRevenue: number;
+    monthlyRevenue: number;
     categoryCount: number;
     trendingService: { categoryId: string; name: string; bookingCount: number } | null;
+    topPerformingPros: {
+      mostRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
+      highestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
+      leastRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
+      lowestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
+    };
   }>;
 }

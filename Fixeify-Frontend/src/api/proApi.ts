@@ -111,3 +111,18 @@ export const getPendingProById = async (pendingProId: string): Promise<PendingPr
   const response = await api.get(`/pro/pending/${pendingProId}`);
   return response.data;
 };
+
+export const fetchProDashboardMetrics = async (proId: string): Promise<{
+  totalRevenue: number;
+  monthlyRevenue: number;
+  completedJobs: number;
+  pendingJobs: number;
+  averageRating: number;
+  walletBalance: number;
+  totalWithdrawn: number;
+}> => {
+  const response = await api.get(`/pro/dashboard-metrics/${proId}`, {
+    withCredentials: true,
+  });
+  return response.data;
+};

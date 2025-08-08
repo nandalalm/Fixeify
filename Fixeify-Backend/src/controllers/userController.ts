@@ -56,16 +56,26 @@ export class UserController {
 
   async getNearbyPros(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { categoryId, longitude, latitude } = req.query;
+      const { categoryId, longitude, latitude, page = '1', limit = '5', sortBy = 'nearest', availabilityFilter } = req.query;
       if (!categoryId || !longitude || !latitude) {
         throw new HttpError(400, "categoryId, longitude, and latitude are required");
       }
-      const pros = await this._userService.getNearbyPros(
+      
+      const pageNum = parseInt(page as string);
+      const limitNum = parseInt(limit as string);
+      const skip = (pageNum - 1) * limitNum;
+      
+      const result = await this._userService.getNearbyPros(
         categoryId as string,
         parseFloat(longitude as string),
-        parseFloat(latitude as string)
+        parseFloat(latitude as string),
+        skip,
+        limitNum,
+        sortBy as string,
+        availabilityFilter as string
       );
-      res.status(200).json(pros);
+      
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }
@@ -137,6 +147,28 @@ export class UserController {
 
       const result = await this._userService.cancelBooking(userId, bookingId, cancelReason);
       res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getBookingById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { bookingId } = req.params;
+      const booking = await this._userService.getBookingById(bookingId);
+      if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
+      res.status(200).json(booking);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getQuotaByBookingId(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { bookingId } = req.params;
+      const quota = await this._userService.getQuotaByBookingId(bookingId);
+      if (!quota) throw new HttpError(404, MESSAGES.QUOTA_NOT_FOUND);
+      res.status(200).json(quota);
     } catch (error) {
       next(error);
     }

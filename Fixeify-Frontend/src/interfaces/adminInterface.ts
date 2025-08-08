@@ -93,6 +93,8 @@ export interface IApprovedPro {
   isBanned: boolean;
   about?: string | null;
   isUnavailable: boolean;
+  averageRating?: number;
+  totalRatings?: number;
 }
 
 export interface BanStatusResponse {

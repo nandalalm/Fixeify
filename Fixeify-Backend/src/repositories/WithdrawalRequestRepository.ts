@@ -65,4 +65,23 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
       updatedAt: withdrawalRequest.updatedAt,
     });
   }
+
+  async getTotalWithdrawnByProId(proId: string): Promise<number> {
+    const result = await this._model.aggregate([
+      {
+        $match: {
+          proId: new Types.ObjectId(proId),
+          status: "approved"
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalWithdrawn: { $sum: "$amount" }
+        }
+      }
+    ]);
+
+    return result[0]?.totalWithdrawn || 0;
+  }
 }
