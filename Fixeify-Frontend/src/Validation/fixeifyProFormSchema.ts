@@ -23,7 +23,7 @@ const phoneNumberSchema = z
 
 const accountNumberSchema = z
   .string()
-  .length(11, "Account Number must be exactly 11 digits")
+  .length(16, "Account Number must be exactly 16 digits")
   .regex(/^\d+$/, "Account Number must contain only numbers")
   .trim();
 

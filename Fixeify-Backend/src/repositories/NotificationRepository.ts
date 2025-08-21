@@ -17,6 +17,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
     description: string;
     userId?: string;
     proId?: string;
+    adminId?: string;
     chatId?: string;
     bookingId?: string;
     quotaId?: string;
@@ -30,6 +31,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       ...data,
       userId: data.userId ? new mongoose.Types.ObjectId(data.userId) : undefined,
       proId: data.proId ? new mongoose.Types.ObjectId(data.proId) : undefined,
+      adminId: data.adminId ? new mongoose.Types.ObjectId(data.adminId) : undefined,
       chatId: data.chatId ? new mongoose.Types.ObjectId(data.chatId) : undefined,
       bookingId: data.bookingId ? new mongoose.Types.ObjectId(data.bookingId) : undefined,
       quotaId: data.quotaId ? new mongoose.Types.ObjectId(data.quotaId) : undefined,
@@ -86,6 +88,30 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
     };
   }
 
+  async findNotificationsByAdmin(adminId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
+    if (!mongoose.Types.ObjectId.isValid(adminId)) {
+      throw new Error("Invalid adminId");
+    }
+    const skip = (page - 1) * limit;
+    const query: any = { adminId: new mongoose.Types.ObjectId(adminId) };
+    if (filter === 'unread') {
+      query.isRead = false;
+    }
+    const notifications = await this._model
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .exec();
+
+    const total = await this._model.countDocuments(query);
+
+    return {
+      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
+      total,
+    };
+  }
+
   async markNotificationAsRead(notificationId: string): Promise<void> {
     if (!mongoose.Types.ObjectId.isValid(notificationId)) {
       throw new Error("Invalid notificationId");
@@ -93,13 +119,15 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
     await this.updateById(notificationId, { isRead: true });
   }
 
-  async markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
+  async markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void> {
     if (!mongoose.Types.ObjectId.isValid(participantId)) {
       throw new Error("Invalid participantId");
     }
     const filter = participantModel === "User"
       ? { userId: new mongoose.Types.ObjectId(participantId), isRead: false }
-      : { proId: new mongoose.Types.ObjectId(participantId), isRead: false };
+      : participantModel === "ApprovedPro"
+      ? { proId: new mongoose.Types.ObjectId(participantId), isRead: false }
+      : { adminId: new mongoose.Types.ObjectId(participantId), isRead: false };
     await this._model.updateMany(filter, { isRead: true }).exec();
   }
 
@@ -111,6 +139,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       description: notification.description,
       userId: notification.userId?.toString(),
       proId: notification.proId?.toString(),
+      adminId: notification.adminId?.toString(),
       chatId: notification.chatId?.toString(),
       bookingId: notification.bookingId?.toString(),
       quotaId: notification.quotaId?.toString(),

@@ -7,6 +7,7 @@ export interface INotification extends Document {
   description: string;
   userId?: mongoose.Types.ObjectId;
   proId?: mongoose.Types.ObjectId;
+  adminId?: mongoose.Types.ObjectId;
   chatId?: mongoose.Types.ObjectId;
   bookingId?: mongoose.Types.ObjectId;
   quotaId?: mongoose.Types.ObjectId;
@@ -24,6 +25,7 @@ const notificationSchema = new Schema<INotification>(
     description: { type: String, required: true },
     userId: { type: Schema.Types.ObjectId, ref: "User" },
     proId: { type: Schema.Types.ObjectId, ref: "ApprovedPro" },
+    adminId: { type: Schema.Types.ObjectId, ref: "Admin" },
     chatId: { type: Schema.Types.ObjectId, ref: "Chat" },
     bookingId: { type: Schema.Types.ObjectId, ref: "Booking" },
     quotaId: { type: Schema.Types.ObjectId, ref: "Quota" },
@@ -39,5 +41,6 @@ const notificationSchema = new Schema<INotification>(
 
 notificationSchema.index({ userId: 1, createdAt: -1 });
 notificationSchema.index({ proId: 1, createdAt: -1 });
+notificationSchema.index({ adminId: 1, createdAt: -1 });
 
 export const Notification = mongoose.model<INotification>("Notification", notificationSchema);

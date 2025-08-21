@@ -5,9 +5,10 @@ import ProfileInfo from "../../components/User/ProfileInfo";
 import EditProfile from "../../components/User/EditProfile";
 import ChangePassword from "../../components/User/ChangePassword";
 import OngoingRequest from "../../components/User/OngoingRequest";
+import UserConflicts from "./UserConflicts";
 import BookingHistory from "../../components/User/BookingHistory";
 import MessagingApp from "../../components/Messaging/MessasingApp";
-import { User, GitPullRequestDraft, ChevronLeft, ChevronRight, ListCollapse, LogOut, X, MessageCircleIcon } from "lucide-react";
+import { User, GitPullRequestDraft, ChevronLeft, ChevronRight, ListCollapse, LogOut, X, MessageCircleIcon,OctagonAlert } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
@@ -100,6 +101,7 @@ const Profile = () => {
       ),
     },
     { name: "Messages", icon: <MessageCircleIcon className="w-5 h-5" /> },
+    { name: "Conflicts", icon: <OctagonAlert className="w-5 h-5" /> },
     { name: "Logout", icon: <LogOut className="w-5 h-5 text-red-600 dark:text-red-400" /> },
   ];
 
@@ -172,7 +174,7 @@ const Profile = () => {
           {isSidebarVisible && (
             <button
               onClick={toggleSidebar}
-              className="absolute top-1/2 -right-4 transform -translate-y-1/2 p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="absolute top-72 -right-4 p-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               {isSidebarShrunk ? (
                 <ChevronRight className="w-6 h-6 text-blue-600 dark:text-white" />
@@ -201,12 +203,7 @@ const Profile = () => {
           {activeTab === "Ongoing Request" && <OngoingRequest />}
           {activeTab === "Booking History" && <BookingHistory />}
           {activeTab === "Messages" && <MessagingApp role="user" />}
-          {activeTab === "Notifications & Alerts" && (
-            <div className="p-6">
-              <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Notifications & Alerts</h2>
-              <p className="text-gray-700 dark:text-gray-300">Notifications will be displayed here.</p>
-            </div>
-          )}
+          {activeTab === "Conflicts" && <UserConflicts />}
         </div>
       </div>
       <Footer />

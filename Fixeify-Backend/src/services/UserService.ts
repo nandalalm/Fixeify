@@ -23,6 +23,8 @@ import { ApprovedProDocument } from "../models/approvedProModel";
 import { UpdateQuery } from "mongoose";
 import { IAdminRepository } from "../repositories/IAdminRepository";
 import { INotificationService } from "./INotificationService";
+import { ITransactionRepository } from "../repositories/ITransactionRepository";
+import { ITicketRepository } from "../repositories/ITicketRepository";
 
 @injectable()
 export class UserService implements IUserService {
@@ -34,7 +36,7 @@ export class UserService implements IUserService {
     return this._quotaRepository.findQuotaByBookingId(bookingId);
   }
 
-  private stripe: Stripe;
+  private _stripe: Stripe;
 
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
@@ -43,9 +45,11 @@ export class UserService implements IUserService {
     @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
     @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository,
-    @inject(TYPES.INotificationService) private _notificationService: INotificationService
+    @inject(TYPES.INotificationService) private _notificationService: INotificationService,
+    @inject(TYPES.ITransactionRepository) private _transactionRepository: ITransactionRepository,
+    @inject(TYPES.ITicketRepository) private _ticketRepository: ITicketRepository
   ) {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    this._stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2025-06-30.basil",
     });
   }
@@ -84,7 +88,7 @@ export class UserService implements IUserService {
     const updatedUser = await this._userRepository.updateUser(userId, updateData);
     if (!updatedUser) return null;
 
-    // Send profile update notification
+   
     try {
       await this._notificationService.createNotification({
         type: "general",
@@ -93,7 +97,7 @@ export class UserService implements IUserService {
         userId: userId
       });
     } catch (error) {
-      console.error("Failed to send profile update notification:", error);
+      console.error(MESSAGES.FAILED_SEND_PROFILE_UPDATE_NOTIFICATION + ":", error);
     }
 
     return this.mapToUserResponse(updatedUser);
@@ -120,7 +124,7 @@ export class UserService implements IUserService {
     const updatedUser = await this._userRepository.updateUser(userId, updateData);
     if (!updatedUser) return null;
 
-    // Send password change notification
+  
     try {
       await this._notificationService.createNotification({
         type: "general",
@@ -129,7 +133,7 @@ export class UserService implements IUserService {
         userId: userId
       });
     } catch (error) {
-      console.error("Failed to send password change notification:", error);
+      console.error(MESSAGES.FAILED_SEND_PASSWORD_CHANGE_NOTIFICATION + ":", error);
     }
 
     return this.mapToUserResponse(updatedUser);
@@ -171,13 +175,13 @@ export class UserService implements IUserService {
     const pro = await this._proRepository.findApprovedProById(proId);
     if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
     if (pro.isBanned) throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
-    if (pro.isUnavailable) throw new HttpError(400, "Professional is currently unavailable");
+    if (pro.isUnavailable) throw new HttpError(400, MESSAGES.PRO_CURRENTLY_UNAVAILABLE);
 
     const preferredDate = new Date(bookingData.preferredDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (preferredDate < today) {
-      throw new HttpError(400, "Preferred date cannot be in the past");
+      throw new HttpError(400, MESSAGES.PREFERRED_DATE_IN_PAST);
     }
 
     const existingBookings = await this._bookingRepository.findBookingsByUserProDateTime(
@@ -189,7 +193,7 @@ export class UserService implements IUserService {
     );
 
     if (existingBookings.length > 0) {
-      throw new HttpError(400, "You already have a booking in progress for this date and time slot. Please choose a different time.");
+      throw new HttpError(400, MESSAGES.BOOKING_ALREADY_IN_PROGRESS);
     }
 
     const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
@@ -213,6 +217,17 @@ export class UserService implements IUserService {
         throw new HttpError(400, `Time slot ${selectedSlot.startTime}-${selectedSlot.endTime} is already booked`);
       }
     }
+   
+    const updatedSlots = bookingData.preferredTime.map((slot) => ({
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      booked: true,
+    }));
+
+    const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, true);
+    if (!availabilityUpdate) {
+      throw new HttpError(400, MESSAGES.FAILED_UPDATE_PRO_AVAIL_SELECTED_SLOTS);
+    }
 
     const booking: Partial<IBooking> = {
       userId: new mongoose.Types.ObjectId(userId),
@@ -226,9 +241,21 @@ export class UserService implements IUserService {
       status: "pending",
     };
 
-    const createdBooking = await this._bookingRepository.createBooking(booking);
+    let createdBooking: BookingResponse;
+    try {
+      createdBooking = await this._bookingRepository.createBooking(booking);
+    } catch (error) {
+      
+      try {
+        const rollbackSlots = updatedSlots.map((s) => ({ ...s, booked: false }));
+        await this._proRepository.updateAvailability(pro.id, dayOfWeek, rollbackSlots, false);
+      } catch (e) {
+        console.error(MESSAGES.FAILED_ROLLBACK_AVAILABILITY_AFTER_BOOKING_ERROR + ":", e);
+      }
+      throw error;
+    }
 
-    // Send booking notification to pro
+   
     try {
       await this._notificationService.createNotification({
         type: "booking",
@@ -238,7 +265,19 @@ export class UserService implements IUserService {
         bookingId: createdBooking.id
       });
     } catch (error) {
-      console.error("Failed to send booking creation notification:", error);
+      console.error(MESSAGES.FAILED_SEND_BOOKING_CREATION_NOTIFICATION + ":", error);
+    }
+
+    try {
+      await this._notificationService.createNotification({
+        type: "booking",
+        title: "Booking Created Successfully",
+        description: `Your booking with ${pro.firstName} ${pro.lastName} has been created. You'll be notified once the pro responds.`,
+        userId: userId,
+        bookingId: createdBooking.id
+      });
+    } catch (error) {
+      console.error(MESSAGES.FAILED_SEND_BOOKING_CONFIRMATION_TO_USER + ":", error);
     }
 
     return createdBooking;
@@ -255,14 +294,14 @@ export class UserService implements IUserService {
   }
   
   async createPaymentIntent(bookingId: string, amount: number): Promise<{ clientSecret: string }> {
-    const paymentIntent = await this.stripe.paymentIntents.create({
+    const paymentIntent = await this._stripe.paymentIntents.create({
       amount,
       currency: "inr",
       automatic_payment_methods: { enabled: true },
       metadata: { bookingId },
     });
     if (!paymentIntent.client_secret) {
-      throw new HttpError(500, "Failed to create payment intent");
+      throw new HttpError(500, MESSAGES.FAILED_CREATE_PAYMENT_INTENT);
     }
     return { clientSecret: paymentIntent.client_secret };
   }
@@ -272,7 +311,7 @@ export class UserService implements IUserService {
     if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
 
     const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
-    if (!quota) throw new HttpError(404, "Quota not found");
+    if (!quota) throw new HttpError(404, MESSAGES.QUOTA_NOT_FOUND);
 
     await this._quotaRepository.updateQuota(quota.id, { paymentStatus: "completed" });
 
@@ -282,35 +321,56 @@ export class UserService implements IUserService {
       wallet = await this._walletRepository.createWallet({
         proId: booking.proId,
         balance: 0,
-        transactions: [],
-      });
+      } as any);
     }
 
-    const transaction = {
-      amount: proAmount,
-      type: "credit" as const,
-      date: new Date(),
-      quotaId: new mongoose.Types.ObjectId(quota.id),
-    };
-
-    const update: UpdateQuery<WalletDocument> = {
-      $set: { balance: wallet.balance + proAmount },
-      $push: { transactions: transaction },
-    };
-
-    const updatedWallet = await this._walletRepository.updateWallet(wallet.id, update);
+   
+    const updatedWallet = await this._walletRepository.updateWallet(wallet.id, {
+      balance: wallet.balance + proAmount,
+    } as Partial<WalletDocument>);
 
     if (!updatedWallet) {
-      throw new HttpError(500, "Failed to update pro wallet");
+      throw new HttpError(500, MESSAGES.FAILED_UPDATE_PRO_WALLET);
     }
 
-    const adminRevenue = Math.round(quota.totalCost * 0.3);
+   
+    await this._transactionRepository.createTransaction({
+      proId: new mongoose.Types.ObjectId(booking.proId),
+      walletId: new mongoose.Types.ObjectId(updatedWallet.id),
+      amount: proAmount,
+      type: "credit",
+      date: new Date(),
+      quotaId: new mongoose.Types.ObjectId(quota.id),
+      bookingId: new mongoose.Types.ObjectId(booking.id),
+      description: `Payment for booking #${booking.id.slice(-6)}`,
+    } as any);
 
+    const adminRevenue = Math.round(quota.totalCost * 0.3);
 
     await this._bookingRepository.updateBooking(booking.id, {
       adminRevenue: adminRevenue,
       proRevenue: proAmount
     });
+
+
+    try {
+      const admin = await this._adminRepository.find();
+      if (admin) {
+        await this._transactionRepository.createTransaction({
+          proId: new mongoose.Types.ObjectId(booking.proId),
+          walletId: new mongoose.Types.ObjectId(updatedWallet.id),
+          amount: adminRevenue,
+          type: "credit",
+          date: new Date(),
+          quotaId: new mongoose.Types.ObjectId(quota.id),
+          bookingId: new mongoose.Types.ObjectId(booking.id),
+          adminId: new mongoose.Types.ObjectId((admin as any)._id),
+          description: `Admin revenue for booking #${booking.id.slice(-6)}`,
+        } as any);
+      }
+    } catch (e) {
+      console.error(MESSAGES.FAILED_RECORD_ADMIN_REVENUE_TRANSACTION + ":", e);
+    }
 
     const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
     if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
@@ -328,7 +388,7 @@ export class UserService implements IUserService {
     const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
     if (!availabilityUpdate) {
       console.log("Availability update failed. Pro document:", await this._proRepository.findApprovedProById(pro.id));
-      throw new HttpError(400, "Failed to update pro availability");
+      throw new HttpError(400, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
     }
 
     await this._bookingRepository.updateBooking(bookingId, {
@@ -356,22 +416,41 @@ export class UserService implements IUserService {
         quotaId: quota.id
       });
     } catch (error) {
-      console.error("Failed to send payment completion notifications:", error);
+      console.error(MESSAGES.FAILED_SEND_PAYMENT_COMPLETION_NOTIFICATIONS + ":", error);
     }
   }
 
  async cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }> {
     const booking = await this._bookingRepository.findBookingById(bookingId);
     if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
-    if (booking.userId.toString() !== userId) throw new HttpError(403, "Unauthorized to cancel this booking");
-    if (booking.status !== "pending") throw new HttpError(400, "Only pending bookings can be cancelled");
+    if (booking.userId.toString() !== userId) throw new HttpError(403, MESSAGES.UNAUTHORIZED_CANCEL_BOOKING);
+    if (booking.status !== "pending") throw new HttpError(400, MESSAGES.ONLY_PENDING_CAN_BE_CANCELLED);
 
-    await this._bookingRepository.cancelBooking(bookingId, {
+   
+    const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
+    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+
+    const preferredDate = new Date(booking.preferredDate);
+    const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
+    const updatedSlots = booking.preferredTime.map((slot) => ({
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      booked: false,
+    }));
+
+    const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
+    if (!availabilityUpdate) {
+      console.log("Availability update failed. Pro document:", await this._proRepository.findApprovedProById(pro.id));
+      throw new HttpError(400, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
+    }
+
+    await this._bookingRepository.updateBooking(bookingId, {
       status: "cancelled",
       cancelReason: cancelReason,
+      preferredTime: updatedSlots.map((slot) => ({ ...slot })),
     });
 
-    // Send cancellation notification to user
+
     try {
       await this._notificationService.createNotification({
         type: "booking",
@@ -381,10 +460,10 @@ export class UserService implements IUserService {
         bookingId: bookingId
       });
     } catch (error) {
-      console.error("Failed to send booking cancellation notification to user:", error);
+      console.error(MESSAGES.FAILED_SEND_BOOKING_CANCELLATION_TO_USER + ":", error);
     }
 
-    // Send cancellation notification to pro
+ 
     try {
       await this._notificationService.createNotification({
         type: "booking",
@@ -394,7 +473,7 @@ export class UserService implements IUserService {
         bookingId: bookingId
       });
     } catch (error) {
-      console.error("Failed to send booking cancellation notification to pro:", error);
+      console.error(MESSAGES.FAILED_SEND_BOOKING_CANCELLATION_TO_PRO + ":", error);
     }
 
     return { message: "Booking cancelled successfully" };

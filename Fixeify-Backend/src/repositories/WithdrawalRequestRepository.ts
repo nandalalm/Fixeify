@@ -24,6 +24,17 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
   async findWithdrawalRequestsByProId(proId: string): Promise<WithdrawalRequestResponse[]> {
     const withdrawalRequests = await this._model
       .find({ proId: new Types.ObjectId(proId) })
+      .sort({ createdAt: -1 })
+      .exec();
+    return withdrawalRequests.map(this.mapToWithdrawalRequestResponse);
+  }
+
+  async findWithdrawalRequestsByProIdPaginated(proId: string, skip: number, limit: number): Promise<WithdrawalRequestResponse[]> {
+    const withdrawalRequests = await this._model
+      .find({ proId: new Types.ObjectId(proId) })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .exec();
     return withdrawalRequests.map(this.mapToWithdrawalRequestResponse);
   }
@@ -38,6 +49,7 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
   async getAllWithdrawalRequests(skip: number, limit: number): Promise<WithdrawalRequestResponse[]> {
     const withdrawalRequests = await this._model
       .find({})
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .exec();
@@ -46,6 +58,10 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
 
   async getTotalWithdrawalRequestsCount(): Promise<number> {
     return this._model.countDocuments({}).exec();
+  }
+
+  async getTotalWithdrawalRequestsCountByProId(proId: string): Promise<number> {
+    return this._model.countDocuments({ proId: new Types.ObjectId(proId) }).exec();
   }
 
   private mapToWithdrawalRequestResponse(withdrawalRequest: WithdrawalRequestDocument): WithdrawalRequestResponse {
@@ -59,6 +75,8 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
       ifscCode: withdrawalRequest.ifscCode || undefined,
       branchName: withdrawalRequest.branchName || undefined,
       upiCode: withdrawalRequest.upiCode || undefined,
+      bookingId: withdrawalRequest.bookingId ? withdrawalRequest.bookingId.toString() : undefined,
+      quotaId: withdrawalRequest.quotaId ? withdrawalRequest.quotaId.toString() : undefined,
       status: withdrawalRequest.status,
       rejectionReason: withdrawalRequest.rejectionReason || undefined,
       createdAt: withdrawalRequest.createdAt,

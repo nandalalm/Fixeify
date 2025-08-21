@@ -10,6 +10,8 @@ export interface WithdrawalRequestDocument extends Document {
   ifscCode?: string;
   branchName?: string;
   upiCode?: string;
+  bookingId?: Types.ObjectId;
+  quotaId?: Types.ObjectId;
   status: "pending" | "approved" | "rejected";
   rejectionReason?: string;
   createdAt: Date;
@@ -26,6 +28,8 @@ const withdrawalRequestSchema = new Schema<WithdrawalRequestDocument>(
     ifscCode: { type: String },
     branchName: { type: String },
     upiCode: { type: String },
+    bookingId: { type: Schema.Types.ObjectId, ref: "Booking" },
+    quotaId: { type: Schema.Types.ObjectId, ref: "Quota" },
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],

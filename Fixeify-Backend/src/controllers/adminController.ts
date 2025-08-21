@@ -7,9 +7,7 @@ import { HttpError } from "../middleware/errorMiddleware";
 import { UserResponse } from "../dtos/response/userDtos";
 import { ProResponse } from "../dtos/response/proDtos";
 import { CategoryResponse } from "../dtos/response/categoryDtos";
-import { BookingResponse } from "../dtos/response/bookingDtos";
-import { QuotaResponse } from "../dtos/response/quotaDtos";
-import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
+import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class AdminController {
@@ -19,8 +17,11 @@ export class AdminController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { bookings, total } = await this._adminService.getBookings(page, limit);
-      res.status(200).json({ bookings, total });
+      const search = req.query.search as string;
+      const status = req.query.status as string;
+      const sortBy = (req.query.sortBy as "latest" | "oldest") || "latest";
+      const { bookings, total } = await this._adminService.getBookings(page, limit, search, status, sortBy);
+      res.status(HttpStatus.OK).json({ bookings, total });
     } catch (error) {
       next(error);
     }
@@ -30,8 +31,8 @@ export class AdminController {
     try {
       const { bookingId } = req.params;
       const quota = await this._adminService.getQuotaByBookingId(bookingId);
-      if (!quota) throw new HttpError(404, MESSAGES.QUOTA_NOT_FOUND);
-      res.status(200).json(quota);
+      if (!quota) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.QUOTA_NOT_FOUND);
+      res.status(HttpStatus.OK).json(quota);
     } catch (error) {
       next(error);
     }
@@ -41,10 +42,10 @@ export class AdminController {
     try {
       const { name, image } = req.body;
       if (!name || !image) {
-        throw new HttpError(400, MESSAGES.NAME_AND_EMAIL_REQUIRED);
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.NAME_AND_EMAIL_REQUIRED);
       }
       const category: CategoryResponse = await this._adminService.createCategory(name, image);
-      res.status(201).json(category);
+      res.status(HttpStatus.CREATED).json(category);
     } catch (error) {
       next(error);
     }
@@ -55,7 +56,7 @@ export class AdminController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const { categories, total } = await this._adminService.getCategories(page, limit);
-      res.status(200).json({ categories, total });
+      res.status(HttpStatus.OK).json({ categories, total });
     } catch (error) {
       next(error);
     }
@@ -70,8 +71,8 @@ export class AdminController {
       if (image) data.image = image;
 
       const updatedCategory = await this._adminService.updateCategory(categoryId, data);
-      if (!updatedCategory) throw new HttpError(404, MESSAGES.CATEGORY_NOT_FOUND);
-      res.status(200).json(updatedCategory);
+      if (!updatedCategory) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
+      res.status(HttpStatus.OK).json(updatedCategory);
     } catch (error) {
       next(error);
     }
@@ -82,7 +83,7 @@ export class AdminController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const { users, total } = await this._adminService.getUsers(page, limit);
-      res.status(200).json({ users, total });
+      res.status(HttpStatus.OK).json({ users, total });
     } catch (error) {
       next(error);
     }
@@ -97,8 +98,8 @@ export class AdminController {
       const { userId } = req.params;
       const { isBanned } = req.body;
       const updatedUser = await this._adminService.banUser(userId, isBanned);
-      if (!updatedUser) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
-      res.status(200).json(updatedUser);
+      if (!updatedUser) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
+      res.status(HttpStatus.OK).json(updatedUser);
     } catch (error) {
       next(error);
     }
@@ -113,8 +114,8 @@ export class AdminController {
       const { proId } = req.params;
       const { isBanned } = req.body;
       const updatedPro = await this._adminService.banPro(proId, isBanned);
-      if (!updatedPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
-      res.status(200).json(updatedPro);
+      if (!updatedPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
+      res.status(HttpStatus.OK).json(updatedPro);
     } catch (error) {
       next(error);
     }
@@ -125,7 +126,7 @@ export class AdminController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const { pros, total } = await this._adminService.getPendingPros(page, limit);
-      res.status(200).json({ pros, total });
+      res.status(HttpStatus.OK).json({ pros, total });
     } catch (error) {
       next(error);
     }
@@ -135,7 +136,7 @@ export class AdminController {
     try {
       const { id } = req.params;
       const pro = await this._adminService.getPendingProById(id);
-      res.status(200).json(pro);
+      res.status(HttpStatus.OK).json(pro);
     } catch (error) {
       next(error);
     }
@@ -146,7 +147,7 @@ export class AdminController {
       const { id } = req.params;
       const { about } = req.body;
       await this._adminService.approvePro(id, about || null);
-      res.status(200).json({ message: MESSAGES.PRO_APPROVED_SUCCESSFULLY });
+      res.status(HttpStatus.OK).json({ message: MESSAGES.PRO_APPROVED_SUCCESSFULLY });
     } catch (error) {
       next(error);
     }
@@ -156,9 +157,9 @@ export class AdminController {
     try {
       const { id } = req.params;
       const { reason } = req.body;
-      if (!reason) throw new HttpError(400, MESSAGES.REJECTION_REASON_REQUIRED);
+      if (!reason) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.REJECTION_REASON_REQUIRED);
       await this._adminService.rejectPro(id, reason);
-      res.status(200).json({ message: MESSAGES.PRO_REJECTED_SUCCESSFULLY });
+      res.status(HttpStatus.OK).json({ message: MESSAGES.PRO_REJECTED_SUCCESSFULLY });
     } catch (error) {
       next(error);
     }
@@ -168,9 +169,24 @@ export class AdminController {
     try {
       const trendingService = await this._adminService.getTrendingService();
       if (!trendingService) {
-        throw new HttpError(404, "No trending service found");
+        throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.NO_TRENDING_SERVICE_FOUND);
       }
-      res.status(200).json(trendingService);
+      res.status(HttpStatus.OK).json(trendingService);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getAdminTransactions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { adminId } = req.query;
+      const page = parseInt((req.query.page as string) || "1", 10);
+      const limit = parseInt((req.query.limit as string) || "5", 10);
+      if (!adminId || typeof adminId !== "string") {
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ADMIN_ID_REQUIRED);
+      }
+      const result = await this._adminService.getAdminTransactions(adminId, page, limit);
+      res.status(HttpStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
@@ -180,10 +196,30 @@ export class AdminController {
     try {
       const { adminId } = req.query;
       if (!adminId || typeof adminId !== "string") {
-        throw new HttpError(400, "Admin ID is required");
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ADMIN_ID_REQUIRED);
       }
       const metrics = await this._adminService.getDashboardMetrics(adminId);
-      res.status(200).json(metrics);
+      res.status(HttpStatus.OK).json(metrics);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getMonthlyRevenueSeries(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const lastNMonths = req.query.lastNMonths ? parseInt(req.query.lastNMonths as string, 10) : undefined;
+      const series = await this._adminService.getMonthlyRevenueSeries(lastNMonths);
+      res.status(HttpStatus.OK).json(series);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getPlatformProMonthlyRevenueSeries(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const lastNMonths = req.query.lastNMonths ? parseInt(req.query.lastNMonths as string, 10) : undefined;
+      const series = await this._adminService.getPlatformProMonthlyRevenueSeries(lastNMonths);
+      res.status(HttpStatus.OK).json(series);
     } catch (error) {
       next(error);
     }
@@ -194,7 +230,7 @@ export class AdminController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const { pros, total } = await this._adminService.getApprovedPros(page, limit);
-      res.status(200).json({ pros, total });
+      res.status(HttpStatus.OK).json({ pros, total });
     } catch (error) {
       next(error);
     }
@@ -204,7 +240,7 @@ export class AdminController {
     try {
       const { id } = req.params;
       const pro = await this._adminService.getApprovedProById(id);
-      res.status(200).json(pro);
+      res.status(HttpStatus.OK).json(pro);
     } catch (error) {
       next(error);
     }
@@ -215,7 +251,7 @@ export class AdminController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const { withdrawals, total, pros } = await this._adminService.getWithdrawalRequests(page, limit);
-      res.status(200).json({ withdrawals, total, pros });
+      res.status(HttpStatus.OK).json({ withdrawals, total, pros });
     } catch (error) {
       next(error);
     }
@@ -225,7 +261,7 @@ export class AdminController {
     try {
       const { withdrawalId } = req.params;
       await this._adminService.acceptWithdrawalRequest(withdrawalId);
-      res.status(200).json({ message: MESSAGES.WITHDRAWAL_REQUEST_APPROVED });
+      res.status(HttpStatus.OK).json({ message: MESSAGES.WITHDRAWAL_REQUEST_APPROVED });
     } catch (error) {
       next(error);
     }
@@ -235,9 +271,9 @@ export class AdminController {
     try {
       const { withdrawalId } = req.params;
       const { reason } = req.body;
-      if (!reason) throw new HttpError(400, MESSAGES.REJECTION_REASON_REQUIRED);
+      if (!reason) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.REJECTION_REASON_REQUIRED);
       await this._adminService.rejectWithdrawalRequest(withdrawalId, reason);
-      res.status(200).json({ message: MESSAGES.WITHDRAWAL_REQUEST_REJECTED });
+      res.status(HttpStatus.OK).json({ message: MESSAGES.WITHDRAWAL_REQUEST_REJECTED });
     } catch (error) {
       next(error);
     }

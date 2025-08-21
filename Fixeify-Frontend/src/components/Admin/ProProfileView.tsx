@@ -8,12 +8,12 @@ import {
   toggleBanPro,
 } from "../../api/adminApi";
 import { IApprovedPro, PendingPro } from "../../interfaces/adminInterface";
-import { ChevronRight, Phone, MapPin, Mail, User, CreditCard, Building, Calendar } from "lucide-react";
+import { ArrowLeft, Phone, MapPin, Mail, User, CreditCard, Building, Calendar } from "lucide-react";
 import { AdminNavbar } from "./AdminNavbar";
-import { Menu } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
+import { AdminTopNavbar } from "./AdminTopNavbar";
 
 const SkillBadge = ({ name }: { name: string }) => (
   <div className="px-4 py-2 text-sm font-medium bg-gray-100 rounded-lg text-gray-800">{name}</div>
@@ -240,54 +240,23 @@ const ProProfileView: FC = () => {
         `}
       </style>
       <div className="flex flex-col h-screen bg-gray-50">
-        <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between z-30">
-          <div className="flex items-center">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-            >
-              <Menu className="h-6 w-6" />
-            </button>
-            <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-gray-700">{user.name}</span>
-          </div>
-        </header>
+        <AdminTopNavbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} userName={user.name} />
 
-        <div className="flex flex-1 overflow-hidden">
-          <AdminNavbar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <div className="flex flex-1 overflow-visible">
+          <AdminNavbar isOpen={sidebarOpen} />
           <main
-            className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-0"}`}
+            className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
           >
             <div className="max-w-7xl mx-auto mb-10">
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="text-start pb-5 bg-white m-0 pl-0">
-                  <div className="flex place-items-start m-0 text-sm pl-0 text-gray-500 space-x-1">
-                    <span
-                      className="text-blue-600 cursor-pointer hover:underline"
-                      onClick={() =>
-                        navigate("/admin/pro-management", {
-                          state: { tab: "createdAt" in pro ? "pending" : "approved", fromNavigation: true },
-                        })
-                      }
-                    >
-                      Facility/Site Management
-                    </span>
-                    <ChevronRight className="w-4 h-4 mx-1" />
-                    <span
-                      className="text-blue-600 cursor-pointer hover:underline"
-                      onClick={() =>
-                        navigate("/admin/pro-management", {
-                          state: { tab: "createdAt" in pro ? "pending" : "approved", fromNavigation: true },
-                        })
-                      }
-                    >
-                      {"createdAt" in pro ? "Approval Pending Users" : "Approved Pros"}
-                    </span>
-                    <ChevronRight className="w-4 h-4 mx-1" />
-                    <span>View Profile</span>
-                  </div>
+                <div className="pb-5">
+                  <button
+                    onClick={() => navigate(-1)}
+                    className="inline-flex items-center gap-2 text-[#032B44] hover:underline"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    Back
+                  </button>
                 </div>
 
                 <div className="mb-2 rounded-lg overflow-hidden">
@@ -299,8 +268,8 @@ const ProProfileView: FC = () => {
                     />
                   </div>
                   <div className="bg-white p-4 flex flex-col items-center md:items-start md:flex-row relative">
-                    <div className="absolute -top-16 left-1/2 md:left-8 transform -translate-x-1/2 md:translate-x-0">
-                      <div className="w-24 h-24 rounded-full border-4 border-white overflow-hidden bg-gray-200">
+                    <div className="md:absolute md:-top-16 md:left-8 -mt-12 md:mt-0">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-4 border-white overflow-hidden bg-gray-200">
                         <img
                           src={
                             pro.profilePhoto ||
@@ -319,9 +288,9 @@ const ProProfileView: FC = () => {
                 </div>
 
                 <div className="mb-6">
-                  <div className="flex border-b">
+                  <div className="flex border-b overflow-x-auto">
                     <button
-                      className={`px-4 py-2 font-medium text-sm ${
+                      className={`px-4 py-2 font-medium text-sm flex-shrink-0 ${
                         activeTab === "service" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
                       }`}
                       onClick={() => setActiveTab("service")}
@@ -329,7 +298,7 @@ const ProProfileView: FC = () => {
                       Service
                     </button>
                     <button
-                      className={`px-4 py-2 font-medium text-sm ${
+                      className={`px-4 py-2 font-medium text-sm flex-shrink-0 ${
                         activeTab === "identity" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
                       }`}
                       onClick={() => setActiveTab("identity")}
@@ -337,7 +306,7 @@ const ProProfileView: FC = () => {
                       Proof of Identity
                     </button>
                     <button
-                      className={`px-4 py-2 font-medium text-sm ${
+                      className={`px-4 py-2 font-medium text-sm flex-shrink-0 ${
                         activeTab === "availability" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
                       }`}
                       onClick={() => setActiveTab("availability")}
@@ -345,7 +314,7 @@ const ProProfileView: FC = () => {
                       Availability
                     </button>
                     <button
-                      className={`px-4 py-2 font-medium text-sm ${
+                      className={`px-4 py-2 font-medium text-sm flex-shrink-0 ${
                         activeTab === "contact" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
                       }`}
                       onClick={() => setActiveTab("contact")}
@@ -353,7 +322,7 @@ const ProProfileView: FC = () => {
                       Contact
                     </button>
                     <button
-                      className={`px-4 py-2 font-medium text-sm ${
+                      className={`px-4 py-2 font-medium text-sm flex-shrink-0 ${
                         activeTab === "bankDetails" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
                       }`}
                       onClick={() => setActiveTab("bankDetails")}
@@ -362,7 +331,7 @@ const ProProfileView: FC = () => {
                     </button>
                     {!("createdAt" in pro) && (
                       <button
-                        className={`px-4 py-2 font-medium text-sm ${
+                        className={`px-4 py-2 font-medium text-sm flex-shrink-0 ${
                           activeTab === "action" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
                         }`}
                         onClick={() => setActiveTab("action")}
@@ -395,7 +364,7 @@ const ProProfileView: FC = () => {
                       </div>
                       <h3 className="text-md font-medium text-gray-600 mb-4">Profile Image</h3>
                       <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
-                        <div className="border rounded-lg overflow-hidden w-64 h-64">
+                        <div className="border rounded-lg overflow-hidden w-40 h-40 sm:w-64 sm:h-64">
                           <img
                             src={
                               pro.profilePhoto ||
@@ -461,11 +430,7 @@ const ProProfileView: FC = () => {
                       <h3 className="text-md font-medium text-gray-600 mb-4">Actions</h3>
                       <button
                         onClick={handleBan}
-                        className={`px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200 ${
-                          pro.isBanned
-                            ? "bg-green-600 text-white hover:bg-green-700"
-                            : "bg-red-600 text-white hover:bg-red-700"
-                        }`}
+                        className="px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 transition-colors duration-200 bg-[#032B44] text-white hover:bg-[#054869]"
                       >
                         <span className="text-sm">{pro.isBanned ? "✓" : "✕"}</span>
                         {pro.isBanned ? "Unban" : "Ban"}

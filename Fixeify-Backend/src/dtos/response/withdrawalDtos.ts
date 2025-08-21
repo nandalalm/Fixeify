@@ -8,6 +8,8 @@ export class WithdrawalRequestResponse {
   ifscCode?: string;
   branchName?: string;
   upiCode?: string;
+  bookingId?: string;
+  quotaId?: string;
   status: "pending" | "approved" | "rejected";
   rejectionReason?: string;
   createdAt: Date;
@@ -23,6 +25,8 @@ export class WithdrawalRequestResponse {
     ifscCode?: string;
     branchName?: string;
     upiCode?: string;
+    bookingId?: string;
+    quotaId?: string;
     status: "pending" | "approved" | "rejected";
     rejectionReason?: string;
     createdAt: Date;
@@ -37,6 +41,8 @@ export class WithdrawalRequestResponse {
     this.ifscCode = data.ifscCode;
     this.branchName = data.branchName;
     this.upiCode = data.upiCode;
+    this.bookingId = data.bookingId;
+    this.quotaId = data.quotaId;
     this.status = data.status;
     this.rejectionReason = data.rejectionReason;
     this.createdAt = data.createdAt;

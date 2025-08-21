@@ -1,9 +1,12 @@
 "use client";
 
-import { useSelector } from "react-redux";
+import { useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Phone, Home, Edit, Lock } from "lucide-react";
+import { getUserProfile } from "@/api/userApi";
+import { updateUser } from "@/store/authSlice";
 
 interface ProfileInfoProps {
   onEdit: () => void;
@@ -12,12 +15,41 @@ interface ProfileInfoProps {
 
 const ProfileInfo = ({ onEdit, onChangePassword }: ProfileInfoProps) => {
   const user = useSelector((state: RootState) => state.auth.user);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  // Fetch latest profile details (e.g., updated Google photo) on mount and when user.id changes
+  useEffect(() => {
+    const syncLatestProfile = async () => {
+      try {
+        if (!user?.id) return;
+        const latest = await getUserProfile(user.id);
+        // Merge conservatively to preserve auth-critical fields
+        dispatch(
+          updateUser({
+            ...user,
+            name: (latest as any)?.name ?? user.name,
+            email: (latest as any)?.email ?? user.email,
+            phoneNo: (latest as any)?.phoneNo ?? user.phoneNo,
+            address: (latest as any)?.address ?? user.address,
+            photo: (latest as any)?.photo ?? user.photo,
+            isBanned: (latest as any)?.isBanned ?? user.isBanned,
+          })
+        );
+      } catch (e) {
+        // Non-blocking: fail silently to avoid disrupting profile view
+        console.warn("Failed to refresh latest user profile", e);
+      }
+    };
+    syncLatestProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   if (!user) {
     navigate("/login");
     return null;
   }
+
 
   return (
     <div className="flex-1 p-6 md:p-10 mb-[70px] mt-5">
@@ -30,6 +62,10 @@ const ProfileInfo = ({ onEdit, onChangePassword }: ProfileInfoProps) => {
             src={user.photo || "/placeholder.svg?height=128&width=128"}
             alt="Profile"
             className="w-full h-full object-cover"
+            onError={(e) => {
+              // Fallback if URL is invalid; avoids broken image until refresh completes
+              (e.currentTarget as HTMLImageElement).src = "/placeholder.svg?height=128&width=128";
+            }}
           />
         </div>
 

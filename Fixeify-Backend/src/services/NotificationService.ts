@@ -7,13 +7,13 @@ import mongoose from "mongoose";
 
 @injectable()
 export class NotificationService implements INotificationService {
-  constructor(@inject(TYPES.INotificationRepository) private notificationRepository: INotificationRepository) {}
+  constructor(@inject(TYPES.INotificationRepository) private _notificationRepository: INotificationRepository) {}
 
   async createNotification(data: CreateNotificationRequest): Promise<NotificationResponse> {
     if (!data.type || !data.title || !data.description) {
       throw new Error("type, title, and description are required");
     }
-    const notification = await this.notificationRepository.createNotification(data);
+    const notification = await this._notificationRepository.createNotification(data);
     const response = {
       id: notification._id.toString(),
       type: notification.type,
@@ -21,6 +21,7 @@ export class NotificationService implements INotificationService {
       description: notification.description,
       userId: notification.userId?.toString(),
       proId: notification.proId?.toString(),
+      adminId: notification.adminId?.toString(),
       chatId: notification.chatId?.toString(),
       bookingId: notification.bookingId?.toString(),
       quotaId: notification.quotaId?.toString(),
@@ -30,8 +31,8 @@ export class NotificationService implements INotificationService {
       timestamp: notification.createdAt.toISOString(),
     };
 
-    const recipientId = response.userId || response.proId;
-    const receiverModel = response.userId ? 'User' : 'ApprovedPro';
+    const recipientId = response.userId || response.proId || response.adminId;
+    const receiverModel = response.userId ? 'User' : response.proId ? 'ApprovedPro' : 'Admin';
     if (recipientId && (global as any).io) {
       const io = (global as any).io;
       const connectedUsers = (global as any).connectedUsers || new Map();
@@ -50,27 +51,31 @@ export class NotificationService implements INotificationService {
 
   async getNotifications(
     participantId: string,
-    participantModel: "User" | "ApprovedPro",
+    participantModel: "User" | "ApprovedPro" | "Admin",
     page: number,
     limit: number,
     filter: 'all' | 'unread' = 'all'
   ): Promise<{ notifications: NotificationResponse[]; total: number }> {
     if (!participantId) throw new Error("participantId is required");
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new Error("Invalid participantId");
-    return participantModel === "User"
-      ? this.notificationRepository.findNotificationsByUser(participantId, page, limit, filter)
-      : this.notificationRepository.findNotificationsByPro(participantId, page, limit, filter);
+    if (participantModel === "User") {
+      return this._notificationRepository.findNotificationsByUser(participantId, page, limit, filter);
+    } else if (participantModel === "ApprovedPro") {
+      return this._notificationRepository.findNotificationsByPro(participantId, page, limit, filter);
+    } else {
+      return this._notificationRepository.findNotificationsByAdmin(participantId, page, limit, filter);
+    }
   }
 
   async markNotificationAsRead(notificationId: string): Promise<void> {
     if (!notificationId) throw new Error("notificationId is required");
     if (!mongoose.Types.ObjectId.isValid(notificationId)) throw new Error("Invalid notificationId");
-    await this.notificationRepository.markNotificationAsRead(notificationId);
+    await this._notificationRepository.markNotificationAsRead(notificationId);
   }
 
-  async markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
+  async markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void> {
     if (!participantId) throw new Error("participantId is required");
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new Error("Invalid participantId");
-    await this.notificationRepository.markAllNotificationsAsRead(participantId, participantModel);
+    await this._notificationRepository.markAllNotificationsAsRead(participantId, participantModel);
   }
 }

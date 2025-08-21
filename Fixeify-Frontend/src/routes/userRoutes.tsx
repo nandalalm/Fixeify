@@ -15,7 +15,7 @@ import ResetPassword from "../pages/User/ResetPassword";
 import BookingForm from "../pages/User/BookingForm";
 import PaymentSuccess from "../components/User/PaymentSuccess";
 import ChatPage from "@/pages/User/ChatPage";
-import BookingDetailsView from "../pages/User/BookingDetailsView";
+// BookingDetailsView removed; details now shown inline via BookingDetails component
 
 const userRoutes = (
   <>
@@ -31,7 +31,7 @@ const userRoutes = (
     <Route path="/become-pro" element={<FixeifyProForm />} />
     <Route path="/success" element={<SuccessPage />} />
     <Route element={<UserPrivateRoute />}>
-      <Route path="/booking-details/:bookingId" element={<BookingDetailsView />} />
+      {/** Booking details route removed; use BookingHistory with inline details instead */}
       <Route path="/profile" element={<Profile />} />
       <Route path="/location" element={<UserLocation />} />
       <Route path="/nearby-pros" element={<NearbyPros />} />

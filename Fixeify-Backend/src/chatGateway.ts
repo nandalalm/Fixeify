@@ -19,8 +19,8 @@ export interface SocketMessage {
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
-  userRole?: "user" | "pro";
-  userModel?: "User" | "ApprovedPro";
+  userRole?: "user" | "pro" | "admin";
+  userModel?: "User" | "ApprovedPro" | "Admin";
 }
 
 @injectable()
@@ -43,6 +43,7 @@ export class ChatGateway {
     });
 
     (global as any).io = this.io;
+    (global as any).connectedUsers = this.connectedUsers;
 
     this.io.use(async (socket: AuthenticatedSocket, next) => {
       try {
@@ -62,6 +63,7 @@ export class ChatGateway {
 
         const user = await mongoose.model("User").findById(decoded.userId, "role").exec();
         const pro = await mongoose.model("ApprovedPro").findById(decoded.userId, "role").exec();
+        const admin = await mongoose.model("Admin").findById(decoded.userId, "role").exec();
 
         if (user) {
           socket.userRole = "user";
@@ -69,6 +71,9 @@ export class ChatGateway {
         } else if (pro) {
           socket.userRole = "pro";
           socket.userModel = "ApprovedPro";
+        } else if (admin) {
+          socket.userRole = "admin";
+          socket.userModel = "Admin";
         } else {
           throw new Error("User not found");
         }
@@ -79,6 +84,8 @@ export class ChatGateway {
           userRole: socket.userRole,
         });
 
+        (global as any).connectedUsers = this.connectedUsers;
+
         next();
       } catch (error) {
         next(new Error("Authentication failed"));
@@ -88,12 +95,12 @@ export class ChatGateway {
     this.io.on("connection", (socket: AuthenticatedSocket) => {
       
       if (socket.userId && socket.userRole) {
-        // Add user to connected users map
         this.connectedUsers.set(socket.userId, {
           socketId: socket.id,
           userId: socket.userId,
           userRole: socket.userRole
         });
+        (global as any).connectedUsers = this.connectedUsers;
         
    
         const onlineUserIds = Array.from(this.connectedUsers.keys());
@@ -126,9 +133,16 @@ export class ChatGateway {
           }
 
           socket.join(chatId);
-          await this.chatService.markMessagesAsRead(chatId, participantId, participantModel);
           
-          this.io.to(chatId).emit("messagesRead", { chatId, participantId });
+        
+          await this.chatService.markMessagesAsDelivered(chatId, participantId, participantModel);
+          
+      
+          this.io.to(chatId).emit("messagesDelivered", { 
+            chatId, 
+            participantId,
+            participantModel
+          });
           
           this.io.to(chatId).emit("userJoined", { 
             chatId, 
@@ -136,8 +150,6 @@ export class ChatGateway {
             participantModel,
             timestamp: new Date().toISOString()
           });
-
-          this.io.emit("onlineStatus", { userId: participantId, isOnline: true });
 
         } catch (error) {
           socket.emit("error", { message: "Failed to join chat", error: (error as Error).message });
@@ -197,11 +209,41 @@ export class ChatGateway {
         }
       });
 
+    
+      socket.on("markMessageRead", async ({ chatId, messageId }: { chatId: string; messageId?: string }) => {
+        try {
+          if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
+            throw new Error("Invalid chatId");
+          }
+
+          const participantModel = socket.userRole === "pro" ? "ApprovedPro" : "User";
+          await this.chatService.markMessagesAsRead(chatId, socket.userId!, participantModel);
+          
+       
+          this.io.to(chatId).emit("messagesRead", { 
+            chatId, 
+            participantId: socket.userId,
+            participantModel,
+            messageId 
+          });
+
+    
+          const chat = await this.chatService.findById(chatId);
+          if (chat) {
+            this.io.to(chatId).emit("conversationUpdated", chat);
+          }
+
+        } catch (error) {
+          socket.emit("error", { message: "Failed to mark message as read", error: (error as Error).message });
+        }
+      });
+
       socket.on("disconnect", () => {
 
         if (socket.userId) {
           this.io.emit("onlineStatus", { userId: socket.userId, isOnline: false });
           this.connectedUsers.delete(socket.userId);
+          (global as any).connectedUsers = this.connectedUsers;
         }
       });
     });

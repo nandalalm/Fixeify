@@ -5,6 +5,7 @@ import { IRatingReviewService } from "./IRatingReviewService";
 import { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
 import { RatingReviewResponse } from "../dtos/response/ratingReviewDtos";
 import { HttpError } from "../middleware/errorMiddleware";
+import { MESSAGES } from "../constants/messages";
 
 @injectable()
 export class RatingReviewService implements IRatingReviewService {
@@ -17,7 +18,7 @@ export class RatingReviewService implements IRatingReviewService {
     data: CreateRatingReviewRequest
   ): Promise<RatingReviewResponse> {
     if (data.rating < 1 || data.rating > 5) {
-      throw new HttpError(400, "Rating must be between 1 and 5");
+      throw new HttpError(400, MESSAGES.RATING_BETWEEN_1_5);
     }
 
     const alreadyReviewed = await this._ratingReviewRepository.hasUserReviewedBookingOrQuota(
@@ -26,7 +27,7 @@ export class RatingReviewService implements IRatingReviewService {
       data.quotaId
     );
     if (alreadyReviewed) {
-      throw new HttpError(400, "You have already reviewed this booking or quota");
+      throw new HttpError(400, MESSAGES.ALREADY_REVIEWED);
     }
 
     const saved = await this._ratingReviewRepository.create({

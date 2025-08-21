@@ -1,11 +1,11 @@
 import type { FC } from "react";
-import { Home, Users, Award, Grid, Calendar, BadgeIndianRupee, Star, LogOut } from "lucide-react";
+import { Home, Users, Award, Grid, Calendar, BadgeIndianRupee, Star, LogOut, OctagonAlert, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { LucideProps } from "lucide-react";
 import { useDispatch } from "react-redux";
 import { logoutUser } from "../../store/authSlice";
 import { AppDispatch } from "../../store/store";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 
 interface NavItem {
@@ -17,7 +17,6 @@ interface NavItem {
 
 interface AdminNavbarProps {
   isOpen: boolean;
-  toggleSidebar: () => void;
 }
 
 export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
@@ -25,6 +24,32 @@ export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isSidebarShrunk, setIsSidebarShrunk] = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
+
+  useEffect(() => {
+    const savedState = localStorage.getItem("isAdminSidebarShrunk");
+    if (savedState !== null) {
+      setIsSidebarShrunk(JSON.parse(savedState));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("isAdminSidebarShrunk", JSON.stringify(isSidebarShrunk));
+  }, [isSidebarShrunk]);
+
+  const toggleSidebarShrink = () => {
+    setIsSidebarShrunk(!isSidebarShrunk);
+  };
 
   const handleLogout = () => {
     dispatch(logoutUser("admin")).then(() => {
@@ -52,21 +77,23 @@ export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
     { icon: Grid, label: "Category Management", path: "/admin/categories" },
     { icon: Calendar, label: "Booking Management", path: "/admin/bookings" },
     { icon: BadgeIndianRupee, label: "Revenue Management", path: "/admin/revenue" },
-    { icon: Star, label: "Reviews Management", path: "/admin/reviews" },
+    { icon: Star, label: "Rating Management", path: "/admin/reviews" },
+    { icon: OctagonAlert, label: "Conflit Management", path: "/admin/conflits" },
     { icon: LogOut, label: "Log Out", path: "/admin-login", onClick: handleLogoutClick },
   ];
 
   return (
     <>
       <aside
-        className={`bg-white h-screen w-64 border-r border-gray-200 overflow-y-auto fixed left-0 top-0 transition-transform duration-300 ease-in-out z-20 ${
-          isOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`bg-white h-screen ${isSidebarShrunk ? "w-20" : "w-64"} border-r border-gray-200 overflow-visible transition-all duration-300 ease-in-out z-20 ${
+          isLargeScreen 
+            ? "relative" 
+            : `fixed left-0 ${
+                isOpen ? "translate-x-0" : "-translate-x-full"
+              }`
+        } ${!isLargeScreen ? "top-16" : "top-0"}`}
       >
-        <div className="p-4 border-b border-gray-200">
-          <h1 className="text-xl font-bold">Fixeify</h1>
-        </div>
-        <nav className="py-4">
+        <nav className="py-4 h-full overflow-y-auto">
           <ul className="space-y-1">
             {navItems.map((item) =>
               item.label === "Log Out" ? (
@@ -77,10 +104,10 @@ export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
                       location.pathname === item.path
                         ? "bg-blue-100 font-semibold"
                         : "hover:bg-gray-100"
-                    } rounded-md mx-2 transition-colors duration-200 cursor-pointer`}
+                    } rounded-md mx-2 transition-colors duration-200 cursor-pointer ${isSidebarShrunk ? "justify-center" : ""}`}
                   >
-                    <item.icon className="h-5 w-5 mr-3 text-red-600" /> {/* Red color for icon */}
-                    <span className="text-red-600">{item.label}</span> {/* Red color for text */}
+                    <item.icon className={`h-5 w-5 text-red-600 ${isSidebarShrunk ? "mx-auto" : "mr-3"}`} />
+                    <span className={`text-red-600 ${isSidebarShrunk ? "hidden" : "block"}`}>{item.label}</span>
                   </div>
                 </li>
               ) : (
@@ -92,16 +119,29 @@ export const AdminNavbar: FC<AdminNavbarProps> = ({ isOpen }) => {
                       location.pathname === item.path
                         ? "bg-blue-100 text-blue-600 font-semibold"
                         : "text-gray-700 hover:bg-gray-100"
-                    } rounded-md mx-2 transition-colors duration-200`}
+                    } rounded-md mx-2 transition-colors duration-200 ${isSidebarShrunk ? "justify-center" : ""}`}
+                    title={isSidebarShrunk ? item.label : ""}
                   >
-                    <item.icon className="h-5 w-5 mr-3" />
-                    <span>{item.label}</span>
+                    <item.icon className={`h-5 w-5 ${isSidebarShrunk ? "mx-auto" : "mr-3"}`} />
+                    <span className={`${isSidebarShrunk ? "hidden" : "block"}`}>{item.label}</span>
                   </Link>
                 </li>
               )
             )}
           </ul>
         </nav>
+        {(isLargeScreen || isOpen) && (
+          <button
+            onClick={toggleSidebarShrink}
+            className="absolute top-72 -right-4 p-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-100 transition-colors z-[30]"
+          >
+            {isSidebarShrunk ? (
+              <ChevronRight className="w-6 h-6 text-blue-600" />
+            ) : (
+              <ChevronLeft className="w-6 h-6 text-blue-600" />
+            )}
+          </button>
+        )}
       </aside>
       <ConfirmationModal
         isOpen={showLogoutModal}

@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "./errorMiddleware";
-import { JwtPayload, verifyAccessToken } from "../utils/jwtUtils";
+import {  verifyAccessToken } from "../utils/jwtUtils";
 
 export interface AuthRequest extends Request {
   userId?: string;

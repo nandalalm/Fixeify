@@ -193,7 +193,7 @@ const Navbar = () => {
             onClick={() => navigate("/become-pro")}
             className="bg-[#032b44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
           >
-            Become a Fixeify Pro
+            Become a Provider
           </button>
           {accessToken ? (
             <div className="relative">
@@ -314,7 +314,7 @@ const Navbar = () => {
                 to="/become-pro"
                 className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
               >
-                Become a Fixeify Pro
+                Become a Provider
               </Link>
               {accessToken ? (
                 <>

@@ -13,5 +13,6 @@ export interface IChatService {
     limit: number
   ): Promise<{ messages: MessageResponse[]; total: number }>;
   markMessagesAsRead(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;
+  markMessagesAsDelivered(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;
   findById(chatId: string): Promise<ChatResponse | null>;
 }

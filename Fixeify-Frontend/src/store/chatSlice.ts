@@ -135,7 +135,7 @@ export const markMessagesRead = createAsyncThunk<
 
 export const fetchAllNotifications = createAsyncThunk<
   NotificationItem[],
-  { userId: string; role: "user" | "pro"; page: number; limit: number; filter: 'all' | 'unread' },
+  { userId: string; role: "user" | "pro" | "admin"; page: number; limit: number; filter: 'all' | 'unread' },
   { rejectValue: string }
 >(
   "chat/fetchAllNotifications",
@@ -167,7 +167,7 @@ export const markNotificationRead = createAsyncThunk<
 
 export const markAllNotificationsRead = createAsyncThunk<
   void,
-  { userId: string; role: "user" | "pro" },
+  { userId: string; role: "user" | "pro" | "admin" },
   { rejectValue: string }
 >(
   "chat/markAllNotificationsRead",
@@ -213,7 +213,6 @@ const chatSlice = createSlice({
         const prevUnreadCount = conversation.unreadCount;
         const prevLastMessage = conversation.lastMessage?.content;
         
-        // Create new lastMessage object to ensure immutability
         conversation.lastMessage = {
           id: message.id,
           content: message.content,
@@ -223,8 +222,7 @@ const chatSlice = createSlice({
           status: message.status,
         };
         
-        // Fix: We need the current user's ID to properly determine if message is from other user
-        // For now, we'll increment unread count for any unread message (will be refined with user context)
+      
         if (!message.isRead) {
           conversation.unreadCount += 1;
         }
@@ -238,6 +236,76 @@ const chatSlice = createSlice({
           prevLastMessage: prevLastMessage?.substring(0, 30),
           newLastMessage: conversation.lastMessage.content?.substring(0, 30)
         });
+      }
+    },
+  
+    addIncomingMessage: (
+      state,
+      action: PayloadAction<{ message: Message; currentUserId: string; activeChatId?: string }>
+    ) => {
+      const { message, currentUserId, activeChatId } = action.payload;
+
+      if (!state.messages[message.chatId]) {
+        state.messages[message.chatId] = [];
+      }
+
+      const existingIndex = state.messages[message.chatId].findIndex(m => m.id === message.id);
+      if (existingIndex === -1) {
+        state.messages[message.chatId].push(message);
+        state.messages[message.chatId].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      } else {
+        state.messages[message.chatId][existingIndex] = message;
+      }
+
+      const conversation = state.conversations.find((c) => c.id === message.chatId);
+      if (conversation) {
+        conversation.lastMessage = {
+          id: message.id,
+          content: message.content,
+          senderId: message.senderId,
+          senderModel: message.senderModel,
+          timestamp: message.timestamp,
+          status: message.status,
+        };
+
+      
+        const isFromOther = message.senderId !== currentUserId;
+        const isActiveChat = activeChatId === message.chatId;
+        
+        if (isFromOther && !isActiveChat) {
+        
+          conversation.unreadCount = (conversation.unreadCount || 0) + 1;
+        } else if (isFromOther && isActiveChat) {
+        
+          conversation.unreadCount = 0;
+        
+          if (state.messages[message.chatId]) {
+            const messageIndex = state.messages[message.chatId].findIndex(m => m.id === message.id);
+            if (messageIndex !== -1) {
+              state.messages[message.chatId][messageIndex].isRead = true;
+              state.messages[message.chatId][messageIndex].status = "read";
+            }
+          }
+        }
+
+        conversation.updatedAt = new Date().toISOString();
+      }
+    },
+    setConversationLastMessageStatus: (
+      state,
+      action: PayloadAction<{ chatId: string; status: "sent" | "delivered" | "read" }>
+    ) => {
+      const { chatId, status } = action.payload;
+      const conversation = state.conversations.find((c) => c.id === chatId);
+      if (conversation && conversation.lastMessage) {
+        conversation.lastMessage.status = status;
+      }
+    },
+    updateConversation: (state, action: PayloadAction<any>) => {
+      const updatedConversation = action.payload;
+      const index = state.conversations.findIndex((c) => c.id === updatedConversation.id);
+      if (index !== -1) {
+        state.conversations[index] = updatedConversation;
       }
     },
     addNotification: (state, action: PayloadAction<NotificationItem>) => {
@@ -269,10 +337,9 @@ const chatSlice = createSlice({
       const { chatId } = action.payload;
       const conversation = state.conversations.find((conv) => conv.id === chatId);
       if (conversation) {
-        // Reset unread count for this conversation
+      
         conversation.unreadCount = 0;
       }
-      // Also update message read status in the messages array
       if (state.messages[chatId]) {
         state.messages[chatId] = state.messages[chatId].map((msg) => ({
           ...msg,
@@ -332,10 +399,10 @@ const chatSlice = createSlice({
         }
         
         if (action.meta.arg.page === 1) {
-          // Initial load: messages come sorted newest first, reverse for display (oldest first)
+      
           state.messages[chatId] = [...messages].reverse();
         } else {
-          // Load more: prepend older messages (they come sorted newest first, so reverse and prepend)
+         
           const olderMessages = [...messages].reverse();
           state.messages[chatId] = [...olderMessages, ...state.messages[chatId]];
         }
@@ -448,12 +515,15 @@ const chatSlice = createSlice({
 
 export const {
   addMessage,
+  addIncomingMessage,
   addNotification,
   updateOnlineStatus,
   clearChatError,
   updateMessageStatus,
   clearMessages,
   updateConversationReadStatus,
+  setConversationLastMessageStatus,
+  updateConversation,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

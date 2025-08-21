@@ -5,6 +5,7 @@ import Wallet, { WalletDocument } from "../models/walletModel";
 import { WalletResponseDTO } from "../dtos/response/walletDtos";
 import { Types, UpdateQuery } from "mongoose";
 import { isValidObjectId } from "mongoose";
+import TransactionModel from "../models/transactionModel";
 
 @injectable()
 export class MongoWalletRepository extends BaseRepository<WalletDocument> implements IWalletRepository {
@@ -14,7 +15,8 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
 
   async createWallet(walletData: Partial<WalletDocument>): Promise<WalletResponseDTO> {
     const wallet = await this._model.create(walletData);
-    return this.mapToWalletResponse(wallet);
+    const transactions = await this.fetchTransactionsForPro(wallet.proId.toString());
+    return this.mapToWalletResponse(wallet, transactions);
   }
 
   async findWalletByProId(proId: string, populateQuotas: boolean = true): Promise<WalletResponseDTO | null> {
@@ -23,27 +25,25 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
       return null;
     }
     let query = this._model.findOne({ proId: proId }); 
-    if (populateQuotas) {
-      query = query.populate("transactions.quotaId", "quotaId bookingId userId totalCost");
-    }
     const wallet = await query.exec();
     if (!wallet) {
       query = this._model.findOne({ proId: new Types.ObjectId(proId) }); 
-      if (populateQuotas) {
-        query = query.populate("transactions.quotaId", "quotaId bookingId userId totalCost");
-      }
       const walletByObjectId = await query.exec();
-      return walletByObjectId ? this.mapToWalletResponse(walletByObjectId) : null;
+      if (!walletByObjectId) return null;
+      const transactions = await this.fetchTransactionsForPro(walletByObjectId.proId.toString());
+      return this.mapToWalletResponse(walletByObjectId, transactions);
     }
-    return this.mapToWalletResponse(wallet);
+    const transactions = await this.fetchTransactionsForPro(wallet.proId.toString());
+    return this.mapToWalletResponse(wallet, transactions);
   }
 
   async updateWallet(walletId: string, update: Partial<WalletDocument>): Promise<WalletResponseDTO | null> {
     const wallet = await this._model
-      .findByIdAndUpdate(walletId, update, { new: true })
-      .populate("transactions.quotaId", "quotaId bookingId userId totalCost") 
+      .findByIdAndUpdate(walletId, update as UpdateQuery<WalletDocument>, { new: true })
       .exec();
-    return wallet ? this.mapToWalletResponse(wallet) : null;
+    if (!wallet) return null;
+    const transactions = await this.fetchTransactionsForPro(wallet.proId.toString());
+    return this.mapToWalletResponse(wallet, transactions);
   }
 
   async findWalletByProIdAndPagination(proId: string, page: number, limit: number, populateQuotas: boolean = true): Promise<{ wallet: WalletResponseDTO | null; total: number }> {
@@ -53,19 +53,16 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
     }
     const total = await this._model.countDocuments({ proId });
     let query = this._model.findOne({ proId: proId }).skip((page - 1) * limit).limit(limit);
-    if (populateQuotas) {
-      query = query.populate("transactions.quotaId", "quotaId bookingId userId totalCost");
-    }
     const wallet = await query.exec();
     if (!wallet) {
       query = this._model.findOne({ proId: new Types.ObjectId(proId) }).skip((page - 1) * limit).limit(limit);
-      if (populateQuotas) {
-        query = query.populate("transactions.quotaId", "quotaId bookingId userId totalCost");
-      }
       const walletByObjectId = await query.exec();
-      return { wallet: walletByObjectId ? this.mapToWalletResponse(walletByObjectId) : null, total };
+      if (!walletByObjectId) return { wallet: null, total };
+      const transactions = await this.fetchTransactionsForPro(walletByObjectId.proId.toString());
+      return { wallet: this.mapToWalletResponse(walletByObjectId, transactions), total };
     }
-    return { wallet: this.mapToWalletResponse(wallet), total };
+    const transactions = await this.fetchTransactionsForPro(wallet.proId.toString());
+    return { wallet: this.mapToWalletResponse(wallet, transactions), total };
   }
 
   async decreaseWalletBalance(walletId: string, amount: number): Promise<WalletResponseDTO | null> {
@@ -77,40 +74,52 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
       console.error("Amount must be positive:", amount);
       return null;
     }
-    const update: UpdateQuery<WalletDocument> = {
-      $inc: { balance: -amount },
-      $push: {
-        transactions: {
-          amount,
-          type: "debit",
-          date: new Date(),
-        },
-      },
-    };
+    const update: UpdateQuery<WalletDocument> = { $inc: { balance: -amount } };
     const wallet = await this._model
       .findByIdAndUpdate(walletId, update, { new: true })
-      .populate("transactions.quotaId", "quotaId bookingId userId totalCost")
       .exec();
-    return wallet ? this.mapToWalletResponse(wallet) : null;
+    if (!wallet) return null;
+    const transactions = await this.fetchTransactionsForPro(wallet.proId.toString());
+    return this.mapToWalletResponse(wallet, transactions);
   }
 
-  private mapToWalletResponse(wallet: WalletDocument): WalletResponseDTO {
+  private async fetchTransactionsForPro(proId: string) {
+    // Exclude admin-credited transactions from pro view
+    const txs = await TransactionModel.find({
+      proId: new Types.ObjectId(proId),
+      $or: [
+        { adminId: { $exists: false } },
+        { adminId: null }
+      ],
+    })
+      .populate("quotaId", "quotaId bookingId userId totalCost")
+      .populate("bookingId", "_id")
+      .sort({ createdAt: -1 })
+      .exec();
+    return txs.map((t: any) => ({
+      _id: t._id.toString(),
+      amount: t.amount,
+      type: t.type,
+      date: t.date,
+      description: t.description,
+      bookingId: t.bookingId ? (t.bookingId._id?.toString?.() || t.bookingId.toString()) : undefined,
+      quotaId: t.quotaId
+        ? {
+            id: t.quotaId._id?.toString() || t.quotaId.toString(),
+            bookingId: t.quotaId?.bookingId?.toString() || undefined,
+            userId: t.quotaId?.userId?.toString() || undefined,
+            totalCost: t.quotaId?.totalCost || undefined,
+          }
+        : undefined,
+    }));
+  }
+
+  private mapToWalletResponse(wallet: WalletDocument, transactions: WalletResponseDTO["transactions"]): WalletResponseDTO {
     return {
       id: wallet._id.toString(),
       proId: wallet.proId.toString(),
       balance: wallet.balance,
-      transactions: wallet.transactions.map(t => ({
-        _id: t._id.toString(),
-        amount: t.amount,
-        type: t.type,
-        date: t.date,
-        quotaId: t.quotaId ? {
-          id: t.quotaId._id?.toString() || t.quotaId.toString(),
-          bookingId: (t.quotaId as any)?.bookingId?.toString() || undefined,
-          userId: (t.quotaId as any)?.userId?.toString() || undefined,
-          totalCost: (t.quotaId as any)?.totalCost || undefined,
-        } : undefined,
-      })),
+      transactions,
       createdAt: wallet.createdAt,
       updatedAt: wallet.updatedAt,
     };

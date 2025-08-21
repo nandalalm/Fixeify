@@ -26,6 +26,8 @@ export class BookingResponse {
   rejectedReason?: string;
   cancelReason?: string;
   isRated?: boolean;
+  hasComplaintRaisedByPro?: boolean;
+  hasComplaintRaisedByUser?: boolean;
   createdAt: Date;
   updatedAt: Date;
 
@@ -43,6 +45,8 @@ export class BookingResponse {
     rejectedReason?: string;
     cancelReason?: string;
     isRated?: boolean;
+    hasComplaintRaisedByPro?: boolean;
+    hasComplaintRaisedByUser?: boolean;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -59,6 +63,8 @@ export class BookingResponse {
     this.rejectedReason = data.rejectedReason;
     this.cancelReason = data.cancelReason;
     this.isRated = data.isRated;
+    this.hasComplaintRaisedByPro = data.hasComplaintRaisedByPro ?? false;
+    this.hasComplaintRaisedByUser = data.hasComplaintRaisedByUser ?? false;
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
   }
@@ -70,6 +76,7 @@ export class BookingCompleteResponse {
     id: string;
     name: string;
     email: string;
+    phoneNo?: string;
     photo?: string;
   };
   pro: {
@@ -94,6 +101,8 @@ export class BookingCompleteResponse {
   rejectedReason?: string;
   cancelReason?: string;
   isRated?: boolean;
+  hasComplaintRaisedByPro?: boolean;
+  hasComplaintRaisedByUser?: boolean;
   adminRevenue?: number;
   proRevenue?: number;
   createdAt: Date;
@@ -101,7 +110,7 @@ export class BookingCompleteResponse {
 
   constructor(data: {
     id: string;
-    user: { id: string; name: string; email: string; photo?: string };
+    user: { id: string; name: string; email: string; phoneNo?: string; photo?: string };
     pro: { id: string; firstName: string; lastName: string; profilePhoto?: string; email?: string; phoneNumber?: string };
     category: { id: string; name: string; image?: string };
     issueDescription: string;
@@ -113,6 +122,8 @@ export class BookingCompleteResponse {
     rejectedReason?: string;
     cancelReason?: string;
     isRated?: boolean;
+    hasComplaintRaisedByPro?: boolean;
+    hasComplaintRaisedByUser?: boolean;
     adminRevenue?: number;
     proRevenue?: number;
     createdAt: Date;
@@ -131,6 +142,8 @@ export class BookingCompleteResponse {
     this.rejectedReason = data.rejectedReason;
     this.cancelReason = data.cancelReason;
     this.isRated = data.isRated;
+    this.hasComplaintRaisedByPro = data.hasComplaintRaisedByPro ?? false;
+    this.hasComplaintRaisedByUser = data.hasComplaintRaisedByUser ?? false;
     this.adminRevenue = data.adminRevenue;
     this.proRevenue = data.proRevenue;
     this.createdAt = data.createdAt;

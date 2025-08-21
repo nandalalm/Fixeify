@@ -9,12 +9,14 @@ interface PopulatedUser {
   _id: Types.ObjectId;
   name: string;
   email: string;
+  photo?: string;
 }
 
 interface PopulatedPro {
   _id: Types.ObjectId;
   firstName: string;
   lastName: string;
+  profilePhoto?: string;
 }
 
 interface PopulatedCategory {
@@ -39,6 +41,8 @@ interface PopulatedBookingDocument {
   createdAt: Date;
   updatedAt: Date;
   isRated?: boolean;
+  hasComplaintRaisedByPro?: boolean;
+  hasComplaintRaisedByUser?: boolean;
   adminRevenue?: number;
   proRevenue?: number;
 }
@@ -59,6 +63,8 @@ interface PopulatedLeanBooking {
   createdAt: Date;
   updatedAt: Date;
   isRated?:boolean;
+  hasComplaintRaisedByPro?: boolean;
+  hasComplaintRaisedByUser?: boolean;
 }
 
 @injectable()
@@ -72,8 +78,8 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       .create(bookingData)
       .then((doc) =>
         doc.populate([
-          { path: "userId", select: "name email" },
-          { path: "proId", select: "firstName lastName" },
+          { path: "userId", select: "name email photo" },
+          { path: "proId", select: "firstName lastName profilePhoto" },
           { path: "categoryId", select: "name image" },
         ])
       ) as any; 
@@ -86,8 +92,8 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     const bookings = await this._model
       .find({ userId, status: { $in: ["pending", "accepted"] } })
       .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
-        { path: "userId", select: "name email" },
-        { path: "proId", select: "firstName lastName" },
+        { path: "userId", select: "name email photo" },
+        { path: "proId", select: "firstName lastName profilePhoto" },
         { path: "categoryId", select: "name image" },
       ])
       .skip(skip)
@@ -107,8 +113,8 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     const bookings = await this._model
       .find({ userId, status: { $in: ["completed", "rejected", "cancelled"] } })
       .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
-        { path: "userId", select: "name email" },
-        { path: "proId", select: "firstName lastName" },
+        { path: "userId", select: "name email photo" },
+        { path: "proId", select: "firstName lastName profilePhoto" },
         { path: "categoryId", select: "name image" },
       ])
       .skip(skip)
@@ -137,10 +143,11 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
   const bookings = await this._model
     .find(query)
     .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
-      { path: "userId", select: "name email" },
-      { path: "proId", select: "firstName lastName" },
+      { path: "userId", select: "name email photo" },
+      { path: "proId", select: "firstName lastName profilePhoto" },
       { path: "categoryId", select: "name image" },
     ])
+    .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit)
     .lean()
@@ -153,21 +160,44 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
   };
 }
 
-async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> {
+async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, status?: string, sortBy: "latest" | "oldest" = "latest"): Promise<{ bookings: BookingResponse[]; total: number }> {
     const skip = (page - 1) * limit;
+    
+  
+    const query: any = {};
+    
+    if (status) {
+      query.status = status;
+    }
+    
+    if (search) {
+      query.$or = [
+        { issueDescription: { $regex: search, $options: "i" } },
+        { "location.address": { $regex: search, $options: "i" } }
+      ];
+    }
+    
+    const sort: any = {};
+    if (sortBy === "latest") {
+      sort.createdAt = -1; 
+    } else if (sortBy === "oldest") {
+      sort.createdAt = 1; 
+    }
+    
     const bookings = await this._model
-      .find()
+      .find(query)
       .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
-        { path: "userId", select: "name email" },
-        { path: "proId", select: "firstName lastName" },
+        { path: "userId", select: "name email photo" },
+        { path: "proId", select: "firstName lastName profilePhoto" },
         { path: "categoryId", select: "name image" },
       ])
+      .sort(sort)
       .skip(skip)
       .limit(limit)
       .lean()
       .exec() as PopulatedLeanBooking[];
 
-    const total = await this._model.countDocuments().exec();
+    const total = await this._model.countDocuments(query).exec();
     return { 
       bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)), 
       total 
@@ -243,6 +273,8 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
       isRated: booking.isRated,
+      hasComplaintRaisedByPro: booking.hasComplaintRaisedByPro,
+      hasComplaintRaisedByUser: booking.hasComplaintRaisedByUser,
       adminRevenue: booking.adminRevenue,
       proRevenue: booking.proRevenue,
     });
@@ -377,11 +409,13 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
         id: booking.userId._id.toString(),
         name: booking.userId.name,
         email: booking.userId.email,
+        photo: (booking.userId as any).photo,
       },
       pro: {
         id: booking.proId._id.toString(),
         firstName: booking.proId.firstName,
         lastName: booking.proId.lastName,
+        profilePhoto: (booking.proId as any).profilePhoto,
       },
       category: {
         id: booking.categoryId._id.toString(),
@@ -399,79 +433,163 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
       isRated: booking.isRated,
+      hasComplaintRaisedByPro: booking.hasComplaintRaisedByPro,
+      hasComplaintRaisedByUser: booking.hasComplaintRaisedByUser,
       adminRevenue: booking.adminRevenue,
       proRevenue: booking.proRevenue,
     });
   }
 
-  async getAdminRevenueMetrics(): Promise<{ totalRevenue: number; monthlyRevenue: number }> {
-    const currentDate = new Date();
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+  async getAdminRevenueMetrics(): Promise<{
+    totalRevenue: number;
+    monthlyRevenue: number;
+    yearlyRevenue: number;
+    dailyRevenue: number;
+    monthlyDeltaPercent: number | null;
+    yearlyDeltaPercent: number | null;
+    dailyDeltaPercent: number | null;
+  }> {
+    const now = new Date();
+    // Period starts
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const startOfPrevYear = new Date(now.getFullYear() - 1, 0, 1);
+    const startOfNextYear = new Date(now.getFullYear() + 1, 0, 1);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfNextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const startOfPrevDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
-    const [totalResult, monthlyResult] = await Promise.all([
+    const matchBase = { status: "completed", adminRevenue: { $exists: true, $ne: null } } as any;
+
+    const [
+      totalAgg,
+      monthAgg,
+      prevMonthAgg,
+      yearAgg,
+      prevYearAgg,
+      dayAgg,
+      prevDayAgg,
+    ] = await Promise.all([
       this._model.aggregate([
-        { $match: { status: "completed", adminRevenue: { $exists: true, $ne: null } } },
-        { $group: { _id: null, totalRevenue: { $sum: "$adminRevenue" } } }
+        { $match: matchBase },
+        { $group: { _id: null, value: { $sum: "$adminRevenue" } } },
       ]),
       this._model.aggregate([
-        { 
-          $match: { 
-            status: "completed", 
-            adminRevenue: { $exists: true, $ne: null },
-            createdAt: { $gte: startOfMonth }
-          } 
-        },
-        { $group: { _id: null, monthlyRevenue: { $sum: "$adminRevenue" } } }
-      ])
+        { $match: { ...matchBase, createdAt: { $gte: startOfMonth, $lt: startOfNextMonth } } },
+        { $group: { _id: null, value: { $sum: "$adminRevenue" } } },
+      ]),
+      this._model.aggregate([
+        { $match: { ...matchBase, createdAt: { $gte: startOfPrevMonth, $lt: startOfMonth } } },
+        { $group: { _id: null, value: { $sum: "$adminRevenue" } } },
+      ]),
+      this._model.aggregate([
+        { $match: { ...matchBase, createdAt: { $gte: startOfYear, $lt: startOfNextYear } } },
+        { $group: { _id: null, value: { $sum: "$adminRevenue" } } },
+      ]),
+      this._model.aggregate([
+        { $match: { ...matchBase, createdAt: { $gte: startOfPrevYear, $lt: startOfYear } } },
+        { $group: { _id: null, value: { $sum: "$adminRevenue" } } },
+      ]),
+      this._model.aggregate([
+        { $match: { ...matchBase, createdAt: { $gte: startOfDay, $lt: startOfNextDay } } },
+        { $group: { _id: null, value: { $sum: "$adminRevenue" } } },
+      ]),
+      this._model.aggregate([
+        { $match: { ...matchBase, createdAt: { $gte: startOfPrevDay, $lt: startOfDay } } },
+        { $group: { _id: null, value: { $sum: "$adminRevenue" } } },
+      ]),
     ]);
 
+    const totalRevenue = totalAgg[0]?.value || 0;
+    const monthlyRevenue = monthAgg[0]?.value || 0;
+    const prevMonthRevenue = prevMonthAgg[0]?.value || 0;
+    const yearlyRevenue = yearAgg[0]?.value || 0;
+    const prevYearRevenue = prevYearAgg[0]?.value || 0;
+    const dailyRevenue = dayAgg[0]?.value || 0;
+    const prevDailyRevenue = prevDayAgg[0]?.value || 0;
+
+    const pct = (curr: number, prev: number): number | null => {
+      if (!prev || prev === 0) return null;
+      return ((curr - prev) / prev) * 100;
+    };
+
     return {
-      totalRevenue: totalResult[0]?.totalRevenue || 0,
-      monthlyRevenue: monthlyResult[0]?.monthlyRevenue || 0
+      totalRevenue,
+      monthlyRevenue,
+      yearlyRevenue,
+      dailyRevenue,
+      monthlyDeltaPercent: pct(monthlyRevenue, prevMonthRevenue),
+      yearlyDeltaPercent: pct(yearlyRevenue, prevYearRevenue),
+      dailyDeltaPercent: pct(dailyRevenue, prevDailyRevenue),
     };
   }
 
   async getProDashboardMetrics(proId: string): Promise<{
     totalRevenue: number;
     monthlyRevenue: number;
+    yearlyRevenue: number;
+    dailyRevenue: number;
     completedJobs: number;
     pendingJobs: number;
     averageRating: number;
   }> {
-    const currentDate = new Date();
-    const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const startOfNextYear = new Date(now.getFullYear() + 1, 0, 1);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfNextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const proObjectId = new mongoose.Types.ObjectId(proId);
 
-    const [revenueResult, monthlyRevenueResult, completedJobs, pendingJobs, ratingResult] = await Promise.all([
+    const [
+      totalAgg,
+      monthAgg,
+      yearAgg,
+      dayAgg,
+      completedJobs,
+      pendingJobs,
+      ratingResult,
+    ] = await Promise.all([
       this._model.aggregate([
         { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null } } },
-        { $group: { _id: null, totalRevenue: { $sum: "$proRevenue" } } }
+        { $group: { _id: null, value: { $sum: "$proRevenue" } } },
       ]),
       this._model.aggregate([
-        { 
-          $match: { 
-            proId: proObjectId, 
-            status: "completed", 
-            proRevenue: { $exists: true, $ne: null },
-            createdAt: { $gte: startOfMonth }
-          } 
-        },
-        { $group: { _id: null, monthlyRevenue: { $sum: "$proRevenue" } } }
+        { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfMonth, $lt: startOfNextMonth } } },
+        { $group: { _id: null, value: { $sum: "$proRevenue" } } },
+      ]),
+      this._model.aggregate([
+        { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfYear, $lt: startOfNextYear } } },
+        { $group: { _id: null, value: { $sum: "$proRevenue" } } },
+      ]),
+      this._model.aggregate([
+        { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfDay, $lt: startOfNextDay } } },
+        { $group: { _id: null, value: { $sum: "$proRevenue" } } },
       ]),
       this._model.countDocuments({ proId: proObjectId, status: "completed" }),
       this._model.countDocuments({ proId: proObjectId, status: { $in: ["pending", "accepted"] } }),
       mongoose.model("RatingReview").aggregate([
         { $match: { proId: proObjectId } },
-        { $group: { _id: null, averageRating: { $avg: "$rating" } } }
-      ])
+        { $group: { _id: null, averageRating: { $avg: "$rating" } } },
+      ]),
     ]);
 
+    const totalRevenue = totalAgg[0]?.value || 0;
+    const monthlyRevenue = monthAgg[0]?.value || 0;
+    const yearlyRevenue = yearAgg[0]?.value || 0;
+    const dailyRevenue = dayAgg[0]?.value || 0;
+
     return {
-      totalRevenue: revenueResult[0]?.totalRevenue || 0,
-      monthlyRevenue: monthlyRevenueResult[0]?.monthlyRevenue || 0,
+      totalRevenue,
+      monthlyRevenue,
+      yearlyRevenue,
+      dailyRevenue,
       completedJobs,
       pendingJobs,
-      averageRating: ratingResult[0]?.averageRating || 0
+      averageRating: ratingResult[0]?.averageRating || 0,
     };
   }
 
@@ -482,7 +600,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
     lowestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
   }> {
     const [mostRated, leastRated, highestEarning, lowestEarning] = await Promise.all([
-      // Most rated pro
+    
       mongoose.model("RatingReview").aggregate([
         { $group: { _id: "$proId", averageRating: { $avg: "$rating" }, count: { $sum: 1 } } },
         { $match: { count: { $gte: 1 } } },
@@ -492,7 +610,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
         { $unwind: "$pro" },
         { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", rating: "$averageRating" } }
       ]),
-      // Least rated pro
+    
       mongoose.model("RatingReview").aggregate([
         { $group: { _id: "$proId", averageRating: { $avg: "$rating" }, count: { $sum: 1 } } },
         { $match: { count: { $gte: 1 } } },
@@ -502,7 +620,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
         { $unwind: "$pro" },
         { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", rating: "$averageRating" } }
       ]),
-      // Highest earning pro
+     
       this._model.aggregate([
         { $match: { status: "completed", proRevenue: { $exists: true, $ne: null } } },
         { $group: { _id: "$proId", totalRevenue: { $sum: "$proRevenue" } } },
@@ -512,7 +630,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
         { $unwind: "$pro" },
         { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", revenue: "$totalRevenue" } }
       ]),
-      // Lowest earning pro
+     
       this._model.aggregate([
         { $match: { status: "completed", proRevenue: { $exists: true, $ne: null } } },
         { $group: { _id: "$proId", totalRevenue: { $sum: "$proRevenue" } } },
@@ -530,5 +648,81 @@ async fetchAllBookings(page: number = 1, limit: number = 5): Promise<{ bookings:
       leastRated: leastRated[0] || null,
       lowestEarning: lowestEarning[0] || null
     };
+  }
+
+  async getAdminMonthlyRevenueSeries(lastNMonths: number = 12): Promise<Array<{ year: number; month: number; revenue: number }>> {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - (lastNMonths - 1), 1);
+    const pipeline = [
+      { $match: { status: "completed", adminRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
+      {
+        $group: {
+          _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+          revenue: { $sum: "$adminRevenue" },
+        },
+      },
+      { $sort: { "_id.year": 1 as 1, "_id.month": 1 as 1 } },
+      {
+        $project: {
+          _id: 0,
+          year: "$_id.year",
+          month: "$_id.month",
+          revenue: 1,
+        },
+      },
+    ] as any[];
+    const result = await this._model.aggregate(pipeline as any).exec();
+    return result as Array<{ year: number; month: number; revenue: number }>;
+  }
+
+  async getPlatformProMonthlyRevenueSeries(lastNMonths: number = 12): Promise<Array<{ year: number; month: number; revenue: number }>> {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - (lastNMonths - 1), 1);
+    const pipeline = [
+      { $match: { status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
+      {
+        $group: {
+          _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+          revenue: { $sum: "$proRevenue" },
+        },
+      },
+      { $sort: { "_id.year": 1 as 1, "_id.month": 1 as 1 } },
+      {
+        $project: {
+          _id: 0,
+          year: "$_id.year",
+          month: "$_id.month",
+          revenue: 1,
+        },
+      },
+    ] as any[];
+    const result = await this._model.aggregate(pipeline as any).exec();
+    return result as Array<{ year: number; month: number; revenue: number }>;
+  }
+
+  async getProMonthlyRevenueSeries(proId: string, lastNMonths: number = 12): Promise<Array<{ year: number; month: number; revenue: number }>> {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - (lastNMonths - 1), 1);
+    const proObjectId = new mongoose.Types.ObjectId(proId);
+    const pipeline = [
+      { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
+      {
+        $group: {
+          _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+          revenue: { $sum: "$proRevenue" },
+        },
+      },
+      { $sort: { "_id.year": 1 as 1, "_id.month": 1 as 1 } },
+      {
+        $project: {
+          _id: 0,
+          year: "$_id.year",
+          month: "$_id.month",
+          revenue: 1,
+        },
+      },
+    ] as any[];
+    const result = await this._model.aggregate(pipeline as any).exec();
+    return result as Array<{ year: number; month: number; revenue: number }>;
   }
 }

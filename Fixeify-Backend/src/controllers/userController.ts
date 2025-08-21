@@ -6,6 +6,7 @@ import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
 import { AuthRequest } from "../middleware/authMiddleware";
 import Stripe from "stripe";
+import { HttpStatus } from "../enums/httpStatus";
 
 type PaymentIntentStatus = Stripe.PaymentIntent.Status;
 
@@ -23,8 +24,8 @@ export class UserController {
     try {
       const { userId } = req.params;
       const user = await this._userService.getUserProfile(userId);
-      if (!user) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
-      res.status(200).json(user);
+      if (!user) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
+      res.status(HttpStatus.OK).json(user);
     } catch (error) {
       next(error);
     }
@@ -35,8 +36,8 @@ export class UserController {
       const { userId } = req.params;
       const { name, email, phoneNo, address, photo } = req.body;
       const updatedUser = await this._userService.updateUserProfile(userId, { name, email, phoneNo, address, photo });
-      if (!updatedUser) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
-      res.status(200).json(updatedUser);
+      if (!updatedUser) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
+      res.status(HttpStatus.OK).json(updatedUser);
     } catch (error) {
       next(error);
     }
@@ -47,8 +48,8 @@ export class UserController {
       const { userId } = req.params;
       const { currentPassword, newPassword } = req.body;
       const updatedUser = await this._userService.changePassword(userId, { currentPassword, newPassword });
-      if (!updatedUser) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
-      res.status(200).json({ message: MESSAGES.PASSWORD_CHANGED_SUCCESSFULLY });
+      if (!updatedUser) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
+      res.status(HttpStatus.OK).json({ message: MESSAGES.PASSWORD_CHANGED_SUCCESSFULLY });
     } catch (error) {
       next(error);
     }
@@ -58,7 +59,7 @@ export class UserController {
     try {
       const { categoryId, longitude, latitude, page = '1', limit = '5', sortBy = 'nearest', availabilityFilter } = req.query;
       if (!categoryId || !longitude || !latitude) {
-        throw new HttpError(400, "categoryId, longitude, and latitude are required");
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CATEGORY_LONG_LAT_REQUIRED);
       }
       
       const pageNum = parseInt(page as string);
@@ -75,7 +76,7 @@ export class UserController {
         availabilityFilter as string
       );
       
-      res.status(200).json(result);
+      res.status(HttpStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
@@ -84,11 +85,12 @@ export class UserController {
   async createBooking(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.userId;
-      if (!userId) throw new HttpError(401, MESSAGES.UNAUTHORIZED);
+      if (!userId) throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.UNAUTHORIZED);
       const { proId, categoryId, issueDescription, location, phoneNumber, preferredDate, preferredTime } = req.body;
       if (!proId || !categoryId || !issueDescription || !location || !phoneNumber || !preferredDate || !preferredTime) {
-        throw new HttpError(400, "All fields are required");
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
       }
+      
       const bookingResponse = await this._userService.createBooking(userId, proId, {
         categoryId,
         issueDescription,
@@ -97,7 +99,7 @@ export class UserController {
         preferredDate: new Date(preferredDate),
         preferredTime,
       });
-      res.status(201).json(bookingResponse);
+      res.status(HttpStatus.CREATED).json(bookingResponse);
     } catch (error) {
       next(error);
     }
@@ -109,7 +111,7 @@ export class UserController {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 5;
     const { bookings, total } = await this._userService.fetchBookingDetails(userId, page, limit);
-    res.status(200).json({ bookings, total });
+    res.status(HttpStatus.OK).json({ bookings, total });
   } catch (error) {
     next(error);
   }
@@ -121,7 +123,7 @@ export class UserController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const { bookings, total } = await this._userService.fetchBookingHistoryDetails(userId, page, limit);
-      res.status(200).json({ bookings, total });
+      res.status(HttpStatus.OK).json({ bookings, total });
     } catch (error) {
       next(error);
     }
@@ -130,10 +132,10 @@ export class UserController {
   async createPaymentIntent(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { bookingId, amount } = req.body;
-      if (!bookingId || !amount) throw new HttpError(400, "bookingId and amount are required");
+      if (!bookingId || !amount) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKINGID_AMOUNT_REQUIRED);
 
       const paymentIntent = await this._userService.createPaymentIntent(bookingId, amount);
-      res.status(200).json(paymentIntent);
+      res.status(HttpStatus.OK).json(paymentIntent);
     } catch (error) {
       next(error);
     }
@@ -143,10 +145,10 @@ export class UserController {
     try {
       const { userId } = req.params;
       const { bookingId, cancelReason } = req.body;
-      if (!bookingId || !cancelReason) throw new HttpError(400, "bookingId and cancelReason are required");
+      if (!bookingId || !cancelReason) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKINGID_CANCELREASON_REQUIRED);
 
       const result = await this._userService.cancelBooking(userId, bookingId, cancelReason);
-      res.status(200).json(result);
+      res.status(HttpStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
@@ -156,8 +158,8 @@ export class UserController {
     try {
       const { bookingId } = req.params;
       const booking = await this._userService.getBookingById(bookingId);
-      if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
-      res.status(200).json(booking);
+      if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
+      res.status(HttpStatus.OK).json(booking);
     } catch (error) {
       next(error);
     }
@@ -167,8 +169,8 @@ export class UserController {
     try {
       const { bookingId } = req.params;
       const quota = await this._userService.getQuotaByBookingId(bookingId);
-      if (!quota) throw new HttpError(404, MESSAGES.QUOTA_NOT_FOUND);
-      res.status(200).json(quota);
+      if (!quota) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.QUOTA_NOT_FOUND);
+      res.status(HttpStatus.OK).json(quota);
     } catch (error) {
       next(error);
     }
@@ -178,23 +180,23 @@ export class UserController {
   try {
     const sig = req.headers["stripe-signature"] as string;
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!endpointSecret) throw new HttpError(500, "Stripe webhook secret is not configured");
+    if (!endpointSecret) throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED);
 
     let event;
     try {
       const rawBody = req.body; // req.body is a Buffer from express.raw()
       if (!rawBody || !(rawBody instanceof Buffer)) {
-        throw new Error("Raw body not available or not a Buffer");
+        throw new Error(MESSAGES.RAW_BODY_NOT_AVAILABLE_OR_INVALID);
       }
       event = this.stripe.webhooks.constructEvent(rawBody.toString(), sig, endpointSecret);
     } catch (err: unknown) {
       const error = err as Error;
-      console.error(`Webhook signature verification failed: ${error.message}`);
-      throw new HttpError(400, `Webhook Error: ${error.message}`);
+      console.error(`${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
+      throw new HttpError(HttpStatus.BAD_REQUEST, `${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
     }
 
     await this._userService.handleWebhookEvent(event);
-    res.status(200).json({ received: true });
+    res.status(HttpStatus.OK).json({ received: true });
   } catch (error) {
     next(error);
   }

@@ -10,6 +10,19 @@ const formatCurrency = (amount: number | undefined): string => {
   return num.toLocaleString('en-IN');
 };
 
+// Convert HH:MM to 12h format, e.g., 14:30 -> 2:30 PM
+const to12h = (time?: string): string => {
+  if (!time) return '-';
+  const [hStr, mStr] = time.split(':');
+  const h = Number(hStr);
+  const m = Number(mStr || 0);
+  if (Number.isNaN(h)) return time;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  const mm = m.toString().padStart(2, '0');
+  return `${hour12}:${mm} ${period}`;
+};
+
 interface InvoiceData {
   booking: BookingCompleteResponse;
   quota: QuotaResponse;
@@ -153,7 +166,7 @@ export const generateInvoice = (data: InvoiceData): void => {
   addText(`Service Location: ${booking.location?.address || 'N/A'}`, margin, yPosition);
   yPosition += 12;
   
-  const timeSlots = booking.preferredTime?.map(t => `${t.startTime} - ${t.endTime}`).join(', ') || 'N/A';
+  const timeSlots = booking.preferredTime?.map(t => `${to12h(t.startTime)} - ${to12h(t.endTime)}`).join(', ') || 'N/A';
   addText(`Time Slots: ${timeSlots}`, margin, yPosition);
   yPosition += 20;
   
@@ -248,7 +261,6 @@ export const generateInvoice = (data: InvoiceData): void => {
   
   addText('Thank you for choosing Fixeify!', margin, footerY);
   addText('For support, contact us at support@fixeify.com', margin, footerY + 8);
-  addText(`Generated on: ${new Date().toLocaleString('en-IN')}`, pageWidth - margin - 80, footerY);
   
   // Save the PDF
   const fileName = `Fixeify_Invoice_${invoiceNumber}_${invoiceDate.replace(/\//g, '-')}.pdf`;

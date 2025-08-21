@@ -48,8 +48,8 @@ export class AuthService implements IAuthService {
     @inject(TYPES.IProRepository) private _proRepository: IProRepository,
     @inject(TYPES.INotificationService) private _notificationService: INotificationService
   ) {
-    this._redisClient.connect().catch((err) => logger.error("Failed to connect to Redis:", err));
-    this._redisClient.on("error", (err) => logger.error("Redis error:", err));
+    this._redisClient.connect().catch((err) => logger.error(MESSAGES.REDIS_CONNECT_FAILED + ":", err));
+    this._redisClient.on("error", (err) => logger.error(MESSAGES.REDIS_ERROR + ":", err));
   }
 
   async sendOtp(email: string): Promise<void> {
@@ -71,8 +71,8 @@ export class AuthService implements IAuthService {
         html: getOtpEmailTemplate(otp),
       });
     } catch (error) {
-      logger.error("Failed to send OTP email:", error);
-      throw new HttpError(500, "Failed to send OTP email");
+      logger.error(MESSAGES.FAILED_SEND_OTP_EMAIL + ":", error);
+      throw new HttpError(500, MESSAGES.FAILED_SEND_OTP_EMAIL);
     }
   }
 
@@ -108,7 +108,7 @@ export class AuthService implements IAuthService {
           userId: newUser.id
         });
       } catch (error) {
-        logger.error("Failed to send welcome notification:", error);
+        logger.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
       }
       
       return newUser;
@@ -214,7 +214,7 @@ export class AuthService implements IAuthService {
     user: UserResponse;
   }> {
     if (role !== UserRole.USER) {
-      throw new HttpError(400, "Google login is only available for users");
+      throw new HttpError(400, MESSAGES.GOOGLE_LOGIN_USERS_ONLY);
     }
 
     let ticket;
@@ -224,13 +224,13 @@ export class AuthService implements IAuthService {
         audience: process.env.GOOGLE_CLIENT_ID,
       });
     } catch (error) {
-      logger.error("Failed to verify Google ID token:", error);
-      throw new HttpError(400, "Invalid Google credential");
+      logger.error(MESSAGES.TOKEN_VERIFICATION_FAILED + ":", error);
+      throw new HttpError(400, MESSAGES.INVALID_GOOGLE_CREDENTIAL);
     }
 
     const payload = ticket.getPayload();
     if (!payload || !payload.email || !payload.name) {
-      throw new HttpError(400, "Invalid Google user data");
+      throw new HttpError(400, MESSAGES.INVALID_GOOGLE_USER_DATA);
     }
 
     let user = await this._userRepository.findUserByEmail(payload.email);
@@ -254,7 +254,7 @@ export class AuthService implements IAuthService {
           userId: user.id
         });
       } catch (error) {
-        logger.error("Failed to send welcome notification:", error);
+        logger.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
       }
     }
 
@@ -303,7 +303,7 @@ export class AuthService implements IAuthService {
     try {
       decoded = jwt.verify(refreshToken, secret) as { userId: string };
     } catch (err) {
-      console.error("Token verification failed:", err);
+      console.error(MESSAGES.TOKEN_VERIFICATION_FAILED + ":", err);
       throw new HttpError(401, MESSAGES.INVALID_TOKEN);
     }
 
@@ -438,7 +438,7 @@ export class AuthService implements IAuthService {
       role = UserRole.PRO;
     }
     if (!user) {
-      throw new HttpError(404, "Email not registered");
+      throw new HttpError(404, MESSAGES.EMAIL_NOT_REGISTERED);
     }
 
     if ("isBanned" in user && user.isBanned) {
@@ -459,9 +459,9 @@ export class AuthService implements IAuthService {
         html: getResetPasswordEmailTemplate(resetUrl),
       });
     } catch (error) {
-      logger.error("Failed to send password reset email:", error);
+      logger.error(MESSAGES.FAILED_SEND_PASSWORD_RESET_EMAIL + ":", error);
       await this._redisClient.del(resetTokenKey);
-      throw new HttpError(500, "Failed to send password reset email");
+      throw new HttpError(500, MESSAGES.FAILED_SEND_PASSWORD_RESET_EMAIL);
     }
   }
 
@@ -469,7 +469,7 @@ export class AuthService implements IAuthService {
     const resetTokenKey = `reset:${userId}`;
     const storedToken = await this._redisClient.get(resetTokenKey);
     if (!storedToken || storedToken !== token) {
-      throw new HttpError(400, "Invalid or expired reset token");
+      throw new HttpError(400, MESSAGES.INVALID_OR_EXPIRED_RESET_TOKEN);
     }
 
     let user: IUser | ApprovedProDocument | null = await this._userRepository.findUserById(userId);

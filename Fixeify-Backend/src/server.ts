@@ -16,6 +16,7 @@ import createStripeRoutes from "./routes/stripeRoutes";
 import createChatRoutes from "./routes/chatRoutes";
 import createNotificationRoutes from "./routes/notificationRoutes";
 import createRatingReviewRoutes from "./routes/ratingReviewRoutes";
+import createTicketRoutes from "./routes/ticketRoutes";
 import { Container } from "inversify";
 import { TYPES } from "./types";
 import { AuthController } from "./controllers/authController";
@@ -25,13 +26,17 @@ import { UserController } from "./controllers/userController";
 import { ChatController } from "./controllers/chatController";
 import { NotificationController } from "./controllers/notificationController";
 import { RatingReviewController } from "./controllers/ratingReviewController";
+import { TicketController } from "./controllers/ticketController";
 import { AuthService } from "./services/AuthService";
+import { IAuthService } from "./services/IAuthService";
 import { AdminService } from "./services/AdminService";
 import { ProService } from "./services/ProService";
 import { UserService } from "./services/UserService";
 import { ChatService } from "./services/ChatService";
 import { NotificationService } from "./services/NotificationService";
 import { RatingReviewService } from "./services/RatingReviewService";
+import { ITicketService } from "./services/ITicketService";
+import { TicketService } from "./services/ticketService";
 import { IUserRepository } from "./repositories/IUserRepository";
 import { IAdminRepository } from "./repositories/IAdminRepository";
 import { IProRepository } from "./repositories/IProRepository";
@@ -43,6 +48,8 @@ import { IWithdrawalRequestRepository } from "./repositories/IWithdrawalRequestR
 import { IChatRepository } from "./repositories/IChatRepository";
 import { INotificationRepository } from "./repositories/INotificationRepository";
 import { IRatingReviewRepository } from "./repositories/IRatingReviewRepository";
+import { ITransactionRepository } from "./repositories/ITransactionRepository";
+import { ITicketRepository } from "./repositories/ITicketRepository";
 import { MongoUserRepository } from "./repositories/UserRepository";
 import { MongoAdminRepository } from "./repositories/AdminRepository";
 import { MongoProRepository } from "./repositories/ProRepository";
@@ -54,6 +61,8 @@ import { MongoWithdrawalRequestRepository } from "./repositories/WithdrawalReque
 import { MongoChatRepository } from "./repositories/ChatRepository";
 import { MongoNotificationRepository } from "./repositories/NotificationRepository";
 import { MongoRatingReviewRepository } from "./repositories/ratingReviewRepository";
+import { MongoTransactionRepository } from "./repositories/TransactionRepository";
+import { MongoTicketRepository } from "./repositories/ticketRepository";
 import { ChatGateway } from "./chatGateway";
 import { errorMiddleware } from "./middleware/errorMiddleware";
 import "./models/notificationModel"; 
@@ -80,13 +89,16 @@ container.bind<IWithdrawalRequestRepository>(TYPES.IWithdrawalRequestRepository)
 container.bind<IChatRepository>(TYPES.IChatRepository).to(MongoChatRepository).inSingletonScope();
 container.bind<INotificationRepository>(TYPES.INotificationRepository).to(MongoNotificationRepository).inSingletonScope();
 container.bind<IRatingReviewRepository>(TYPES.IRatingReviewRepository).to(MongoRatingReviewRepository).inSingletonScope();
-container.bind<AuthService>(TYPES.AuthService).to(AuthService).inSingletonScope();
+container.bind<ITransactionRepository>(TYPES.ITransactionRepository).to(MongoTransactionRepository).inSingletonScope();
+container.bind<ITicketRepository>(TYPES.ITicketRepository).to(MongoTicketRepository).inSingletonScope();
+container.bind<IAuthService>(TYPES.IAuthService).to(AuthService).inSingletonScope();
 container.bind<AdminService>(TYPES.IAdminService).to(AdminService).inSingletonScope();
 container.bind<ProService>(TYPES.IProService).to(ProService).inSingletonScope();
 container.bind<UserService>(TYPES.IUserService).to(UserService).inSingletonScope();
 container.bind<ChatService>(TYPES.IChatService).to(ChatService).inSingletonScope();
 container.bind<NotificationService>(TYPES.INotificationService).to(NotificationService).inSingletonScope();
 container.bind<RatingReviewService>(TYPES.IRatingReviewService).to(RatingReviewService).inSingletonScope();
+container.bind<ITicketService>(TYPES.ITicketService).to(TicketService).inSingletonScope();
 container.bind<AuthController>(TYPES.AuthController).to(AuthController).inSingletonScope();
 container.bind<AdminController>(TYPES.AdminController).to(AdminController).inSingletonScope();
 container.bind<ProController>(TYPES.ProController).to(ProController).inSingletonScope();
@@ -94,6 +106,7 @@ container.bind<UserController>(TYPES.UserController).to(UserController).inSingle
 container.bind<ChatController>(TYPES.ChatController).to(ChatController).inSingletonScope();
 container.bind<NotificationController>(TYPES.NotificationController).to(NotificationController).inSingletonScope();
 container.bind<RatingReviewController>(TYPES.RatingReviewController).to(RatingReviewController).inSingletonScope();
+container.bind<TicketController>(TYPES.TicketController).to(TicketController).inSingletonScope();
 container.bind<ChatGateway>(TYPES.ChatGateway).to(ChatGateway).inSingletonScope();
 
 const app = express();
@@ -124,6 +137,7 @@ app.use("/api/stripe", createStripeRoutes(container));
 app.use("/api/chat", express.json(), createChatRoutes(container));
 app.use("/api/notifications", express.json(), createNotificationRoutes(container));
 app.use("/api/rating-reviews", express.json(), createRatingReviewRoutes(container));
+app.use("/api/tickets", express.json(), createTicketRoutes(container));
 
 app.use(errorMiddleware);
 

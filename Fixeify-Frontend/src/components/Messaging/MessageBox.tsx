@@ -4,7 +4,7 @@ import { AppDispatch, RootState } from "../../store/store";
 import { Check, CheckCheck, Send, ArrowLeft, ChevronDown, X, Image as ImageIcon } from "lucide-react";
 import { Message, User } from "../../interfaces/messagesInterface";
 import { getSocket, isSocketConnected } from "../../services/socket";
-import { fetchConversationMessages, markMessagesRead, addMessage, updateOnlineStatus, updateMessageStatus } from "../../store/chatSlice";
+import { fetchConversationMessages, updateOnlineStatus, updateMessageStatus, addIncomingMessage, setConversationLastMessageStatus } from "../../store/chatSlice";
 import { sendNewMessage } from "../../api/chatApi";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
@@ -57,6 +57,10 @@ const MessageBox: FC<MessageBoxProps> = ({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dispatch = useDispatch<AppDispatch>();
   const messages = useSelector((state: RootState) => state.chat.messages[conversationId] || []);
+  const messagesRef = useRef<Message[]>(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const onlineUsers = useSelector((state: RootState) => state.chat.onlineUsers);
   const socket = getSocket();
 
@@ -139,7 +143,7 @@ const MessageBox: FC<MessageBoxProps> = ({
     return role === Role.USER || role === Role.PRO;
   };
 
-  // Join chat room and mark messages as read
+  // Join chat room and mark existing messages as read since MessageBox is open
   useEffect(() => {
     if (socket && isSocketConnected()) {
       const role = currentUser.role as Role;
@@ -149,7 +153,8 @@ const MessageBox: FC<MessageBoxProps> = ({
           participantId: currentUser.id,
           participantModel: role === Role.PRO ? "ApprovedPro" : "User",
         });
-        dispatch(markMessagesRead({ chatId: conversationId, userId: currentUser.id, role }));
+        // Mark existing unread messages as read since user opened MessageBox
+        socket.emit("markMessageRead", { chatId: conversationId });
       }
     }
 
@@ -227,17 +232,34 @@ const MessageBox: FC<MessageBoxProps> = ({
   // Socket event handlers
   useEffect(() => {
     if (socket) {
-      const handleNewMessage = (message: Message) => {
+      const handleNewMessage = (raw: any) => {
+        // Normalize to our Message shape
+        const message: Message = {
+          id: raw.id || raw._id || raw.messageId,
+          chatId: raw.chatId,
+          senderId: raw.senderId,
+          senderModel: raw.senderModel,
+          content: raw.content ?? raw.body ?? "",
+          timestamp: raw.timestamp || raw.createdAt || new Date().toISOString(),
+          status: (raw.status as any) || (raw.isRead ? 'read' : 'delivered'),
+          isRead: typeof raw.isRead === 'boolean' ? raw.isRead : raw.status === 'read',
+          attachments: raw.attachments,
+          type: raw.type,
+        } as any;
         if (message.chatId === conversationId) {
-          dispatch(addMessage(message));
+          dispatch(addIncomingMessage({ message, currentUserId: currentUser.id, activeChatId: conversationId }));
           setOtherUserTyping(false);
           if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
           }
           // Auto-scroll to bottom when new message arrives
           setShouldAutoScroll(true);
+          // If MessageBox is open and user is actively viewing, mark as read immediately
           if (message.senderId !== currentUser.id) {
-            dispatch(markMessagesRead({ chatId: conversationId, userId: currentUser.id, role: currentUser.role as "user" | "pro" }));
+            const socket = getSocket();
+            if (socket && isSocketConnected()) {
+              socket.emit("markMessageRead", { chatId: conversationId, messageId: message.id });
+            }
           }
         }
       };
@@ -263,17 +285,43 @@ const MessageBox: FC<MessageBoxProps> = ({
         setError(error.message);
       };
 
-      const handleMessagesRead = ({ chatId, participantId }: { chatId: string; participantId: string }) => {
-        if (chatId === conversationId && participantId !== currentUser.id) {
+      const handleMessagesRead = ({ chatId, participantId }: { chatId: string; participantId?: string }) => {
+        if (chatId === conversationId && (participantId ? participantId !== currentUser.id : true)) {
           // Update message status to 'read' for all messages sent by current user
-          // Get current messages for this chat and update each one sent by current user
-          const currentMessages = messages;
+          const currentMessages = messagesRef.current;
           currentMessages.forEach(message => {
             if (message.senderId === currentUser.id && message.status !== 'read') {
               dispatch(updateMessageStatus({
                 chatId: conversationId,
                 messageId: message.id,
                 status: 'read'
+              }));
+            }
+          });
+          // Also update the conversation lastMessage status for clarity in the list
+          dispatch(setConversationLastMessageStatus({ chatId: conversationId, status: 'read' }));
+        }
+      };
+
+      const handleMessageRead = ({ chatId, messageId, participantId }: { chatId: string; messageId: string; participantId?: string }) => {
+        if (chatId === conversationId && (participantId ? participantId !== currentUser.id : true)) {
+          // Mark this single message as read
+          dispatch(updateMessageStatus({ chatId, messageId, status: 'read' }));
+          // If it's the last message in the conversation, update list preview status
+          dispatch(setConversationLastMessageStatus({ chatId, status: 'read' }));
+        }
+      };
+
+      const handleMessagesDelivered = ({ chatId, participantId }: { chatId: string; participantId: string }) => {
+        if (chatId === conversationId && participantId !== currentUser.id) {
+          // Update message status to 'delivered' for messages sent by current user
+          const currentMessages = messagesRef.current;
+          currentMessages.forEach(message => {
+            if (message.senderId === currentUser.id && message.status === 'sent') {
+              dispatch(updateMessageStatus({
+                chatId: conversationId,
+                messageId: message.id,
+                status: 'delivered'
               }));
             }
           });
@@ -285,6 +333,8 @@ const MessageBox: FC<MessageBoxProps> = ({
       socket.on("stopTyping", handleStopTyping);
       socket.on("onlineStatus", handleOnlineStatus);
       socket.on("messagesRead", handleMessagesRead);
+      socket.on("messageRead", handleMessageRead);
+      socket.on("messagesDelivered", handleMessagesDelivered);
       socket.on("error", handleError);
 
       return () => {
@@ -293,6 +343,8 @@ const MessageBox: FC<MessageBoxProps> = ({
         socket.off("stopTyping", handleStopTyping);
         socket.off("onlineStatus", handleOnlineStatus);
         socket.off("messagesRead", handleMessagesRead);
+        socket.off("messageRead", handleMessageRead);
+        socket.off("messagesDelivered", handleMessagesDelivered);
         socket.off("error", handleError);
       };
     }
@@ -303,6 +355,9 @@ const MessageBox: FC<MessageBoxProps> = ({
       const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
       const isAtBottom = scrollHeight - scrollTop <= clientHeight + 100;
       setShowScrollToBottom(!isAtBottom);
+
+      // Messages are already marked as read when MessageBox opens
+      // No need for scroll-based read receipts
 
       // Load more messages when scrolling near the top (pagination should load older messages)
       if (scrollTop < 100 && hasMore && !loadingMore && !isInitialLoad) {
@@ -373,7 +428,7 @@ const MessageBox: FC<MessageBoxProps> = ({
             messageType,
             attachments.length > 0 ? attachments : undefined
           );
-          dispatch(addMessage(message));
+          dispatch(addIncomingMessage({ message, currentUserId: currentUser.id, activeChatId: conversationId }));
           setNewMessage("");
           clearSelectedImage();
         }

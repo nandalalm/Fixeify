@@ -30,8 +30,8 @@ type PopulatedChat = Omit<IChat, "participants" | "lastMessage"> & {
 @injectable()
 export class ChatService implements IChatService {
   constructor(
-    @inject(TYPES.IChatRepository) private chatRepository: IChatRepository,
-    @inject(TYPES.INotificationService) private notificationService: INotificationService
+    @inject(TYPES.IChatRepository) private _chatRepository: IChatRepository,
+    @inject(TYPES.INotificationService) private _notificationService: INotificationService
   ) {}
 
   async getExistingChat(userId: string, proId: string, participantModel: "User" | "ApprovedPro"): Promise<ChatResponse | null> {
@@ -39,7 +39,7 @@ export class ChatService implements IChatService {
     if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(proId)) {
       throw new Error("Invalid userId or proId");
     }
-    const chat = await this.chatRepository.findChatByParticipants(userId, proId);
+    const chat = await this._chatRepository.findChatByParticipants(userId, proId);
     if (!chat) {
       return null;
     }
@@ -68,7 +68,7 @@ export class ChatService implements IChatService {
     if (!user) throw new Error("User not found");
     if (!pro) throw new Error("Professional not found");
 
-    let chat: PopulatedChat | null = await this.chatRepository.findChatByParticipants(data.userId, data.proId);
+    let chat: PopulatedChat | null = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
     if (chat) {
       return this.mapToChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro", {
         userName: user.name,
@@ -79,8 +79,8 @@ export class ChatService implements IChatService {
     }
 
     try {
-      const newChat = await this.chatRepository.createChat(data.userId, data.proId);
-      chat = await this.chatRepository.findChatByParticipants(data.userId, data.proId);
+      const newChat = await this._chatRepository.createChat(data.userId, data.proId);
+      chat = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
       if (!chat) {
         throw new Error("Failed to fetch created chat");
       }
@@ -93,7 +93,7 @@ export class ChatService implements IChatService {
       });
     } catch (error: any) {
       if (error.code === 11000 && error.message.includes('participants.userId')) {
-        chat = await this.chatRepository.findChatByParticipants(data.userId, data.proId);
+        chat = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
         if (chat) {
           return this.mapToChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro", {
             userName: user.name,
@@ -111,8 +111,8 @@ export class ChatService implements IChatService {
     if (!participantId) throw new Error("participantId is required");
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new Error("Invalid participantId");
     const chats = await (participantModel === "User"
-      ? this.chatRepository.findChatsByUser(participantId)
-      : this.chatRepository.findChatsByPro(participantId));
+      ? this._chatRepository.findChatsByUser(participantId)
+      : this._chatRepository.findChatsByPro(participantId));
     return Promise.all(
       chats.map(async (chat) => {
         const user = await mongoose.model("User").findById(chat.participants.userId._id, "name photo").exec();
@@ -137,7 +137,7 @@ export class ChatService implements IChatService {
       throw new Error("Message body or attachments required");
     }
 
-    const chat = await this.chatRepository.findById(data.chatId);
+    const chat = await this._chatRepository.findById(data.chatId);
     if (!chat) throw new Error("Chat not found");
 
     // Access the _id from populated participants
@@ -174,9 +174,9 @@ export class ChatService implements IChatService {
       status: "sent",
     };
 
-    const message = await this.chatRepository.createMessage(messageData);
-    await this.chatRepository.updateChatLastMessage(data.chatId, message);
-    await this.chatRepository.updateUnreadCount(data.chatId, receiverId, receiverModel, true);
+    const message = await this._chatRepository.createMessage(messageData);
+    await this._chatRepository.updateChatLastMessage(data.chatId, message);
+    await this._chatRepository.updateUnreadCount(data.chatId, receiverId, receiverModel, true);
 
     const receiver = await (receiverModel === "User"
       ? mongoose.model("User").findById(receiverId, "name").exec()
@@ -203,7 +203,7 @@ export class ChatService implements IChatService {
       description = "New message";
     }
 
-    const notification = await this.notificationService.createNotification({
+    const notification = await this._notificationService.createNotification({
       userId: receiverModel === "User" ? receiverId : undefined,
       proId: receiverModel === "ApprovedPro" ? receiverId : undefined,
       title: `New message from ${senderName}`,
@@ -233,7 +233,7 @@ export class ChatService implements IChatService {
       throw new Error("Invalid chatId or participantId");
     }
 
-    const chat = await this.chatRepository.findById(chatId);
+    const chat = await this._chatRepository.findById(chatId);
     if (!chat) throw new Error("Chat not found");
 
     const userId = chat.participants.userId._id.toString();
@@ -242,7 +242,7 @@ export class ChatService implements IChatService {
       throw new Error(`Participant not authorized to view this chat (chatId: ${chatId}, participantId: ${participantId})`);
     }
 
-    const result = await this.chatRepository.findMessagesByChatId(chatId, page, limit);
+    const result = await this._chatRepository.findMessagesByChatId(chatId, page, limit);
     return result;
   }
 
@@ -252,7 +252,7 @@ export class ChatService implements IChatService {
       throw new Error("Invalid chatId or participantId");
     }
 
-    const chat = await this.chatRepository.findById(chatId);
+    const chat = await this._chatRepository.findById(chatId);
     if (!chat) throw new Error("Chat not found");
 
     const userId = chat.participants.userId._id.toString();
@@ -261,14 +261,32 @@ export class ChatService implements IChatService {
       throw new Error(`Participant not authorized to mark messages as read (chatId: ${chatId}, participantId: ${participantId})`);
     }
 
-    await this.chatRepository.markMessagesAsRead(chatId, participantId, participantModel);
+    await this._chatRepository.markMessagesAsRead(chatId, participantId, participantModel);
+  }
+
+  async markMessagesAsDelivered(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
+    if (!chatId || !participantId) throw new Error("chatId and participantId are required");
+    if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
+      throw new Error("Invalid chatId or participantId");
+    }
+
+    const chat = await this._chatRepository.findById(chatId);
+    if (!chat) throw new Error("Chat not found");
+
+    const userId = chat.participants.userId._id.toString();
+    const proId = chat.participants.proId._id.toString();
+    if (![userId, proId].includes(participantId)) {
+      throw new Error(`Participant not authorized to mark messages as delivered (chatId: ${chatId}, participantId: ${participantId})`);
+    }
+
+    await this._chatRepository.markMessagesAsDelivered(chatId, participantId, participantModel);
   }
 
   async findById(chatId: string): Promise<ChatResponse | null> {
     if (!mongoose.Types.ObjectId.isValid(chatId)) {
       throw new Error("Invalid chatId");
     }
-    const chat = await this.chatRepository.findById(chatId);
+    const chat = await this._chatRepository.findById(chatId);
     if (!chat) {
       return null;
     }
@@ -310,6 +328,7 @@ export class ChatService implements IChatService {
             senderId: chat.lastMessage.senderId.toString(),
             senderModel: chat.lastMessage.senderModel,
             timestamp: chat.lastMessage.createdAt.toISOString(),
+            status: chat.lastMessage.isRead ? "read" : chat.lastMessage.status,
           }
         : undefined,
       unreadCount: unread ? unread.count : 0,

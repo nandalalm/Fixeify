@@ -11,6 +11,7 @@ import AdminPrivateRoute from "../components/ProtectedRoutes/AdminPrivateRoute";
 import AdminBookingManagement from "@/pages/Admin/AdminBookingManagement";
 import AdminRevenueManagement from "@/pages/Admin/AdminRevenueManagement";
 import AdminReviewManagement from "@/pages/Admin/AdminReviewManagement";
+import AdminConflictManagement from "@/pages/Admin/AdminConflictManagement";
 
 const adminRoutes = (
   <>
@@ -27,6 +28,7 @@ const adminRoutes = (
       <Route path="/admin/bookings" element={<AdminBookingManagement/>} />
       <Route path="/admin/revenue" element={<AdminRevenueManagement/>} />
       <Route path="/admin/reviews" element={<AdminReviewManagement />} />
+      <Route path="/admin/conflits" element={<AdminConflictManagement />} />
     </Route>
   </>
 );

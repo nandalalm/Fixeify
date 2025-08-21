@@ -59,7 +59,7 @@ export const UserDetailsModal: FC<UserDetailsModalProps> = ({ isOpen, onClose, u
           </button>
           <button
             onClick={() => onToggleBan(user)}
-            className="px-4 py-2 bg-blue-900 text-white rounded-md hover:bg-blue-800"
+            className="px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869]"
           >
             {user.isBanned ? "Unban" : "Ban"}
           </button>

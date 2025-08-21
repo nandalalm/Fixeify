@@ -7,6 +7,8 @@ export interface WalletResponseDTO {
     amount: number;
     type: "credit" | "debit";
     date: Date;
+    description?: string;
+    bookingId?: string;
     quotaId?: {
       id: string;
       bookingId?: string;

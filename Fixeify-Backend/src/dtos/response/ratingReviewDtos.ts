@@ -2,9 +2,8 @@ import { IRatingReview } from "../../models/ratingReviewModel";
 
 export class RatingReviewResponse {
   id: string;
-  user: { id: string; name: string; avatar?: string | null };
-  pro: { id: string; firstName: string; lastName: string; avatar?: string | null };
-  service?: string;
+  user: { id: string; name: string; email?: string | null; phoneNo?: string | null; photo?: string | null };
+  pro: { id: string; firstName: string; lastName: string; email?: string | null; phoneNumber?: string | null; profilePhoto?: string | null };
   issueDescription?: string;
   bookingId?: string;
   quotaId?: string;
@@ -19,15 +18,19 @@ export class RatingReviewResponse {
   }) {
     this.id = doc._id.toString();
     this.user = {
-      id: doc.userId?._id?.toString() || doc.userId?.toString(),
-      name: doc.userId?.name || "",
-      avatar: doc.userId?.avatar || null,
+      id: doc.userId?._id?.toString() || (doc.userId as any)?.toString?.() || "",
+      name: (doc as any).userId?.name || "",
+      email: (doc as any).userId?.email || null,
+      phoneNo: (doc as any).userId?.phoneNo || null,
+      photo: (doc as any).userId?.photo || null,
     };
     this.pro = {
-      id: doc.proId?._id?.toString() || doc.proId?.toString(),
-      firstName: doc.proId?.firstName || "",
-      lastName: doc.proId?.lastName || "",
-      avatar: doc.proId?.avatar || null,
+      id: doc.proId?._id?.toString() || (doc.proId as any)?.toString?.() || "",
+      firstName: (doc as any).proId?.firstName || "",
+      lastName: (doc as any).proId?.lastName || "",
+      email: (doc as any).proId?.email || null,
+      phoneNumber: (doc as any).proId?.phoneNumber || null,
+      profilePhoto: (doc as any).proId?.profilePhoto || null,
     };
     // Set category object if available
     if ((doc as any).categoryId?.name) {
@@ -35,12 +38,6 @@ export class RatingReviewResponse {
         id: (doc as any).categoryId?._id?.toString() || (doc as any).categoryId?.toString(),
         name: (doc as any).categoryId.name,
         image: (doc as any).categoryId.image,
-      };
-    } else if (doc.bookingId && (doc as any).bookingId?.category?.name) {
-      this.category = {
-        id: (doc as any).bookingId.category._id?.toString() || (doc as any).bookingId.category.toString(),
-        name: (doc as any).bookingId.category.name,
-        image: (doc as any).bookingId.category.image,
       };
     }
     if (doc.bookingId) {

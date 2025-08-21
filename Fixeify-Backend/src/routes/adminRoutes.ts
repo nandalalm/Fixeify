@@ -26,7 +26,10 @@ export default function createAdminRoutes(container: Container): Router {
   router.post("/acceptWithdrawalRequest/:withdrawalId", authenticateToken, adminController.acceptWithdrawalRequest.bind(adminController));
   router.post("/rejectWithdrawalRequest/:withdrawalId", authenticateToken, adminController.rejectWithdrawalRequest.bind(adminController));
   router.get("/trending-service", authenticateToken, adminController.getTrendingService.bind(adminController));
-   router.get("/dashboard-metrics", authenticateToken, adminController.getDashboardMetrics.bind(adminController));
+  router.get("/admin-transactions", authenticateToken, adminController.getAdminTransactions.bind(adminController));
+  router.get("/dashboard-metrics", authenticateToken, adminController.getDashboardMetrics.bind(adminController));
+  router.get("/monthly-revenue-series", authenticateToken, adminController.getMonthlyRevenueSeries.bind(adminController));
+  router.get("/platform-pro-monthly-revenue-series", authenticateToken, adminController.getPlatformProMonthlyRevenueSeries.bind(adminController));
 
   return router;
 }

@@ -5,10 +5,11 @@ import { TYPES } from "../types";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { UserRole } from "../enums/roleEnum";
 import { MESSAGES } from "../constants/messages";
+import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class NotificationController {
-  constructor(@inject(TYPES.INotificationService) private notificationService: INotificationService) {}
+  constructor(@inject(TYPES.INotificationService) private _notificationService: INotificationService) {}
 
   private isUserRole(role: unknown): role is UserRole {
     return typeof role === "string" && Object.values(UserRole).includes(role as UserRole);
@@ -24,22 +25,22 @@ export class NotificationController {
       if (!role || !this.isUserRole(role)) {
         throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
-      const participantModel = role === UserRole.PRO ? "ApprovedPro" : "User";
-      const result = await this.notificationService.getNotifications(
+      const participantModel = role === UserRole.PRO ? "ApprovedPro" : role === UserRole.ADMIN ? "Admin" : "User";
+      const result = await this._notificationService.getNotifications(
         participantId,
         participantModel,
         Number(page),
         Number(limit),
         filter === 'unread' ? 'unread' : 'all'
       );
-      res.status(200).json(result);
+      res.status(HttpStatus.OK).json(result);
     } catch (error) {
-      console.error("Error in getNotifications:", {
+      console.error(MESSAGES.FAILED_TO_FETCH_NOTIFICATIONS, {
         error: (error as Error).message,
         participantId,
         role,
       });
-      res.status(500).json({ message: "Failed to fetch notifications", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_FETCH_NOTIFICATIONS, error: (error as Error).message });
     }
   }
 
@@ -47,11 +48,11 @@ export class NotificationController {
     const { notificationId } = req.params;
 
     try {
-      if (!notificationId) throw new Error("notificationId is required");
-      await this.notificationService.markNotificationAsRead(notificationId);
-      res.status(200).json({ message: "Notification marked as read" });
+      if (!notificationId) throw new Error(MESSAGES.NOTIFICATIONID_REQUIRED);
+      await this._notificationService.markNotificationAsRead(notificationId);
+      res.status(HttpStatus.OK).json({ message: MESSAGES.NOTIFICATION_MARKED_AS_READ });
     } catch (error) {
-      res.status(500).json({ message: "Failed to mark notification as read", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_MARK_NOTIFICATION_AS_READ, error: (error as Error).message });
     }
   }
 
@@ -64,11 +65,11 @@ export class NotificationController {
       if (!role || !this.isUserRole(role)) {
         throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
-      const participantModel = role === UserRole.PRO ? "ApprovedPro" : "User";
-      await this.notificationService.markAllNotificationsAsRead(participantId, participantModel);
-      res.status(200).json({ message: "All notifications marked as read" });
+      const participantModel = role === UserRole.PRO ? "ApprovedPro" : role === UserRole.ADMIN ? "Admin" : "User";
+      await this._notificationService.markAllNotificationsAsRead(participantId, participantModel);
+      res.status(HttpStatus.OK).json({ message: MESSAGES.ALL_NOTIFICATIONS_MARKED_AS_READ });
     } catch (error) {
-      res.status(500).json({ message: "Failed to mark all notifications as read", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_MARK_ALL_NOTIFICATIONS_AS_READ, error: (error as Error).message });
     }
   }
 }

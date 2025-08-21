@@ -3,6 +3,8 @@ export interface ITransaction {
   amount: number;
   type: "credit" | "debit";
   date: Date;
+  description?: string;
+  bookingId?: string;
 }
 
 export interface WalletResponse {

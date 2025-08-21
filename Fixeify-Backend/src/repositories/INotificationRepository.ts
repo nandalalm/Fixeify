@@ -8,6 +8,7 @@ export interface INotificationRepository {
     description: string;
     userId?: string;
     proId?: string;
+    adminId?: string;
     chatId?: string;
     bookingId?: string;
     quotaId?: string;
@@ -16,6 +17,7 @@ export interface INotificationRepository {
   }): Promise<INotification>;
   findNotificationsByUser(userId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
   findNotificationsByPro(proId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findNotificationsByAdmin(adminId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
   markNotificationAsRead(notificationId: string): Promise<void>;
-  markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;
+  markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void>;
 }

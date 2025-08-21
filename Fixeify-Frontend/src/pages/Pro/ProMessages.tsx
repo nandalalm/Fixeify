@@ -14,6 +14,7 @@ const ProMessages = () => {
   const navigate = useNavigate();
 
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [loading, setLoading] = useState<boolean>(true); 
 
 
@@ -30,9 +31,27 @@ const ProMessages = () => {
     setLoading(false);
   }, [user, accessToken, dispatch, navigate]);
 
-  const toggleSidebar = () => {
-    setSidebarOpen((prev: boolean) => !prev);
-  };
+  useEffect(() => {
+    if (!user || user.role !== UserRole.PRO) {
+      navigate("/login");
+    }
+  }, [user, navigate]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setSidebarOpen(false);
+    }
+  }, [isLargeScreen]);
+
 
   if (loading) {
     return (
@@ -48,13 +67,15 @@ const ProMessages = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <ProTopNavbar toggleSidebar={toggleSidebar} />
-      <div className="flex flex-1 overflow-hidden">
-        <ProNavbar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+      <ProTopNavbar 
+        toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+        isLargeScreen={isLargeScreen}
+        sidebarOpen={sidebarOpen}
+      />
+      <div className="flex flex-1 overflow-visible">
+        <ProNavbar isOpen={sidebarOpen} />
         <main
-          className={`flex-1 overflow-y-auto p-4 transition-all duration-300 ${
-            sidebarOpen ? "ml-64" : "ml-0"
-          }`}
+          className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
           <div className="max-w-7xl mx-auto h-full">
             <MessagingApp role="pro" />

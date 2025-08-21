@@ -146,7 +146,7 @@ const RatingModal: React.FC<RatingModalProps> = ({ isOpen, onClose, userId, proI
         <button
           onClick={handleOpenConfirm}
           disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="w-full bg-[#032B44] text-white py-2 rounded hover:bg-[#054869] disabled:opacity-50"
         >
           {loading ? "Submitting..." : "Submit"}
         </button>

@@ -1,12 +1,13 @@
 import { type FC, useState, useEffect } from "react";
 import { AdminNavbar } from "../../components/Admin/AdminNavbar";
-import { Menu, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { fetchUsers, toggleBanUser } from "../../api/adminApi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
 import { UserDetailsModal } from "../../components/Admin/UserDetailsModal";
+import { AdminTopNavbar } from "../../components/Admin/AdminTopNavbar";
 
 export interface ILocation {
   address: string;
@@ -29,7 +30,8 @@ export interface User {
 }
 
 const UserManagement: FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -60,6 +62,21 @@ const UserManagement: FC = () => {
       getUsers();
     }
   }, [user, navigate, currentPage]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setSidebarOpen(false);
+    }
+  }, [isLargeScreen]);
 
   const handleToggleBan = async () => {
     if (!selectedUser) return;
@@ -110,33 +127,21 @@ const UserManagement: FC = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Top Navbar */}
-      <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between z-30">
-        <div className="flex items-center">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center">
-            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user.name}</span>
-          </div>
-        </div>
-      </header>
+      <AdminTopNavbar 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        userName={user.name}
+        isLargeScreen={isLargeScreen}
+      />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-visible">
         {/* Sidebar */}
-        <AdminNavbar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <AdminNavbar isOpen={sidebarOpen} />
 
         {/* Content */}
         <main
-          className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${
-            sidebarOpen ? "ml-64" : "ml-0"
-          }`}
+          className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
           <div className="max-w-7xl mx-auto">
             <h2 className="text-2xl font-semibold text-gray-800 mb-6">User Management</h2>
@@ -155,9 +160,43 @@ const UserManagement: FC = () => {
               />
             </div>
 
-            {/* Users Table */}
+            {/* Users List - Mobile Cards */}
+            <div className="sm:hidden space-y-4 mb-4">
+              {filteredUsers.map((user) => (
+                <div key={user.id} className="bg-white shadow-sm rounded-lg p-4 flex items-start gap-4">
+                  <img
+                    src={user.photo || "/placeholder.svg"}
+                    alt={user.name}
+                    className="h-12 w-12 rounded-full object-cover flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                      <span
+                        className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                          user.isBanned ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {user.isBanned ? "Banned" : "Active"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-600 truncate">{user.email}</p>
+                    <div className="mt-3">
+                      <button
+                        onClick={() => openDetailsModal(user)}
+                        className="bg-[#032B44] text-white px-3 py-1.5 rounded-md text-xs hover:bg-[#054869] transition-colors"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Users Table - Desktop */}
             <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="hidden sm:block overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -192,7 +231,7 @@ const UserManagement: FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => openDetailsModal(user)}
-                            className="bg-blue-900 text-white px-4 py-1 rounded-md text-sm hover:bg-blue-800 transition-colors"
+                            className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors"
                           >
                             View
                           </button>

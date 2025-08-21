@@ -8,13 +8,12 @@ export default function createProRoutes(container: Container): Router {
   const router = express.Router();
   const proController = container.get<ProController>(TYPES.ProController);
 
-  // Public routes - no authentication needed
+  // Public routes
   router.post("/apply", proController.applyPro.bind(proController));
   router.get("/fetchProfile/:id", proController.getProfile.bind(proController));
   router.get("/fetchCategories", proController.getAllCategories.bind(proController));
   router.get("/pending/:id", proController.getPendingProById.bind(proController));
   
-  // Protected routes - require authentication but no specific role
   router.put("/updateProfile/:id", authenticateToken, proController.updateProfile.bind(proController));
   router.put("/changePassword/:id", authenticateToken, proController.changePassword.bind(proController));
   router.get("/fetchAvailability/:id", authenticateToken, proController.getAvailability.bind(proController));
@@ -28,7 +27,9 @@ export default function createProRoutes(container: Container): Router {
   router.get("/wallet/:proId", authenticateToken, proController.getWallet.bind(proController));
   router.get("/walletWithPagenation/:proId", authenticateToken, proController.getWalletWithPagenation.bind(proController));
   router.post("/requestWithdrawal/:proId", authenticateToken, proController.requestWithdrawal.bind(proController));
+  router.get("/withdrawalRequests/:proId", authenticateToken, proController.getWithdrawalRequestsByProId.bind(proController));
   router.get("/dashboard-metrics/:proId", authenticateToken, proController.getDashboardMetrics.bind(proController));
+  router.get("/monthly-revenue-series/:proId", authenticateToken, proController.getMonthlyRevenueSeries.bind(proController));
 
   return router;
 }

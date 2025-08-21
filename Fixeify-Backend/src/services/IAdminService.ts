@@ -18,17 +18,36 @@ export interface IAdminService {
   createCategory(name: string, image: string): Promise<CategoryResponse>;
   getCategories(page: number, limit: number): Promise<{ categories: CategoryResponse[]; total: number }>;
   updateCategory(categoryId: string, data: { name?: string; image?: string }): Promise<CategoryResponse | null>;
-  getBookings(page: number, limit: number, search?: string, status?: string): Promise<{ bookings: BookingResponse[]; total: number }>;
+  getBookings(page: number, limit: number, search?: string, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }>;
   getQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null>;
   getWithdrawalRequests(page: number, limit: number): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number; pros: ProResponse[] }>;
   acceptWithdrawalRequest(withdrawalId: string): Promise<void>;
   rejectWithdrawalRequest(withdrawalId: string, reason: string): Promise<void>;
   getTrendingService(): Promise<{ categoryId: string; name: string; bookingCount: number } | null>;
+  getAdminTransactions(adminId: string, page: number, limit: number): Promise<{ transactions: Array<{
+    id: string;
+    proId: string;
+    walletId?: string;
+    amount: number;
+    type: "credit" | "debit";
+    date: Date;
+    description?: string;
+    bookingId?: string;
+    quotaId?: string;
+    adminId?: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>; total: number }>;
   getDashboardMetrics(adminId: string): Promise<{
     userCount: number;
     proCount: number;
     totalRevenue: number;
     monthlyRevenue: number;
+    yearlyRevenue: number;
+    dailyRevenue: number;
+    monthlyDeltaPercent: number | null;
+    yearlyDeltaPercent: number | null;
+    dailyDeltaPercent: number | null;
     categoryCount: number;
     trendingService: { categoryId: string; name: string; bookingCount: number } | null;
     topPerformingPros: {
@@ -38,4 +57,6 @@ export interface IAdminService {
       lowestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
     };
   }>;
+  getMonthlyRevenueSeries(lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>>;
+  getPlatformProMonthlyRevenueSeries(lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>>;
 }

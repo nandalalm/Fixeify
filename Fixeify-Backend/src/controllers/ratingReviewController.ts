@@ -3,6 +3,8 @@ import { inject, injectable } from "inversify";
 import { TYPES } from "../types";
 import { IRatingReviewService } from "../services/IRatingReviewService";
 import { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
+import { MESSAGES } from "../constants/messages";
+import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class RatingReviewController {
@@ -15,7 +17,7 @@ export class RatingReviewController {
     try {
       const body = req.body as CreateRatingReviewRequest;
       const result = await this._ratingReviewService.createRatingReview(body);
-      res.status(201).json(result);
+      res.status(HttpStatus.CREATED).json(result);
     } catch (error) {
       next(error);
     }
@@ -61,7 +63,7 @@ export class RatingReviewController {
     try {
       const { id } = req.params;
       const result = await this._ratingReviewService.getRatingReviewById(id);
-      if (!result) return res.status(404).json({ message: "Not found" });
+      if (!result) return res.status(HttpStatus.NOT_FOUND).json({ message: MESSAGES.NOT_FOUND });
       res.json(result);
     } catch (error) {
       next(error);

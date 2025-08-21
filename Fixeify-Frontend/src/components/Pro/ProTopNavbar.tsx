@@ -2,7 +2,7 @@ import { FC, useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
-import { Menu, Bell } from "lucide-react";
+import { Menu, Bell, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
@@ -17,9 +17,11 @@ import { getSocket } from "../../services/socket";
 
 interface ProTopNavbarProps {
   toggleSidebar: () => void;
+  isLargeScreen?: boolean;
+  sidebarOpen?: boolean;
 }
 
-const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
+const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = true, sidebarOpen = false }) => {
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
   const notifications = useSelector((state: RootState) => state.chat.notifications);
   const dispatch = useDispatch<AppDispatch>();
@@ -119,12 +121,18 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar }) => {
     <header className="sticky top-0 z-50 w-full bg-white dark:bg-gray-900 shadow-md transition-colors duration-300">
       <div className="container mx-auto px-4 py-3 flex justify-between items-center">
         <div className="flex items-center gap-4">
-          <button
-            onClick={toggleSidebar}
-            className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
+          {!isLargeScreen && (
+            <button
+              onClick={toggleSidebar}
+              className="p-2 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md"
+            >
+              {sidebarOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          )}
           <img
             src="/logo.png"
             alt="Fixeify Logo"

@@ -15,6 +15,7 @@ export interface ChatResponse {
     senderId: string;
     senderModel: "User" | "ApprovedPro";
     timestamp: string;
+    status?: "sent" | "delivered" | "read";
   };
   unreadCount: number;
   createdAt: Date;

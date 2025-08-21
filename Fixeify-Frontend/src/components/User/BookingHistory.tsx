@@ -8,10 +8,14 @@ import { fetchBookingHistoryDetails, fetchQuotaByBookingId } from "../../api/use
 import { BookingResponse } from "../../interfaces/bookingInterface";
 import { QuotaResponse } from "../../interfaces/quotaInterface";
 import BookingTable from "../../components/Reuseable/BookingTable";
-import InlineBookingDetails from "./InlineBookingDetails";
+import RaiseComplaintModal from "../Modals/RaiseComplaintModal";
+import RatingModal from "../Modals/RatingModal";
+import BookingDetails from "../../components/Reuseable/BookingDetails";
 
 import { RotateCcw } from "lucide-react";
 import { fetchReviewsByUser } from "../../store/ratingReviewSlice";
+import { createTicket } from "../../store/ticketSlice";
+import { TicketPriority } from "../../interfaces/ticketInterface";
 
 
 
@@ -32,9 +36,21 @@ const BookingHistory: React.FC = () => {
   const [, setQuotas] = useState<{ [key: string]: QuotaResponse | null }>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
+  const [detailsRefreshKey, setDetailsRefreshKey] = useState<number>(0);
+  const [complaintBookingId, setComplaintBookingId] = useState<string | null>(null);
+  const [complaintOpen, setComplaintOpen] = useState(false);
+  // rating modal state
+  const [ratingOpen, setRatingOpen] = useState(false);
+  const [ratingContext, setRatingContext] = useState<{
+    proId: string;
+    categoryId: string;
+    bookingId?: string;
+    quotaId?: string;
+  } | null>(null);
   
-  const [, setRatingModalBooking] = useState<BookingResponse | null>(null);
+  // rating modal state will be handled inside the details view flow if needed
 
   const dispatch = useDispatch<AppDispatch>();
   // User's submitted reviews to determine if a booking is already rated
@@ -133,13 +149,61 @@ const BookingHistory: React.FC = () => {
   }
 
   if (error) {
+    // Keep inline error for full-page failures
     return <p className="text-red-500 text-center py-8">{error}</p>;
   }
 
+  const selectedComplaintBooking = complaintBookingId ? bookings.find(b => b.id === complaintBookingId) || null : null;
+
+  // complaint open is now triggered from InlineBookingDetails
+
+  const handleSubmitComplaint = async (data: { subject: string; description: string; priority?: TicketPriority }) => {
+    if (!userId || !selectedComplaintBooking) return;
+    try {
+      await dispatch(createTicket({
+        complainantType: "user",
+        complainantId: userId,
+        againstType: "pro",
+        againstId: selectedComplaintBooking.pro.id,
+        bookingId: selectedComplaintBooking.id,
+        subject: data.subject,
+        description: data.description,
+        priority: data.priority,
+      })).unwrap();
+      // Close modal and reset state after success
+      setComplaintOpen(false);
+      setComplaintBookingId(null);
+      // Refetch bookings to reflect complaint flags so button hides
+      try {
+        const refreshed = await fetchBookingHistoryDetails(userId, currentPage, 5);
+        setBookings(refreshed.bookings || []);
+        setTotalPages(Math.ceil((refreshed.total || 0) / 5));
+      } catch (e) {
+        console.error("Failed to refresh bookings after complaint:", e);
+      }
+      // Force details view to re-fetch its data if open
+      setDetailsRefreshKey((k) => k + 1);
+      setSuccessMessage("Complaint submitted successfully");
+      setTimeout(() => setSuccessMessage(null), 2000);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || "Failed to submit complaint";
+      setSuccessMessage(null);
+      setError(msg);
+      setTimeout(() => setError(null), 2000);
+    }
+  };
+
   return (
     <div className="p-6 mb-[350px] mt-8">
+      {successMessage && (
+        <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-md text-center">{successMessage}</div>
+      )}
+      {/* lightweight error toast scoped to action failures */}
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-center">{error}</div>
+      )}
       <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Booking History</h2>
-      {bookings.length > 0 && (
+      {bookings.length > 0 && !selectedBookingId && (
         <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
           <input
             type="text"
@@ -179,9 +243,34 @@ const BookingHistory: React.FC = () => {
         </div>
       ) : (
         selectedBookingId ? (
-          <InlineBookingDetails 
-            bookingId={selectedBookingId} 
-            onBack={() => setSelectedBookingId(null)} 
+          <BookingDetails
+            bookingId={selectedBookingId}
+            viewerRole="user"
+            onBack={async () => {
+              setSelectedBookingId(null);
+              try {
+                const refreshed = await fetchBookingHistoryDetails(userId, currentPage, 5);
+                setBookings(refreshed.bookings || []);
+                setTotalPages(Math.ceil((refreshed.total || 0) / 5));
+              } catch (e) {
+                console.error("Failed to refresh bookings on back:", e);
+              }
+            }}
+            onRate={(booking) => {
+              // open rating modal with current booking context
+              setRatingContext({
+                proId: booking.pro.id,
+                categoryId: booking.category.id,
+                bookingId: booking.id,
+                // quotaId can be provided if you have it; BookingDetails fetches quota internally, so optional
+              });
+              setRatingOpen(true);
+            }}
+            onRaiseComplaint={(booking) => {
+              setComplaintBookingId(booking.id);
+              setComplaintOpen(true);
+            }}
+            refreshKey={detailsRefreshKey}
           />
         ) : (
           <BookingTable
@@ -189,18 +278,44 @@ const BookingHistory: React.FC = () => {
             onViewDetails={(booking: BookingResponse) => {
               setSelectedBookingId(booking.id);
             }}
-            onRate={(booking: BookingResponse) => {
-              setRatingModalBooking(booking);
-            }}
-            isRated={(bookingId: string) => {
-              const booking = bookings.find(b => b.id === bookingId);
-              return booking?.isRated || false;
-            }}
             totalPages={1}
             currentPage={1}
             onPageChange={() => {}}
           />
         )
+      )}
+
+      <RaiseComplaintModal
+        open={complaintOpen}
+        onClose={() => { setComplaintOpen(false); setDetailsRefreshKey((k) => k + 1); }}
+        onSubmit={handleSubmitComplaint}
+        bookingSummary={selectedComplaintBooking ? `${selectedComplaintBooking.category.name} with ${selectedComplaintBooking.pro.firstName} ${selectedComplaintBooking.pro.lastName} on ${formatDate(new Date(selectedComplaintBooking.preferredDate))}` : undefined}
+      />
+
+      {/* Rating Modal */}
+      {ratingOpen && ratingContext && userId && (
+        <RatingModal
+          isOpen={ratingOpen}
+          onClose={() => setRatingOpen(false)}
+          userId={userId}
+          proId={ratingContext.proId}
+          categoryId={ratingContext.categoryId}
+          bookingId={ratingContext.bookingId}
+          quotaId={ratingContext.quotaId}
+          onSuccess={async () => {
+            // Refresh list so isRated is updated and button hides after closing modal
+            try {
+              const refreshed = await fetchBookingHistoryDetails(userId, currentPage, 5);
+              setBookings(refreshed.bookings || []);
+              setTotalPages(Math.ceil((refreshed.total || 0) / 5));
+            } catch (e) {
+              console.error("Failed to refresh bookings after rating:", e);
+            }
+            // Force details view to re-fetch by bumping refreshKey so canRate recomputes
+            setDetailsRefreshKey((k) => k + 1);
+            setRatingOpen(false);
+          }}
+        />
       )}
     </div>
   );

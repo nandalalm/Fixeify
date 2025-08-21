@@ -350,6 +350,9 @@ const BookingForm = () => {
             case 404:
               setErrors({ general: "User or professional not found." });
               break;
+            case 409:
+              setErrors({ general: "This pro is currently conflicted" });
+              break;  
             default:
               setServerError("Booking failed. Please try again.");
           }

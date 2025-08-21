@@ -21,6 +21,8 @@ interface ConfirmationModalProps {
     | "acceptWithdrawal"
     | "rejectWithdrawal"
     | "rating"
+    | "openTicket"
+    | "closeTicket"
     | null;
   entityType?: "pro" | "user" | "booking" | "wallet";
   reason?: string;
@@ -106,6 +108,8 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           {action === "acceptWithdrawal" && "Confirm Accept Withdrawal"}
           {action === "rejectWithdrawal" && "Reject Withdrawal Request"}
           {action === "rating" && "Rate/Review Professional"}
+          {action === "openTicket" && (customTitle || "Open Ticket")}
+          {action === "closeTicket" && (customTitle || "Close Ticket")}
         </h3>
         <p className={`mb-4 ${action === "logout" ? "dark:text-white" : ""}`}>
           {action === null && customReason
@@ -127,7 +131,9 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
             : "Are you sure you want to cancel this booking?")}
           {action === "acceptWithdrawal" && "Are you sure you want to accept this withdrawal request?"}
           {action === "rejectWithdrawal" && "Please select a reason for rejecting this withdrawal request:"}
-           {action === "rating" && "Are you sure you want to rate/review this professional?"}
+          {action === "rating" && "Are you sure you want to rate/review this professional?"}
+          {action === "openTicket" && (customReason || "Open this pending ticket and mark it Under Review?")}
+          {action === "closeTicket" && (customReason || "Close this ticket as Resolved?")}
         </p>
         {(action === "reject" || action === "rejectBooking" || action === "rejectWithdrawal" || (action === "cancel" && customTitle === "Select Cancellation Reason")) && setReason && setCustomReason && (
           <div className="mb-4">
@@ -177,22 +183,15 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
         <div className="flex justify-end gap-4">
           <button
             onClick={onCancel}
-            className={`px-4 py-2 rounded-md ${
-              action === "logout"
-                ? "bg-red-600 text-white hover:bg-red-700 dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
-                : "bg-red-600 text-white hover:bg-red-700"
-            } disabled:opacity-50`}
+            className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300 border border-gray-300 shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400 dark:!bg-gray-500 dark:!text-gray-100 dark:!hover:!bg-gray-300 dark:!border-gray-600 dark:!shadow-sm dark:!focus-visible:ring-gray-500 dark:!focus-visible:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isProcessing}
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-md ${
-              action === "logout"
-                ? "bg-green-600 text-white hover:bg-green-700 dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
-                : "bg-green-600 text-white hover:bg-green-700"
-            } disabled:opacity-50`}
+            className="px-4 py-2 rounded-md text-white hover:opacity-95 border shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:!bg-gray-700 dark:!text-gray-100 dark:!hover:bg-gray-600 dark:!border-gray-600 dark:!shadow-sm dark:!focus-visible:ring-gray-500 dark:!focus-visible:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: "#032b44", borderColor: "#032b44" }}
             disabled={isProcessing || ((action === "reject" || action === "rejectBooking" || action === "rejectWithdrawal" || (action === "cancel" && customTitle === "Select Cancellation Reason")) && !reason)}
           >
             {isProcessing ? "Processing..." : "Confirm"}

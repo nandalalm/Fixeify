@@ -6,10 +6,11 @@ import { TYPES } from "../types";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { UserRole } from "../enums/roleEnum";
 import { MESSAGES } from "../constants/messages";
+import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class ChatController {
-  constructor(@inject(TYPES.IChatService) private chatService: IChatService) {}
+  constructor(@inject(TYPES.IChatService) private _chatService: IChatService) {}
 
   private isUserRole(role: unknown): role is UserRole {
     return typeof role === "string" && ["user", "pro"].includes(role as UserRole);
@@ -22,25 +23,25 @@ export class ChatController {
     try {
       const authUserId = authReq.userId;
       if (!authUserId) throw new Error(MESSAGES.UNAUTHORIZED);
-      if (!userId || !proId) throw new Error("userId and proId are required");
+      if (!userId || !proId) throw new Error(MESSAGES.USERID_AND_PROID_REQUIRED);
       if (!role || !this.isUserRole(role)) {
         throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
       if (authUserId !== userId) {
-        throw new Error("Unauthorized: Can only access own chats");
+        throw new Error(MESSAGES.UNAUTHORIZED_OWN_CHATS);
       }
       const participantModel = role === UserRole.PRO ? "ApprovedPro" : "User";
-      const chat = await this.chatService.getExistingChat(userId, proId, participantModel);
-      res.status(200).json({ chat });
+      const chat = await this._chatService.getExistingChat(userId, proId, participantModel);
+      res.status(HttpStatus.OK).json({ chat });
     } catch (error) {
-      console.error("Error in getExistingChat:", {
+      console.error(MESSAGES.FAILED_TO_FETCH_CHAT, {
         error: (error as Error).message,
         userId,
         proId,
         role,
         authUserId: authReq.userId,
       });
-      res.status(500).json({ message: "Failed to fetch chat", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_FETCH_CHAT, error: (error as Error).message });
     }
   }
 
@@ -51,25 +52,25 @@ export class ChatController {
 
     try {
       if (!userId) throw new Error(MESSAGES.UNAUTHORIZED);
-      if (!proId) throw new Error("proId is required");
+      if (!proId) throw new Error(MESSAGES.PROID_REQUIRED);
       if (!role || !this.isUserRole(role)) {
         throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
       const senderModel = role === UserRole.PRO ? "ApprovedPro" : "User";
       if ((senderModel === "User" && role !== UserRole.USER) || (senderModel === "ApprovedPro" && role !== UserRole.PRO)) {
-        throw new Error("Role does not match expected participant model");
+        throw new Error(MESSAGES.ROLE_MISMATCH_PARTICIPANT_MODEL);
       }
-      const chat = await this.chatService.createChat({ userId, proId, role });
-      res.status(201).json(chat);
+      const chat = await this._chatService.createChat({ userId, proId, role });
+      res.status(HttpStatus.CREATED).json(chat);
     } catch (error: any) {
-      console.error("Error in createChat:", {
+      console.error(MESSAGES.FAILED_TO_CREATE_CHAT, {
         error: error.message,
         userId,
         proId,
         role,
         stack: error.stack,
       });
-      res.status(500).json({ message: "Failed to create chat", error: error.message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_CREATE_CHAT, error: error.message });
     }
   }
 
@@ -80,23 +81,23 @@ export class ChatController {
     try {
       const authUserId = authReq.userId;
       if (!authUserId) throw new Error(MESSAGES.UNAUTHORIZED);
-      if (!userId) throw new Error("userId is required");
+      if (!userId) throw new Error(MESSAGES.USERID_REQUIRED);
       if (!role || !this.isUserRole(role)) {
         throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
       if (authUserId !== userId) {
-        throw new Error("Unauthorized: Can only access own chats");
+        throw new Error(MESSAGES.UNAUTHORIZED_OWN_CHATS);
       }
       const participantModel = role === UserRole.PRO ? "ApprovedPro" : "User";
-      const chats = await this.chatService.getChats(authUserId, participantModel);
-      res.status(200).json({ chats });
+      const chats = await this._chatService.getChats(authUserId, participantModel);
+      res.status(HttpStatus.OK).json({ chats });
     } catch (error) {
-      console.error("Error in getChats:", {
+      console.error(MESSAGES.FAILED_TO_FETCH_CHATS, {
         error: (error as Error).message,
         userId,
         role,
       });
-      res.status(500).json({ message: "Failed to fetch chats", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_FETCH_CHATS, error: (error as Error).message });
     }
   }
 
@@ -107,35 +108,35 @@ export class ChatController {
 
     try {
       if (!senderId) throw new Error(MESSAGES.UNAUTHORIZED);
-      if (!chatId) throw new Error("chatId is required");
-      if (!body && (!attachments || attachments.length === 0)) throw new Error("Message body or attachments required");
+      if (!chatId) throw new Error(MESSAGES.CHATID_REQUIRED);
+      if (!body && (!attachments || attachments.length === 0)) throw new Error(MESSAGES.MESSAGE_BODY_OR_ATTACHMENTS_REQUIRED);
       if (!role || !this.isUserRole(role)) {
         throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
       if (!senderModel || !["User", "ApprovedPro"].includes(senderModel)) {
-        throw new Error("Invalid senderModel");
+        throw new Error(MESSAGES.INVALID_SENDER_MODEL);
       }
       if ((senderModel === "User" && role !== UserRole.USER) || (senderModel === "ApprovedPro" && role !== UserRole.PRO)) {
-        throw new Error("Role does not match expected participant model");
+        throw new Error(MESSAGES.ROLE_MISMATCH_PARTICIPANT_MODEL);
       }
-      const chat = await this.chatService.findById(chatId);
-      if (!chat) throw new Error("Chat not found");
+      const chat = await this._chatService.findById(chatId);
+      if (!chat) throw new Error(MESSAGES.CHAT_NOT_FOUND);
 
       if (![chat.participants.userId, chat.participants.proId].includes(senderId)) {
-        throw new Error(`Sender not authorized to send message in this chat (chatId: ${chatId}, senderId: ${senderId})`);
+        throw new Error(MESSAGES.SENDER_NOT_AUTHORIZED_IN_CHAT);
       }
 
-      const message = await this.chatService.sendMessage({ chatId, senderId, senderModel, body, attachments, role });
-      res.status(201).json(message);
+      const message = await this._chatService.sendMessage({ chatId, senderId, senderModel, body, attachments, role });
+      res.status(HttpStatus.CREATED).json(message);
     } catch (error) {
-      console.error("Error in sendMessage:", {
+      console.error(MESSAGES.FAILED_TO_SEND_MESSAGE, {
         error: (error as Error).message,
         chatId,
         senderId,
         role,
         senderModel,
       });
-      res.status(500).json({ message: "Failed to send message", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_SEND_MESSAGE, error: (error as Error).message });
     }
   }
 
@@ -147,22 +148,22 @@ export class ChatController {
 
     try {
       if (!participantId) throw new Error(MESSAGES.UNAUTHORIZED);
-      if (!chatId) throw new Error("chatId is required");
+      if (!chatId) throw new Error(MESSAGES.CHATID_REQUIRED);
       if (!role || !this.isUserRole(role)) {
-        throw new Error("Valid role (user or pro) is required");
+        throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
       const participantModel = role === UserRole.PRO ? "ApprovedPro" : "User";
-      const result = await this.chatService.getMessages(chatId, participantId, participantModel, Number(page), Number(limit));
-      res.status(200).json(result);
+      const result = await this._chatService.getMessages(chatId, participantId, participantModel, Number(page), Number(limit));
+      res.status(HttpStatus.OK).json(result);
     } catch (error) {
-      console.error("Error in getMessages:", {
+      console.error(MESSAGES.FAILED_TO_FETCH_MESSAGES, {
         error: (error as Error).message,
         chatId,
         participantId,
         role,
         stack: (error as Error).stack,
       });
-      res.status(500).json({ message: "Failed to fetch messages", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_FETCH_MESSAGES, error: (error as Error).message });
     }
   }
 
@@ -175,30 +176,30 @@ export class ChatController {
     try {
       const authUserId = authReq.userId;
       if (!authUserId) throw new Error(MESSAGES.UNAUTHORIZED);
-      if (!userId) throw new Error("userId is required");
-      if (!chatId) throw new Error("chatId is required");
+      if (!userId) throw new Error(MESSAGES.USERID_REQUIRED);
+      if (!chatId) throw new Error(MESSAGES.CHATID_REQUIRED);
       if (!role || !this.isUserRole(role)) {
         throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
       }
       const participantModel = role === UserRole.PRO ? "ApprovedPro" : "User";
-      const chat = await this.chatService.findById(chatId);
-      if (!chat) throw new Error("Chat not found");
+      const chat = await this._chatService.findById(chatId);
+      if (!chat) throw new Error(MESSAGES.CHAT_NOT_FOUND);
 
       if (![chat.participants.userId, chat.participants.proId].includes(userId)) {
-        throw new Error(`User not authorized to mark messages in this chat (chatId: ${chatId}, userId: ${userId})`);
+        throw new Error(MESSAGES.USER_NOT_AUTHORIZED_MARK_MESSAGES);
       }
 
-      await this.chatService.markMessagesAsRead(chatId, userId, participantModel);
-      res.status(200).json({ message: "Messages marked as read" });
+      await this._chatService.markMessagesAsRead(chatId, userId, participantModel);
+      res.status(HttpStatus.OK).json({ message: MESSAGES.MESSAGES_MARKED_AS_READ });
     } catch (error) {
-      console.error("Error in markMessagesAsRead:", {
+      console.error(MESSAGES.FAILED_TO_MARK_MESSAGES_AS_READ, {
         error: (error as Error).message,
         chatId,
         userId,
         role,
         stack: (error as Error).stack,
       });
-      res.status(500).json({ message: "Failed to mark messages as read", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_MARK_MESSAGES_AS_READ, error: (error as Error).message });
     }
   }
 }

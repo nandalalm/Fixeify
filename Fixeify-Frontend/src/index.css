@@ -140,3 +140,34 @@ body {
   }
 }
 
+/* Animated radial blob utilities for dashboard banners */
+@keyframes blob-float {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(24px, -18px) scale(1.05); }
+  66% { transform: translate(-18px, 16px) scale(0.97); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes blob-hue {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(18deg); }
+  100% { filter: hue-rotate(0deg); }
+}
+
+@keyframes soft-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.85; }
+}
+
+.blob-animate {
+  animation: blob-float 12s ease-in-out infinite, blob-hue 18s ease-in-out infinite, soft-pulse 8s ease-in-out infinite;
+}
+
+.blob-animate-fast {
+  animation: blob-float 9s ease-in-out infinite, blob-hue 16s ease-in-out infinite, soft-pulse 6s ease-in-out infinite;
+}
+
+.blob-animate-slow {
+  animation: blob-float 16s ease-in-out infinite, blob-hue 22s ease-in-out infinite, soft-pulse 10s ease-in-out infinite;
+}
+

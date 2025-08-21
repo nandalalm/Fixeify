@@ -43,16 +43,32 @@ export interface IProService {
   fetchQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null>;
   getWallet(proId: string): Promise<WalletResponseDTO | null>;
   getWalletWithPagination(proId: string, page: number, limit: number): Promise<{ wallet: WalletResponseDTO | null; total: number }>;
-  requestWithdrawal(proId: string, data: { amount: number; paymentMode: "bank" | "upi"; bankName?: string; accountNumber?: string; ifscCode?: string; branchName?: string; upiCode?: string }): Promise<WithdrawalRequestResponse>;
+  requestWithdrawal(
+    proId: string,
+    data: {
+      amount: number;
+      paymentMode: "bank" | "upi";
+      bankName?: string;
+      accountNumber?: string;
+      ifscCode?: string;
+      branchName?: string;
+      upiCode?: string;
+      bookingId?: string; // optional link to a specific booking
+    }
+  ): Promise<WithdrawalRequestResponse>;
   getWithdrawalRequestsByProId(proId: string): Promise<WithdrawalRequestResponse[]>;
+  getWithdrawalRequestsByProIdPaginated(proId: string, page: number, limit: number): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number }>;
   getPendingProById(pendingProId: string): Promise<PendingProResponse>;
   getDashboardMetrics(proId: string): Promise<{
     totalRevenue: number;
     monthlyRevenue: number;
+    yearlyRevenue: number;
+    dailyRevenue: number;
     completedJobs: number;
     pendingJobs: number;
     averageRating: number;
     walletBalance: number;
     totalWithdrawn: number;
   }>;
+  getMonthlyRevenueSeries(proId: string, lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>>;
 }

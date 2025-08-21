@@ -172,9 +172,7 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
   async findMessagesByChatId(chatId: string, page: number, limit: number): Promise<{ messages: MessageResponse[]; total: number }> {
     try {
       const skip = (page - 1) * limit;
-      
-      // Always sort by newest first (descending) for proper pagination
-      // Skip the appropriate number of messages to get older messages for subsequent pages
+    
       const messages = await MessageModel
         .find({ chatId })
         .sort([["createdAt", -1]])
@@ -259,5 +257,22 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
         }
       )
       .exec();
+  }
+
+  async markMessagesAsDelivered(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
+    if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
+      throw new Error("Invalid chatId or participantId");
+    }
+   
+    await MessageModel.updateMany(
+      {
+        chatId: new mongoose.Types.ObjectId(chatId),
+        receiverId: new mongoose.Types.ObjectId(participantId),
+        receiverModel: participantModel,
+        status: "sent",
+        isRead: false,
+      },
+      { $set: { status: "delivered", updatedAt: new Date() } }
+    ).exec();
   }
 }

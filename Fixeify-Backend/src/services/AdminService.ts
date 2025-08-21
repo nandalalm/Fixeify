@@ -8,6 +8,7 @@ import { IQuotaRepository } from "../repositories/IQuotaRepository";
 import { IWalletRepository } from "../repositories/IWalletRepository";
 import { IWithdrawalRequestRepository } from "../repositories/IWithdrawalRequestRepository";
 import { IAdminRepository } from "../repositories/IAdminRepository";
+import { ITransactionRepository } from "../repositories/ITransactionRepository";
 import { UserResponse } from "../dtos/response/userDtos";
 import { IAdminService } from "./IAdminService";
 import { UserRole } from "../enums/roleEnum";
@@ -43,17 +44,34 @@ export class AdminService implements IAdminService {
     @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
     @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
     @inject(TYPES.IWithdrawalRequestRepository) private _withdrawalRequestRepository: IWithdrawalRequestRepository,
+    @inject(TYPES.ITransactionRepository) private _transactionRepository: ITransactionRepository,
     @inject(TYPES.INotificationService) private _notificationService: INotificationService,
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
   ) {
-    this._redisClient.connect().catch((err) => console.error("Failed to connect to Redis:", err));
-    this._redisClient.on("error", (err) => console.error("Redis error:", err));
+    this._redisClient.connect().catch((err) => console.error(MESSAGES.REDIS_CONNECT_FAILED + ":", err));
+    this._redisClient.on("error", (err) => console.error(MESSAGES.REDIS_ERROR + ":", err));
+  }
+
+  async getAdminTransactions(adminId: string, page: number, limit: number): Promise<{ transactions: Array<{
+    id: string;
+    proId: string;
+    walletId?: string;
+    amount: number;
+    type: "credit" | "debit";
+    date: Date;
+    description?: string;
+    bookingId?: string;
+    quotaId?: string;
+    adminId?: string;
+    createdAt: Date;
+    updatedAt: Date;
+  }>; total: number }> {
+    return this._transactionRepository.findByAdminIdPaginated(adminId, page, limit);
   }
 
 
-  async getBookings(page: number, limit: number, search?: string, status?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
-    const skip = (page - 1) * limit;
-    const { bookings, total } = await this._bookingRepository.fetchAllBookings(page, limit);
+  async getBookings(page: number, limit: number, search?: string, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const { bookings, total } = await this._bookingRepository.fetchAllBookings(page, limit, search, status, sortBy);
     return { bookings, total };
   }
 
@@ -237,7 +255,7 @@ export class AdminService implements IAdminService {
         proId: approvedProId
       });
     } catch (error) {
-      console.error("Failed to send pro approval notification:", error);
+      console.error(MESSAGES.FAILED_SEND_PRO_APPROVAL_NOTIFICATION + ":", error);
     }
   }
 
@@ -300,7 +318,7 @@ export class AdminService implements IAdminService {
   async acceptWithdrawalRequest(withdrawalId: string): Promise<void> {
     const withdrawal = await this._withdrawalRequestRepository.findWithdrawalRequestById(withdrawalId);
     if (!withdrawal) throw new HttpError(404, MESSAGES.WITHDRAWAL_NOT_FOUND);
-    if (withdrawal.status !== "pending") throw new HttpError(400, "Withdrawal request is not pending");
+    if (withdrawal.status !== "pending") throw new HttpError(400, MESSAGES.WITHDRAWAL_NOT_PENDING);
 
     const wallet = await this._walletRepository.findWalletByProId(withdrawal.proId, false);
     if (!wallet) throw new HttpError(404, MESSAGES.WALLET_NOT_FOUND);
@@ -308,17 +326,41 @@ export class AdminService implements IAdminService {
 
     await this._walletRepository.decreaseWalletBalance(wallet.id, withdrawal.amount);
     await this._withdrawalRequestRepository.updateWithdrawalRequest(withdrawalId, { status: "approved" });
+
+    // Notify pro on approval
+    try {
+      await this._notificationService.createNotification({
+        type: "wallet",
+        title: "Withdrawal Approved",
+        description: `Good news! Your withdrawal request of ₹${withdrawal.amount} has been approved and is being processed.`,
+        proId: withdrawal.proId,
+      });
+    } catch (error) {
+      console.error(MESSAGES.FAILED_SEND_WITHDRAWAL_APPROVAL_NOTIFICATION + ":", error);
+    }
   }
 
   async rejectWithdrawalRequest(withdrawalId: string, reason: string): Promise<void> {
     const withdrawal = await this._withdrawalRequestRepository.findWithdrawalRequestById(withdrawalId);
     if (!withdrawal) throw new HttpError(404, MESSAGES.WITHDRAWAL_NOT_FOUND);
-    if (withdrawal.status !== "pending") throw new HttpError(400, "Withdrawal request is not pending");
+    if (withdrawal.status !== "pending") throw new HttpError(400, MESSAGES.WITHDRAWAL_NOT_PENDING);
 
     await this._withdrawalRequestRepository.updateWithdrawalRequest(withdrawalId, {
       status: "rejected",
       rejectionReason: reason,
     });
+
+    // Notify pro on rejection
+    try {
+      await this._notificationService.createNotification({
+        type: "wallet",
+        title: "Withdrawal Rejected",
+        description: `Your withdrawal request of ₹${withdrawal.amount} was rejected. Reason: ${reason || "Not specified"}.`,
+        proId: withdrawal.proId,
+      });
+    } catch (error) {
+      console.error(MESSAGES.FAILED_SEND_WITHDRAWAL_REJECTION_NOTIFICATION + ":", error);
+    }
   }
 
   private async generatePassword(): Promise<{ plainPassword: string; hashedPassword: string }> {
@@ -370,7 +412,7 @@ export class AdminService implements IAdminService {
       console.log(`Approval email sent to ${email}`);
     } catch (error) {
       console.error(`Failed to send approval email to ${email}:`, error);
-      throw new HttpError(500, "Failed to send approval email");
+      throw new HttpError(500, MESSAGES.FAILED_SEND_APPROVAL_EMAIL);
     }
   }
 
@@ -383,6 +425,11 @@ export class AdminService implements IAdminService {
     proCount: number;
     totalRevenue: number;
     monthlyRevenue: number;
+    yearlyRevenue: number;
+    dailyRevenue: number;
+    monthlyDeltaPercent: number | null;
+    yearlyDeltaPercent: number | null;
+    dailyDeltaPercent: number | null;
     categoryCount: number;
     trendingService: { categoryId: string; name: string; bookingCount: number } | null;
     topPerformingPros: {
@@ -406,10 +453,23 @@ export class AdminService implements IAdminService {
       proCount,
       totalRevenue: revenueMetrics.totalRevenue,
       monthlyRevenue: revenueMetrics.monthlyRevenue,
+      yearlyRevenue: revenueMetrics.yearlyRevenue,
+      dailyRevenue: revenueMetrics.dailyRevenue,
+      monthlyDeltaPercent: revenueMetrics.monthlyDeltaPercent ?? null,
+      yearlyDeltaPercent: revenueMetrics.yearlyDeltaPercent ?? null,
+      dailyDeltaPercent: revenueMetrics.dailyDeltaPercent ?? null,
       categoryCount,
       trendingService,
       topPerformingPros,
     };
+  }
+
+  async getMonthlyRevenueSeries(lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>> {
+    return this._bookingRepository.getAdminMonthlyRevenueSeries(lastNMonths);
+  }
+
+  async getPlatformProMonthlyRevenueSeries(lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>> {
+    return this._bookingRepository.getPlatformProMonthlyRevenueSeries(lastNMonths);
   }
 
 
@@ -440,7 +500,7 @@ export class AdminService implements IAdminService {
       console.log(`Rejection email sent to ${email}`);
     } catch (error) {
       console.error(`Failed to send rejection email to ${email}:`, error);
-      throw new HttpError(500, "Failed to send rejection email");
+      throw new HttpError(500, MESSAGES.FAILED_SEND_REJECTION_EMAIL);
     }
   }
 }

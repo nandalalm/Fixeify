@@ -5,6 +5,7 @@ export interface NotificationResponse {
   description: string;
   userId?: string;
   proId?: string;
+  adminId?: string;
   chatId?: string;
   bookingId?: string;
   quotaId?: string;
@@ -20,6 +21,7 @@ export interface CreateNotificationRequest {
   description: string;
   userId?: string;
   proId?: string;
+  adminId?: string;
   chatId?: string;
   bookingId?: string;
   quotaId?: string;

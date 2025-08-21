@@ -18,6 +18,8 @@ export interface ProProfile {
   profilePhoto: string;
   about: string | null;
   isBanned: boolean;
+  // Optional: primary category name for display purposes
+  categoryName?: string;
 }
 
 export interface TimeSlot {

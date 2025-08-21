@@ -1,5 +1,6 @@
 import api from "./axios";
 import { User } from "../store/authSlice";
+import { AuthBase } from "@/Constants/BaseRoutes";
 
 interface AuthResponse {
   accessToken: string;
@@ -7,12 +8,12 @@ interface AuthResponse {
 }
 
 export const sendOtp = async (email: string): Promise<{ message: string }> => {
-  const response = await api.post("/auth/send-otp", { email });
+  const response = await api.post(`${AuthBase}/send-otp`, { email });
   return response.data;
 };
 
 export const verifyOtp = async (email: string, otp: string): Promise<{ message: string }> => {
-  const response = await api.post("/auth/verify-otp", { email, otp });
+  const response = await api.post(`${AuthBase}/verify-otp`, { email, otp });
   return response.data;
 };
 
@@ -21,7 +22,7 @@ export const loginUser = async (
   password: string,
   role: "user" | "pro" | "admin"
 ): Promise<AuthResponse> => {
-  const response = await api.post("/auth/login", { email, password, role });
+  const response = await api.post(`${AuthBase}/login`, { email, password, role });
   return response.data;
 };
 
@@ -29,7 +30,7 @@ export const googleLogin = async (
   credential: string,
   role: "user"
 ): Promise<AuthResponse> => {
-  const response = await api.post("/auth/google-login", { credential, role });
+  const response = await api.post(`${AuthBase}/google-login`, { credential, role });
   return response.data;
 };
 
@@ -39,12 +40,12 @@ export const registerUser = async (
   password: string,
   role: "user" | "admin"
 ): Promise<AuthResponse> => {
-  const response = await api.post("/auth/register", { name, email, password, role });
+  const response = await api.post(`${AuthBase}/register`, { name, email, password, role });
   return response.data;
 };
 
 export const forgotPassword = async (email: string): Promise<{ message: string }> => {
-  const response = await api.post("/auth/forgot-password", { email });
+  const response = await api.post(`${AuthBase}/forgot-password`, { email });
   return response.data;
 };
 
@@ -53,6 +54,6 @@ export const resetPassword = async (
   token: string,
   newPassword: string
 ): Promise<{ message: string }> => {
-  const response = await api.post("/auth/reset-password", { userId, token, newPassword });
+  const response = await api.post(`${AuthBase}/reset-password`, { userId, token, newPassword });
   return response.data;
 };

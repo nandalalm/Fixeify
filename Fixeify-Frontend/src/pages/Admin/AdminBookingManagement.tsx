@@ -1,67 +1,26 @@
 import { type FC, useState, useEffect } from "react";
 import { AdminNavbar } from "../../components/Admin/AdminNavbar";
-import { Menu, X, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
-import { fetchAdminBookings, fetchQuotaByBookingId } from "../../api/adminApi";
+import { fetchAdminBookings } from "../../api/adminApi";
 import { BookingResponse } from "../../interfaces/bookingInterface";
-import { QuotaResponse } from "../../interfaces/quotaInterface";
+// import { QuotaResponse } from "../../interfaces/quotaInterface";
 import BookingTable from "../../components/Reuseable/BookingTable";
+import BookingDetails from "../../components/Reuseable/BookingDetails";
+import { AdminTopNavbar } from "../../components/Admin/AdminTopNavbar";
 
-const formatTimeTo12Hour = (time: string): string => {
-  const [hours, minutes] = time.split(":").map(Number);
-  const period = hours >= 12 ? "PM" : "AM";
-  const adjustedHours = hours % 12 || 12;
-  return `${adjustedHours}:${minutes.toString().padStart(2, "0")} ${period}`;
-};
-
-const formatDate = (date: Date): string => {
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-};
-
-const getStatusStyles = (status: string) => {
-  switch (status) {
-    case "pending":
-      return "bg-yellow-100 text-yellow-800";
-    case "accepted":
-      return "bg-green-100 text-green-800";
-    case "completed":
-      return "bg-green-600 text-white";
-    case "rejected":
-      return "bg-red-800 text-white";
-    case "cancelled":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
-
-const getPaymentStatusStyles = (status: "pending" | "completed" | "failed") => {
-  switch (status) {
-    case "pending":
-      return "bg-yellow-100 text-yellow-800";
-    case "completed":
-      return "bg-green-600 text-white";
-    case "failed":
-      return "bg-red-800 text-white";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
+// removed unused formatting helpers
 
 const AdminBookingManagement: FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [bookings, setBookings] = useState<BookingResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedBooking, setSelectedBooking] = useState<BookingResponse | null>(null);
-  const [selectedQuota, setSelectedQuota] = useState<QuotaResponse | null>(null);
-  const [isViewModalOpen, setIsViewModalOpen] = useState<boolean>(false);
+  // const [selectedQuota, setSelectedQuota] = useState<QuotaResponse | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "pending" | "accepted" | "completed" | "rejected" | "cancelled" | "">("latest");
   const [currentPage, setCurrentPage] = useState(1);
@@ -77,13 +36,44 @@ const AdminBookingManagement: FC = () => {
     } else {
       fetchBookings();
     }
-  }, [user, navigate, currentPage, sortOption]);
+  }, [user, navigate, currentPage, sortOption, searchTerm]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [user, navigate, currentPage, sortOption, searchTerm]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setSidebarOpen(false);
+    }
+  }, [isLargeScreen]);
 
   const fetchBookings = async () => {
     setLoading(true);
     setError(null);
     try {
-      const { bookings, total } = await fetchAdminBookings(currentPage, limit);
+      // Determine server-side params
+      const statusFilter = ["pending", "accepted", "completed", "rejected", "cancelled"].includes(sortOption)
+        ? (sortOption as "pending" | "accepted" | "completed" | "rejected" | "cancelled")
+        : undefined;
+      const sortByParam = sortOption === "latest" || sortOption === "oldest" ? sortOption : "latest";
+
+      const { bookings, total } = await fetchAdminBookings(
+        currentPage,
+        limit,
+        searchTerm || undefined,
+        statusFilter,
+        sortByParam
+      );
       setBookings(bookings);
       setTotalPages(Math.ceil(total / limit));
     } catch (err: any) {
@@ -99,16 +89,6 @@ const AdminBookingManagement: FC = () => {
 
   const handleViewBooking = async (booking: BookingResponse) => {
     setSelectedBooking(booking);
-    if (booking.status === "accepted" || booking.status === "completed") {
-      try {
-        const quota = await fetchQuotaByBookingId(booking.id);
-        setSelectedQuota(quota);
-      } catch (err: any) {
-        console.error("Fetch quota error:", err);
-        setError(err.response?.data?.message || "Failed to load quota");
-      }
-    }
-    setIsViewModalOpen(true);
   };
 
   const handlePageChange = (page: number) => {
@@ -118,26 +98,14 @@ const AdminBookingManagement: FC = () => {
   const handleClearFilter = () => {
     setSearchTerm("");
     setSortOption("latest");
+    setCurrentPage(1);
+    fetchBookings();
   };
 
   if (!user || user.role !== "admin") return null;
 
-  const filteredBookings = bookings.filter(
-    (booking) =>
-      !searchTerm ||
-      booking.issueDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.location.address.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const sortedBookings = sortOption && sortOption !== "latest" && sortOption !== "oldest"
-    ? filteredBookings.filter((booking) => booking.status === sortOption)
-    : filteredBookings.sort((a, b) => {
-        if (sortOption === "latest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        if (sortOption === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        return 0;
-      });
-
-  const displayBookings = sortedBookings.length > 0 ? sortedBookings : [];
+  // Server-side returns already filtered/sorted page of results
+  const displayBookings = bookings;
 
   if (loading) {
     return (
@@ -150,32 +118,21 @@ const AdminBookingManagement: FC = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Top Navbar */}
-      <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between z-30">
-        <div className="flex items-center">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          
-          <div className="flex items-center">
-            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user.name}</span>
-          </div>
-        </div>
-      </header>
+      <AdminTopNavbar 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        userName={user.name}
+        isLargeScreen={isLargeScreen}
+      />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-visible">
         {/* Sidebar */}
-        <AdminNavbar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <AdminNavbar isOpen={sidebarOpen} />
 
         {/* Content */}
         <main
-          className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-0"}`}
+          className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
           <div className="max-w-7xl mx-auto mb-[50px]">
             <h1 className="text-2xl font-semibold text-gray-800 mb-6">Booking Management</h1>
@@ -192,32 +149,34 @@ const AdminBookingManagement: FC = () => {
               </div>
             ) : (
               <>
-                <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-                  <div className="relative w-full sm:w-5/6">
-                    <input
-                      type="text"
-                      placeholder="Search by issue or location..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                {!selectedBooking && (
+                  <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                    <div className="relative w-full sm:w-5/6">
+                      <input
+                        type="text"
+                        placeholder="Search by issue or location..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="relative w-full sm:w-1/6">
+                      <select
+                        value={sortOption}
+                        onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                      >
+                        <option value="latest">Sort by Latest</option>
+                        <option value="oldest">Sort by Oldest</option>
+                        <option value="pending">Sort by Pending</option>
+                        <option value="accepted">Sort by Accepted</option>
+                        <option value="completed">Sort by Completed</option>
+                        <option value="rejected">Sort by Rejected</option>
+                        <option value="cancelled">Sort by Cancelled</option>
+                      </select>
+                    </div>
                   </div>
-                  <div className="relative w-full sm:w-1/6">
-                    <select
-                      value={sortOption}
-                      onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                    >
-                      <option value="latest">Sort by Latest</option>
-                      <option value="oldest">Sort by Oldest</option>
-                      <option value="pending">Sort by Pending</option>
-                      <option value="accepted">Sort by Accepted</option>
-                      <option value="completed">Sort by Completed</option>
-                      <option value="rejected">Sort by Rejected</option>
-                      <option value="cancelled">Sort by Cancelled</option>
-                    </select>
-                  </div>
-                </div>
+                )}
 
                 {displayBookings.length === 0 ? (
                   <div className="text-center text-gray-600 space-y-2">
@@ -231,6 +190,14 @@ const AdminBookingManagement: FC = () => {
                       <RotateCcw className="ml-2 h-5 w-5 text-blue-600" />
                     </button>
                   </div>
+                ) : selectedBooking ? (
+                  <div className="mt-4">
+                    <BookingDetails
+                      bookingId={selectedBooking.id}
+                      viewerRole="admin"
+                      onBack={async () => { setSelectedBooking(null); await fetchBookings(); }}
+                    />
+                  </div>
                 ) : (
                   <BookingTable
                     bookings={displayBookings}
@@ -241,95 +208,6 @@ const AdminBookingManagement: FC = () => {
                   />
                 )}
               </>
-            )}
-
-            {isViewModalOpen && selectedBooking && (
-              <div
-                className="fixed inset-0 p-5 flex items-center justify-center z-50 bg-gray-800/30 backdrop-blur-sm"
-                onClick={() => setIsViewModalOpen(false)}
-              >
-                <div
-                  className="p-6 rounded-lg shadow-lg w-96 relative bg-white"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <button
-                    onClick={() => setIsViewModalOpen(false)}
-                    className="absolute top-2 right-2 text-gray-600 hover:text-gray-800"
-                    aria-label="Close booking details modal"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                  <h3 className="text-lg font-semibold mb-4">Booking Details</h3>
-                  <div className="space-y-2">
-                    <p>
-                      <strong>User:</strong> {selectedBooking.user.name}
-                    </p>
-                    <p>
-                      <strong>Category:</strong> {selectedBooking.category.name}
-                    </p>
-                    <p>
-                      <strong>Issue:</strong> {selectedBooking.issueDescription}
-                    </p>
-                    <p>
-                      <strong>Location:</strong> {selectedBooking.location.address}, {selectedBooking.location.city},{" "}
-                      {selectedBooking.location.state}
-                    </p>
-                    <p>
-                      <strong>Phone:</strong> {selectedBooking.phoneNumber}
-                    </p>
-                    <p>
-                      <strong>Date:</strong> {formatDate(new Date(selectedBooking.preferredDate))}
-                    </p>
-                    <p>
-                      <strong>Time:</strong>{" "}
-                      {selectedBooking.preferredTime
-                        .map((slot) => `${formatTimeTo12Hour(slot.startTime)} - ${formatTimeTo12Hour(slot.endTime)}`)
-                        .join(", ")}
-                    </p>
-                    <p>
-                      <strong>Booking Status:</strong>
-                      <span
-                        className={`ml-2 inline-block px-2 py-1 rounded-full text-xs font-semibold ${getStatusStyles(
-                          selectedBooking.status
-                        )}`}
-                      >
-                        {selectedBooking.status}
-                      </span>
-                    </p>
-                    {selectedBooking.status === "rejected" && selectedBooking.rejectedReason && (
-                      <p>
-                        <strong>Rejection Reason:</strong> {selectedBooking.rejectedReason}
-                      </p>
-                    )}
-                    {(selectedBooking.status === "accepted" || selectedBooking.status === "completed") && selectedQuota && (
-                      <>
-                        <p>
-                          <strong>Labor Cost:</strong> ₹{selectedQuota.laborCost}
-                        </p>
-                        <p>
-                          <strong>Material Cost:</strong> ₹{selectedQuota.materialCost}
-                        </p>
-                        <p>
-                          <strong>Additional Charges:</strong> ₹{selectedQuota.additionalCharges}
-                        </p>
-                        <p>
-                          <strong>Total Cost:</strong> ₹{selectedQuota.totalCost}
-                        </p>
-                        <p>
-                          <strong>Payment Status:</strong>
-                          <span
-                            className={`ml-2 inline-block px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusStyles(
-                              selectedQuota.paymentStatus
-                            )}`}
-                          >
-                            {selectedQuota.paymentStatus}
-                          </span>
-                        </p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
             )}
           </div>
         </main>

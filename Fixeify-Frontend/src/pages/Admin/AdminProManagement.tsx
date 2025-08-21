@@ -1,14 +1,16 @@
 import { type FC, useState, useEffect } from "react";
 import { AdminNavbar } from "../../components/Admin/AdminNavbar";
-import { Menu, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { fetchPendingPros, fetchApprovedPros } from "../../api/adminApi";
 import { IApprovedPro, PendingPro } from "../../interfaces/adminInterface";
+import { AdminTopNavbar } from "../../components/Admin/AdminTopNavbar";
 
 const AdminProManagement: FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [pros, setPros] = useState<(PendingPro | IApprovedPro)[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -17,52 +19,57 @@ const AdminProManagement: FC = () => {
   const limit = 5;
 
   const navigate = useNavigate();
-  const location = useLocation();
   const user = useSelector((state: RootState) => state.auth.user);
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
       navigate("/admin-login");
-      return;
-    }
+    } else {
+      const fetchProsData = async () => {
+        try {
+          console.log("Fetching pros for tab:", activeTab, "page:", currentPage);
+          let data: { pros: PendingPro[] | IApprovedPro[]; total: number } | undefined;
+          if (activeTab === "pending") {
+            data = await fetchPendingPros(currentPage, limit);
+            console.log("Fetched pending pros:", { pros: data.pros, total: data.total });
+          } else if (activeTab === "approved") {
+            data = await fetchApprovedPros(currentPage, limit);
+            console.log("Fetched approved pros:", { pros: data.pros, total: data.total });
+          }
 
-    const tabFromState = location.state?.tab as "approved" | "pending" | undefined;
-    if (tabFromState && location.state?.fromNavigation) {
-      console.log("Setting tab from navigation state:", tabFromState);
-      setActiveTab(tabFromState);
-      setCurrentPage(1);
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-
-    const fetchPros = async () => {
-      try {
-        console.log("Fetching pros for tab:", activeTab, "page:", currentPage);
-        let data: { pros: PendingPro[] | IApprovedPro[]; total: number } | undefined;
-        if (activeTab === "pending") {
-          data = await fetchPendingPros(currentPage, limit);
-          console.log("Fetched pending pros:", { pros: data.pros, total: data.total });
-        } else if (activeTab === "approved") {
-          data = await fetchApprovedPros(currentPage, limit);
-          console.log("Fetched approved pros:", { pros: data.pros, total: data.total });
-        }
-
-        if (data) {
-          setPros(data.pros);
-          setTotalPages(Math.ceil(data.total / limit));
-          console.log("State updated - pros:", data.pros);
-        } else {
+          if (data) {
+            setPros(data.pros);
+            setTotalPages(Math.ceil(data.total / limit));
+            console.log("State updated - pros:", data.pros);
+          } else {
+            setPros([]);
+            setTotalPages(0);
+            console.warn("No data received, resetting to empty state.");
+          }
+        } catch (error) {
+          console.error(`Failed to fetch ${activeTab} pros:`, error);
           setPros([]);
           setTotalPages(0);
-          console.warn("No data received, resetting to empty state.");
         }
-      } catch (error) {
-        console.error(`Failed to fetch ${activeTab} pros:`, error);
-        setPros([]);
-        setTotalPages(0);
-      }
-    };
-    fetchPros();
+      };
+      fetchProsData();
+    }
   }, [user?.id, navigate, currentPage, activeTab]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setSidebarOpen(false);
+    }
+  }, [isLargeScreen]);
 
   if (!user || user.role !== "admin") return null;
 
@@ -91,27 +98,17 @@ const AdminProManagement: FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between z-30">
-        <div className="flex items-center">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center">
-            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user.name}</span>
-          </div>
-        </div>
-      </header>
+      <AdminTopNavbar 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        userName={user.name}
+        isLargeScreen={isLargeScreen}
+      />
 
-      <div className="flex flex-1 overflow-hidden">
-        <AdminNavbar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+      <div className="flex flex-1 overflow-visible">
+        <AdminNavbar isOpen={sidebarOpen} />
         <main
-          className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-0"}`}
+          className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
           <div className="max-w-7xl mx-auto">
             <h2 className="text-2xl font-semibold text-gray-800 mb-6">Fixeify Pro Management</h2>
@@ -157,7 +154,8 @@ const AdminProManagement: FC = () => {
             </div>
 
             <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
+              {/* Desktop/Table view */}
+              <div className="overflow-x-auto hidden sm:block">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
@@ -227,7 +225,7 @@ const AdminProManagement: FC = () => {
                           <td className="w-[15%] px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
                             <button
                               onClick={() => handleViewProfile(pro._id)}
-                              className="bg-blue-900 text-white px-4 py-1 rounded-md text-sm hover:bg-blue-800 transition-colors"
+                              className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:opacity-90 transition-colors"
                             >
                               View
                             </button>
@@ -237,6 +235,49 @@ const AdminProManagement: FC = () => {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile/Card view */}
+              <div className="block sm:hidden">
+                {filteredPros.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-gray-500">
+                    No {activeTab === "pending" ? "pending" : "approved"} pros found.
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-gray-200">
+                    {filteredPros.map((pro, index) => (
+                      <li key={pro._id} className="p-4">
+                        <div className="flex items-center gap-4">
+                          <img
+                            src={pro.profilePhoto || "/placeholder.svg"}
+                            alt={`${pro.firstName} ${pro.lastName}`}
+                            className="h-12 w-12 rounded-full flex-shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-500"># {(currentPage - 1) * limit + index + 1}</p>
+                            <p className="text-base font-medium text-gray-900 truncate">{`${pro.firstName} ${pro.lastName}`}</p>
+                            <p className="text-sm text-gray-600 truncate">{pro.email}</p>
+                            {activeTab === "approved" && "isBanned" in pro && (
+                              <p className="mt-1">
+                                <span className={`px-2 py-0.5 text-xs rounded ${pro.isBanned ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}>
+                                  {pro.isBanned ? "Banned" : "Active"}
+                                </span>
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <button
+                              onClick={() => handleViewProfile(pro._id)}
+                              className="bg-[#032B44] text-white px-3 py-2 rounded-md text-sm hover:opacity-90"
+                            >
+                              View
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200 sm:px-6">
                 <nav className="flex items-center space-x-2" aria-label="Pagination">

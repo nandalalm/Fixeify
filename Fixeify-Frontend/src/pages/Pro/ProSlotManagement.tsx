@@ -25,6 +25,7 @@ const ProSlotManagement = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [isEditing, setIsEditing] = useState<boolean>(false);
 
   useEffect(() => {
@@ -51,9 +52,21 @@ const ProSlotManagement = () => {
     fetchAvailability();
   }, [user, accessToken, dispatch, navigate]);
 
-  const toggleSidebar = () => {
-    setSidebarOpen((prev: boolean) => !prev);
-  };
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setSidebarOpen(false);
+    }
+  }, [isLargeScreen]);
+
 
   const handleEditSlots = () => {
     setIsEditing(true);
@@ -120,14 +133,16 @@ const ProSlotManagement = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-     <ProTopNavbar toggleSidebar={toggleSidebar} />
+      <ProTopNavbar 
+        toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+        isLargeScreen={isLargeScreen}
+        sidebarOpen={sidebarOpen}
+      />
 
-      <div className="flex flex-1 overflow-hidden">
-        <ProNavbar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+      <div className="flex flex-1 overflow-visible">
+        <ProNavbar isOpen={sidebarOpen} />
         <main
-          className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${
-            sidebarOpen ? "ml-64" : "ml-0"
-          }`}
+          className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
           {isEditing ? (
             <EditProSlot

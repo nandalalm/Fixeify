@@ -17,9 +17,20 @@ export class MongoRatingReviewRepository
   async create(data: Partial<IRatingReview>): Promise<IRatingReview> {
     const doc = await RatingReview.create(data);
     return (await doc.populate([
-      { path: "userId", select: "name email photo" },
-      { path: "proId", select: "firstName lastName profilePhoto" },
+      { path: "userId", select: "name email phoneNo photo" },
+      { path: "proId", select: "firstName lastName email phoneNumber profilePhoto" },
+      { path: "categoryId", select: "name image" },
+      { path: "bookingId", select: "issueDescription" },
     ])) as unknown as IRatingReview;
+  }
+
+  async findById(id: string): Promise<IRatingReview | null> {
+    return RatingReview.findById(id)
+      .populate({ path: "userId", select: "name email phoneNo photo" })
+      .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
+      .populate({ path: "categoryId", select: "name image" })
+      .populate({ path: "bookingId", select: "issueDescription" })
+      .exec();
   }
 
   async findByProId(
@@ -31,8 +42,8 @@ export class MongoRatingReviewRepository
 
     const [items, total] = await Promise.all([
       RatingReview.find({ proId: new mongoose.Types.ObjectId(proId) })
-        .populate({ path: "userId", select: "name email photo" })
-        .populate({ path: "proId", select: "firstName lastName profilePhoto" })
+        .populate({ path: "userId", select: "name email phoneNo photo" })
+        .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
         .populate({ path: "categoryId", select: "name image" })
         .populate({ path: "bookingId", select: "issueDescription" })
         
@@ -58,7 +69,8 @@ export class MongoRatingReviewRepository
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
       RatingReview.find({ userId: new mongoose.Types.ObjectId(userId) })
-        .populate({ path: "proId", select: "firstName lastName profilePhoto" })
+        .populate({ path: "userId", select: "name email phoneNo photo" })
+        .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
         .populate({ path: "categoryId", select: "name image" })
         .populate({ path: "bookingId", select: "issueDescription" })
         
@@ -78,8 +90,8 @@ export class MongoRatingReviewRepository
 
     const [items, total] = await Promise.all([
       RatingReview.find()
-        .populate({ path: "userId", select: "name email photo" })
-        .populate({ path: "proId", select: "firstName lastName profilePhoto" })
+        .populate({ path: "userId", select: "name email phoneNo photo" })
+        .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
         .populate({ path: "categoryId", select: "name image" })
         .populate({ path: "bookingId", select: "issueDescription" })
         

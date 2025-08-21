@@ -33,4 +33,5 @@ export interface IChatRepository {
   updateChatLastMessage(chatId: string, message: IMessage): Promise<IChat | null>;
   updateUnreadCount(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro", increment: boolean): Promise<IChat | null>;
   markMessagesAsRead(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;
+  markMessagesAsDelivered(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;
 }

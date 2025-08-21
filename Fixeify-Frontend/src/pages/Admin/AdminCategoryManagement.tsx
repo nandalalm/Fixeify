@@ -1,15 +1,17 @@
 import { type FC, useState, useEffect } from "react";
 import { AdminNavbar } from "../../components/Admin/AdminNavbar";
-import { Menu, Search, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { fetchCategories } from "../../api/adminApi";
 import { useSelector } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
 import { AddCategory } from "../../components/Admin/AddCategory";
 import { ICategory } from "../../interfaces/adminInterface";
+import { AdminTopNavbar } from "../../components/Admin/AdminTopNavbar";
 
 const AdminCategoryManagement: FC = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [categories, setCategories] = useState<ICategory[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,6 +39,21 @@ const AdminCategoryManagement: FC = () => {
     }
   }, [user, navigate, currentPage]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setSidebarOpen(false);
+    }
+  }, [isLargeScreen]);
+
   const handleAddSuccess = (newCategory: ICategory) => {
     setCategories((prev) => [newCategory, ...prev]);
     setShowAddForm(false);
@@ -51,33 +68,21 @@ const AdminCategoryManagement: FC = () => {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       {/* Top Navbar */}
-      <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between z-30">
-        <div className="flex items-center">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
-          <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center">
-            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{user.name}</span>
-          </div>
-        </div>
-      </header>
+      <AdminTopNavbar 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
+        userName={user.name}
+        isLargeScreen={isLargeScreen}
+      />
 
       {/* Main Content Area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-visible">
         {/* Sidebar */}
-        <AdminNavbar isOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} />
+        <AdminNavbar isOpen={sidebarOpen} />
 
         {/* Content */}
         <main
-          className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${
-            sidebarOpen ? "ml-64" : "ml-0"
-          }`}
+          className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
           <div className="max-w-7xl mx-auto">
             {showAddForm ? (
@@ -88,7 +93,7 @@ const AdminCategoryManagement: FC = () => {
                   <h2 className="text-2xl font-semibold text-gray-800">Category Management</h2>
                   <button
                     onClick={() => setShowAddForm(true)}
-                    className="bg-blue-900 text-white px-4 py-2 rounded-md text-sm hover:bg-blue-800 flex items-center"
+                    className="bg-[#032B44] text-white px-4 py-2 rounded-md text-sm hover:bg-[#054869] flex items-center"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Category

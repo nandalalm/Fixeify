@@ -1,11 +1,13 @@
 import api from "./axios";
 import { Conversation, Message, NotificationItem } from "../interfaces/messagesInterface";
+import { ChatBase } from "@/Constants/BaseRoutes";
+import { NotifBase } from "@/Constants/BaseRoutes";
 
 export const fetchUserChats = async (userId: string, role: "user" | "pro"): Promise<Conversation[]> => {
   if (!userId || !["user", "pro"].includes(role)) {
     throw new Error("Invalid userId or role");
   }
-  const response = await api.get(`/chat/${role}/${userId}/chats`, { withCredentials: true });
+  const response = await api.get(`${ChatBase}/${role}/${userId}/chats`, { withCredentials: true });
   if (!response.data?.chats) {
     throw new Error("No chats found in response");
   }
@@ -39,7 +41,7 @@ export const getExistingChat = async (userId: string, proId: string, role: "user
     throw new Error("Invalid userId, proId, or role");
   }
   try {
-    const response = await api.get(`/chat/existing/${role}/${userId}/${proId}`, { withCredentials: true });
+    const response = await api.get(`${ChatBase}/existing/${role}/${userId}/${proId}`, { withCredentials: true });
     if (!response.data?.chat) {
       return null;
     }
@@ -68,7 +70,7 @@ export const getExistingChat = async (userId: string, proId: string, role: "user
        updatedAt: chat.updatedAt ? new Date(chat.updatedAt).toISOString() : new Date().toISOString(),
      };
   } catch (error) {
-    return null; // Return null if no chat exists or an error occurs
+    return null;
   }
 };
 
@@ -81,7 +83,7 @@ export const createNewChat = async (data: {
     throw new Error("Invalid userId, proId, or role");
   }
   const response = await api.post(
-    "/chat/create",
+    `${ChatBase}/create`,
     { userId: data.userId, proId: data.proId, role: data.role },
     { withCredentials: true }
   );
@@ -123,7 +125,7 @@ export const fetchChatMessages = async (
   if (!chatId) {
     throw new Error("Invalid chatId");
   }
-  const response = await api.get(`/chat/messages/${chatId}`, {
+  const response = await api.get(`${ChatBase}/messages/${chatId}`, {
     params: { page, limit, role },
     withCredentials: true,
   });
@@ -149,7 +151,6 @@ export const fetchChatMessages = async (
   };
 };
 
-// This function is now only used for fallback when socket is not available
 export const sendNewMessage = async (
   chatId: string,
   senderId: string,
@@ -162,12 +163,12 @@ export const sendNewMessage = async (
     throw new Error("Invalid message parameters");
   }
   const response = await api.post(
-    "/chat/messages",
+    `${ChatBase}/messages`,
     { 
       chatId, 
       senderId, 
       senderModel, 
-      body: content, // Use 'body' to match backend expectation
+      body: content, 
       type, 
       attachments, 
       role: senderModel === "User" ? "user" : "pro" 
@@ -197,20 +198,20 @@ export const markChatMessagesAsRead = async (chatId: string, userId: string, rol
   if (!chatId || !userId || !role) {
     throw new Error("Invalid chatId, userId, or role");
   }
-  await api.put(`/chat/messages/read/${chatId}?role=${role}`, { userId }, { withCredentials: true });
+  await api.put(`${ChatBase}/messages/read/${chatId}?role=${role}`, { userId }, { withCredentials: true });
 };
 
 export const fetchUserNotifications = async (
   userId: string,
-  role: "user" | "pro",
+  role: "user" | "pro" | "admin",
   page: number = 1,
   limit: number = 10,
   filter: 'all' | 'unread' = 'all'
 ): Promise<{ notifications: NotificationItem[]; total: number }> => {
-  if (!userId || !["user", "pro"].includes(role)) {
+  if (!userId || !["user", "pro", "admin"].includes(role)) {
     throw new Error("Invalid userId or role");
   }
-  const response = await api.get(`/notifications/${role}/${userId}`, {
+  const response = await api.get(`${NotifBase}/${role}/${userId}`, {
     params: { page, limit, filter },
     withCredentials: true,
   });
@@ -227,6 +228,7 @@ export const fetchUserNotifications = async (
       type: notif.type,
       userId: notif.userId,
       proId: notif.proId,
+      adminId: notif.adminId,
       chatId: notif.chatId,
       bookingId: notif.bookingId,
       quotaId: notif.quotaId,
@@ -241,14 +243,14 @@ export const markSingleNotificationAsRead = async (notificationId: string): Prom
   if (!notificationId) {
     throw new Error("Invalid notificationId");
   }
-  await api.put(`/notifications/read/${notificationId}`, {}, { withCredentials: true });
+  await api.put(`${NotifBase}/read/${notificationId}`, {}, { withCredentials: true });
 };
 
-export const markAllNotificationsAsRead = async (userId: string, role: "user" | "pro"): Promise<void> => {
-  if (!userId || !["user", "pro"].includes(role)) {
+export const markAllNotificationsAsRead = async (userId: string, role: "user" | "pro" | "admin"): Promise<void> => {
+  if (!userId || !["user", "pro", "admin"].includes(role)) {
     throw new Error("Invalid userId or role");
   }
-  await api.put(`/notifications/read-all/${role}/${userId}`, {}, { withCredentials: true });
+  await api.put(`${NotifBase}/read-all/${role}/${userId}`, {}, { withCredentials: true });
 };
 
 export interface User {

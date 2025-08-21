@@ -7,7 +7,7 @@ export interface IBookingRepository {
   fetchBookingDetails(userId: string, page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>;
   fetchBookingHistoryDetails(userId: string, page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>;
   fetchProBookings(proId: string, page?: number, limit?: number, status?: string): Promise<{ bookings: BookingResponse[]; total: number }>;
-  fetchAllBookings(page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>; // New method
+  fetchAllBookings(page?: number, limit?: number, search?: string, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }>; // supports filters and sorting
   updateBooking(bookingId: string, updateData: Partial<BookingDocument>): Promise<BookingDocument | null>;
   findBookingById(bookingId: string): Promise<BookingDocument | null>;
   findBookingByIdPopulated(bookingId: string): Promise<BookingResponse | null>;
@@ -28,14 +28,30 @@ export interface IBookingRepository {
     status: string
   ): Promise<BookingDocument[]>;
   getTrendingService(): Promise<{ categoryId: string; name: string; bookingCount: number } | null>;
-  getAdminRevenueMetrics(): Promise<{ totalRevenue: number; monthlyRevenue: number }>;
+  getAdminRevenueMetrics(): Promise<{
+    totalRevenue: number;
+    monthlyRevenue: number;
+    yearlyRevenue: number;
+    dailyRevenue: number;
+    monthlyDeltaPercent: number | null;
+    yearlyDeltaPercent: number | null;
+    dailyDeltaPercent: number | null;
+  }>;
   getProDashboardMetrics(proId: string): Promise<{
     totalRevenue: number;
     monthlyRevenue: number;
+    yearlyRevenue: number;
+    dailyRevenue: number;
     completedJobs: number;
     pendingJobs: number;
     averageRating: number;
   }>;
+  // Monthly revenue time series, grouped by year and month, ordered ascending by date
+  // lastNMonths defaults to 12 if not provided
+  getAdminMonthlyRevenueSeries(lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>>;
+  getProMonthlyRevenueSeries(proId: string, lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>>;
+  // Platform-wide pro revenue series (sum of all pros' proRevenue)
+  getPlatformProMonthlyRevenueSeries(lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>>;
   getTopPerformingPros(): Promise<{
     mostRated: { proId: string; firstName: string; lastName: string; rating: number } | null;
     highestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;

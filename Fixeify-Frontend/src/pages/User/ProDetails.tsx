@@ -221,7 +221,6 @@ const ProDetails = () => {
                   </div>
                 </div>
               </div>
-
               <div className="flex flex-col gap-6">
                 <div>
                   <h2 className="text-xl font-medium mb-3 text-gray-900 dark:text-gray-200">Reviews</h2>
@@ -232,14 +231,11 @@ const ProDetails = () => {
                   ) : (
                     <div className="flex flex-col gap-4">
                       {reviews.slice(0, visibleCount).map((review, index) => (
-                        <div
-                          key={index}
-                          className="pb-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0"
-                        >
-                          <div className="flex items-center gap-3 mb-2">
+                        <div key={index} className="bg-gray-50 dark:bg-gray-800/60 rounded-md p-4 shadow-sm">
+                          <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
                               <img
-                                src="/placeholder.svg?height=40&width=40"
+                                src={review.user.photo || "/placeholder.svg"}
                                 alt={review.user.name}
                                 className="w-full h-full object-cover"
                               />
@@ -257,7 +253,7 @@ const ProDetails = () => {
                               />
                             ))}
                           </div>
-                          <p className="text-base text-gray-900 dark:text-gray-300 mb-2">{review.review}</p>
+                          <p className="text-base text-gray-900 dark:text-gray-300">{review.review}</p>
                         </div>
                       ))}
                     </div>

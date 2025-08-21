@@ -2,13 +2,12 @@ import { useState, useEffect, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { useNavigate } from "react-router-dom";
-import { X, RotateCcw } from "lucide-react";
+import { RotateCcw, X } from "lucide-react";
 import {
   fetchProBookings,
   acceptBooking,
   rejectBooking,
   generateQuota,
-  fetchQuotaByBookingId,
 } from "../../api/proApi";
 import { BookingResponse } from "../../interfaces/bookingInterface";
 import { logoutUserSync } from "../../store/authSlice";
@@ -16,15 +15,12 @@ import { UserRole } from "../../store/authSlice";
 import { ProNavbar } from "../../components/Pro/ProNavbar";
 import ProTopNavbar from "../../components/Pro/ProTopNavbar";
 import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
-import { QuotaResponse } from "../../interfaces/quotaInterface";
+// import { QuotaResponse } from "../../interfaces/quotaInterface";
 import BookingTable from "../../components/Reuseable/BookingTable";
-
-const formatTimeTo12Hour = (time: string): string => {
-  const [hours, minutes] = time.split(":").map(Number);
-  const period = hours >= 12 ? "PM" : "AM";
-  const adjustedHours = hours % 12 || 12;
-  return `${adjustedHours}:${minutes.toString().padStart(2, "0")} ${period}`;
-};
+import BookingDetails from "../../components/Reuseable/BookingDetails";
+import RaiseComplaintModal from "../../components/Modals/RaiseComplaintModal";
+import { createTicket } from "../../store/ticketSlice";
+import { TicketPriority } from "../../interfaces/ticketInterface";
 
 const formatDate = (date: Date): string => {
   return date.toLocaleDateString("en-GB", {
@@ -34,35 +30,7 @@ const formatDate = (date: Date): string => {
   });
 };
 
-const getPaymentStatusStyles = (status: "pending" | "completed" | "failed") => {
-  switch (status) {
-    case "pending":
-      return "bg-yellow-100 text-yellow-800";
-    case "completed":
-      return "bg-green-600 text-white";
-    case "failed":
-      return "bg-red-800 text-white";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
-
-const getStatusStyles = (status: string) => {
-  switch (status) {
-    case "pending":
-      return "bg-yellow-100 text-yellow-800";
-    case "accepted":
-      return "bg-green-100 text-green-800";
-    case "completed":
-      return "bg-green-600 text-white";
-    case "rejected":
-      return "bg-red-800 text-white";
-    case "cancelled":
-      return "bg-red-100 text-red-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
+// removed unused status helpers; BookingDetails handles status rendering
 
 const JobManagementPage = () => {
   const user = useSelector((state: RootState) => state.auth.user);
@@ -75,9 +43,12 @@ const JobManagementPage = () => {
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [activeTab, setActiveTab] = useState<"requests" | "scheduled" | "history">("requests");
   const [selectedBooking, setSelectedBooking] = useState<BookingResponse | null>(null);
-  const [isViewModalOpen, setIsViewModalOpen] = useState<boolean>(false);
+  const [complaintBooking, setComplaintBooking] = useState<BookingResponse | null>(null);
+  const [complaintOpen, setComplaintOpen] = useState(false);
+  // view is now inline using BookingDetails
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState<boolean>(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [isQuotaModalOpen, setIsQuotaModalOpen] = useState<boolean>(false);
@@ -94,9 +65,9 @@ const JobManagementPage = () => {
     materialCost: "",
     additionalCharges: "",
   });
-  const [selectedQuota, setSelectedQuota] = useState<QuotaResponse | null>(null);
+  // const [selectedQuota, setSelectedQuota] = useState<QuotaResponse | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "">("");
+  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "">("latest");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<{ requests: number; scheduled: number; history: number }>({
     requests: 1,
@@ -147,28 +118,32 @@ const JobManagementPage = () => {
     fetchBookings(activeTab);
   }, [user, accessToken, dispatch, navigate, activeTab, currentPage[activeTab]]);
 
-  const toggleSidebar = () => setSidebarOpen((prev) => !prev);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setSidebarOpen(false);
+    }
+  }, [isLargeScreen]);
+
 
   const handleTabChange = (tab: "requests" | "scheduled" | "history") => {
     setActiveTab(tab);
     setSearchTerm("");
-    setSortOption("");
+    setSortOption("latest");
     setCurrentPage((prev) => ({ ...prev, [tab]: 1 }));
     fetchBookings(tab);
   };
 
   const handleViewBooking = async (booking: BookingResponse) => {
     setSelectedBooking(booking);
-    if (booking.status === "accepted" || booking.status === "completed") {
-      try {
-        const quota = await fetchQuotaByBookingId(booking.id);
-        setSelectedQuota(quota);
-      } catch (err: any) {
-        console.error("Fetch quota error:", err);
-        setError(err.response?.data?.message || "Failed to load quota");
-      }
-    }
-    setIsViewModalOpen(true);
   };
 
   const showSuccessMessage = (message: string) => {
@@ -190,23 +165,18 @@ const JobManagementPage = () => {
       await acceptBooking(selectedBooking.id);
       showSuccessMessage("Booking accepted successfully");
       setIsAcceptModalOpen(false);
-      setIsViewModalOpen(false);
       await fetchBookings(activeTab);
     } catch (err: any) {
       console.error("Accept booking error:", err);
       const errorMessage = err.response?.data?.message || "An error occurred while accepting the booking";
       showErrorMessage(errorMessage);
       setIsAcceptModalOpen(false);
-      setIsViewModalOpen(false);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleRejectBooking = () => {
-    setIsViewModalOpen(false);
-    setIsRejectModalOpen(true);
-  };
+  // inline reject handler via setIsRejectModalOpen(true)
 
   const confirmRejectBooking = async () => {
     if (!selectedBooking || !rejectionReason) return;
@@ -215,7 +185,6 @@ const JobManagementPage = () => {
       await rejectBooking(selectedBooking.id, rejectionReason);
       showSuccessMessage("Booking rejected successfully");
       setIsRejectModalOpen(false);
-      setIsViewModalOpen(false);
       setRejectionReason("");
       setCustomRejectionReason("");
       await fetchBookings(activeTab);
@@ -223,17 +192,12 @@ const JobManagementPage = () => {
       console.error("Reject booking error:", err);
       showErrorMessage(err.response?.data?.message || "Failed to reject booking");
       setIsRejectModalOpen(false);
-      setIsViewModalOpen(false);
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleGenerateQuota = () => {
-    setIsViewModalOpen(false);
-    setIsQuotaModalOpen(true);
-    setQuotaErrors({ laborCost: "", materialCost: "", additionalCharges: "" });
-  };
+  // inline quota handler via setIsQuotaModalOpen(true)
 
   const validateQuota = () => {
     const errors = {
@@ -288,22 +252,19 @@ const JobManagementPage = () => {
       const materialCost = quotaData.materialCost === "" ? 0 : Number(quotaData.materialCost);
       const additionalCharges = quotaData.additionalCharges === "" ? 0 : Number(quotaData.additionalCharges);
 
-      const quota = await generateQuota(selectedBooking.id, {
+      await generateQuota(selectedBooking.id, {
         laborCost,
         materialCost,
         additionalCharges,
       });
-      setSelectedQuota(quota);
       showSuccessMessage("Quota generated successfully");
       setIsConfirmQuotaModalOpen(false);
-      setIsViewModalOpen(false);
       setQuotaData({ laborCost: "", materialCost: "", additionalCharges: "" });
       await fetchBookings(activeTab);
     } catch (err: any) {
       console.error("Generate quota error:", err);
       showErrorMessage(err.response?.data?.message || "Failed to generate quota");
       setIsConfirmQuotaModalOpen(false);
-      setIsViewModalOpen(false);
     } finally {
       setActionLoading(false);
     }
@@ -336,12 +297,42 @@ const JobManagementPage = () => {
 
   const clearFilters = () => {
     setSearchTerm("");
-    setSortOption("");
+    setSortOption("latest");
     setCurrentPage((prev) => ({ ...prev, [activeTab]: 1 }));
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage((prev) => ({ ...prev, [activeTab]: page }));
+  };
+
+  const handleOpenComplaint = (booking: BookingResponse) => {
+    setComplaintBooking(booking);
+    setComplaintOpen(true);
+  };
+
+  const handleSubmitComplaint = async (data: { subject: string; description: string; priority?: TicketPriority }) => {
+    if (!user || !complaintBooking) return;
+    try {
+      await dispatch(
+        createTicket({
+          complainantType: "pro",
+          complainantId: user.id,
+          againstType: "user",
+          againstId: complaintBooking.user.id,
+          bookingId: complaintBooking.id,
+          subject: data.subject,
+          description: data.description,
+          priority: data.priority,
+        })
+      ).unwrap();
+      setComplaintOpen(false);
+      setComplaintBooking(null);
+      // Refetch bookings so the complaint button hides based on updated flags
+      await fetchBookings(activeTab);
+      showSuccessMessage("Complaint submitted successfully");
+    } catch (err: any) {
+      showErrorMessage(err?.response?.data?.message || "Failed to submit complaint");
+    }
   };
 
   if (!user) {
@@ -364,12 +355,16 @@ const JobManagementPage = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <ProTopNavbar toggleSidebar={toggleSidebar} />
+      <ProTopNavbar 
+        toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+        isLargeScreen={isLargeScreen}
+        sidebarOpen={sidebarOpen}
+      />
 
-      <div className="flex flex-1 overflow-hidden">
-        <ProNavbar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} />
+      <div className="flex flex-1 overflow-visible">
+        <ProNavbar isOpen={sidebarOpen} />
         <main
-          className={`flex-1 overflow-y-auto p-6 transition-all duration-300 ${sidebarOpen ? "ml-64" : "ml-0"}`}
+          className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
           <div className="max-w-7xl mx-auto mb-[50px]">
             <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Job Management</h1>
@@ -386,70 +381,89 @@ const JobManagementPage = () => {
               </div>
             )}
 
-            <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-              <input
-                type="text"
-                placeholder="Search by issue or location..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <select
-                value={sortOption}
-                onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
-                className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-              >
-                <option value="">Sort by...</option>
-                <option value="latest">Latest</option>
-                <option value="oldest">Oldest</option>
-                {activeTab === "history" && (
-                  <>
-                    <option value="completed">Completed</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="cancelled">Cancelled</option>
-                  </>
-                )}
-              </select>
-            </div>
-
-            <div className="mb-6">
-              <div className="border-b border-gray-200">
-                <nav
-                  className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-8"
-                  aria-label="Tabs"
+            {!selectedBooking && (
+              <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                <input
+                  type="text"
+                  placeholder="Search by issue or location..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <select
+                  value={sortOption}
+                  onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
+                  className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
                 >
-                  <button
-                    onClick={() => handleTabChange("requests")}
-                    className={`py-2 px-4 text-sm font-medium ${activeTab === "requests"
-                      ? "border-b-2 border-blue-500 text-blue-600"
-                      : "text-gray-500 hover:text-gray-700"
-                      }`}
-                  >
-                    Job Requests
-                  </button>
-                  <button
-                    onClick={() => handleTabChange("scheduled")}
-                    className={`py-2 px-4 text-sm font-medium ${activeTab === "scheduled"
-                      ? "border-b-2 border-blue-500 text-blue-600"
-                      : "text-gray-500 hover:text-gray-700"
-                      }`}
-                  >
-                    Scheduled Jobs
-                  </button>
-                  <button
-                    onClick={() => handleTabChange("history")}
-                    className={`py-2 px-4 text-sm font-medium ${activeTab === "history"
-                      ? "border-b-2 border-blue-500 text-blue-600"
-                      : "text-gray-500 hover:text-gray-700"
-                      }`}
-                  >
-                    Job History
-                  </button>
-                </nav>
+                  <option value="">Sort by...</option>
+                  <option value="latest">Latest</option>
+                  <option value="oldest">Oldest</option>
+                  {activeTab === "history" && (
+                    <>
+                      <option value="completed">Completed</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="cancelled">Cancelled</option>
+                    </>
+                  )}
+                </select>
               </div>
-            </div>
+            )}
 
-            {filteredAndSortedBookings.length === 0 ? (
+            {!selectedBooking && (
+              <div className="mb-6">
+                <div className="border-b border-gray-200">
+                  <nav
+                    className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-8"
+                    aria-label="Tabs"
+                  >
+                    <button
+                      onClick={() => handleTabChange("requests")}
+                      className={`py-2 px-4 text-sm font-medium ${activeTab === "requests"
+                        ? "border-b-2 border-blue-500 text-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
+                    >
+                      Job Requests
+                    </button>
+                    <button
+                      onClick={() => handleTabChange("scheduled")}
+                      className={`py-2 px-4 text-sm font-medium ${activeTab === "scheduled"
+                        ? "border-b-2 border-blue-500 text-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
+                    >
+                      Scheduled Jobs
+                    </button>
+                    <button
+                      onClick={() => handleTabChange("history")}
+                      className={`py-2 px-4 text-sm font-medium ${activeTab === "history"
+                        ? "border-b-2 border-blue-500 text-blue-600"
+                        : "text-gray-500 hover:text-gray-700"
+                        }`}
+                    >
+                      Job History
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            )}
+
+            {selectedBooking ? (
+              <div className="mt-4">
+                <BookingDetails
+                  bookingId={selectedBooking.id}
+                  viewerRole="pro"
+                  onBack={async () => {
+                    setSelectedBooking(null);
+                    await fetchBookings(activeTab);
+                  }}
+                  onRaiseComplaint={(booking) => handleOpenComplaint({ ...selectedBooking!, id: booking.id } as BookingResponse)}
+                  onAccept={() => setIsAcceptModalOpen(true)}
+                  onReject={() => setIsRejectModalOpen(true)}
+                  onGenerateQuota={() => setIsQuotaModalOpen(true)}
+                />
+              </div>
+            ) : filteredAndSortedBookings.length === 0 ? (
               <div className="text-center text-gray-600">
                 <p>No results found for your search or sort criteria.</p>
                 <a
@@ -475,132 +489,6 @@ const JobManagementPage = () => {
           </div>
         </main>
       </div>
-
-      {isViewModalOpen && selectedBooking && (
-        <div
-          className={`fixed inset-0 p-5 flex items-center justify-center z-50 ${activeTab === "history" && (selectedBooking.status === "rejected" || selectedBooking.status === "cancelled")
-            ? "bg-gray-800/50 backdrop-blur-sm"
-            : "bg-gray-800/30 backdrop-blur-sm"
-            }`}
-          onClick={() => setIsViewModalOpen(false)}
-        >
-          <div
-            className={`p-6 rounded-lg shadow-lg w-96 relative bg-white ${activeTab === "history" && (selectedBooking.status === "rejected" || selectedBooking.status === "cancelled")
-              ? "bg-gray-100"
-              : ""
-              }`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setIsViewModalOpen(false)}
-              className="absolute top-2 right-2 text-gray-600 hover:text-gray-800"
-            >
-              <X className="h-6 w-6" />
-            </button>
-            <h3 className="text-lg font-semibold mb-4">Booking Details</h3>
-            <div className="space-y-2">
-              <p>
-                <strong>User:</strong> {selectedBooking.user.name}
-              </p>
-              <p>
-                <strong>Category:</strong> {selectedBooking.category.name}
-              </p>
-              <p>
-                <strong>Issue:</strong> {selectedBooking.issueDescription}
-              </p>
-              <p>
-                <strong>Location:</strong> {selectedBooking.location.address}, {selectedBooking.location.city},{" "}
-                {selectedBooking.location.state}
-              </p>
-              <p>
-                <strong>Phone:</strong> {selectedBooking.phoneNumber}
-              </p>
-              <p>
-                <strong>Date:</strong> {formatDate(new Date(selectedBooking.preferredDate))}
-              </p>
-              <p>
-                <strong>Time:</strong>{" "}
-                {selectedBooking.preferredTime
-                  .map((slot) => `${formatTimeTo12Hour(slot.startTime)} - ${formatTimeTo12Hour(slot.endTime)}`)
-                  .join(", ")}
-              </p>
-              <p>
-                <strong>Booking Status:</strong>
-                <span
-                  className={`ml-2 inline-block px-2 py-1 rounded-full text-xs font-semibold ${getStatusStyles(
-                    selectedBooking.status
-                  )}`}
-                >
-                  {selectedBooking.status}
-                </span>
-              </p>
-              {selectedBooking.status === "rejected" && selectedBooking.rejectedReason && (
-                <p>
-                  <strong>Rejection Reason:</strong> <span className="text-red-500 dark:text-red-400">{selectedBooking.rejectedReason}</span>
-                </p>
-              )}
-              {selectedBooking.status === "cancelled" && selectedBooking.cancelReason && (
-                <p>
-                  <strong>Cancellation Reason:</strong> <span className="text-red-500 dark:text-red-400">{selectedBooking.cancelReason}</span>
-                </p>
-              )}
-              {(selectedBooking.status === "accepted" || selectedBooking.status === "completed") && selectedQuota && (
-                <>
-                  <p>
-                    <strong>Labor Cost:</strong> ₹{selectedQuota.laborCost}
-                  </p>
-                  <p>
-                    <strong>Material Cost:</strong> ₹{selectedQuota.materialCost}
-                  </p>
-                  <p>
-                    <strong>Additional Charges:</strong> ₹{selectedQuota.additionalCharges}
-                  </p>
-                  <p>
-                    <strong>Total Cost:</strong> ₹{selectedQuota.totalCost}
-                  </p>
-                  <p>
-                    <strong>Payment Status:</strong>
-                    <span
-                      className={`ml-2 inline-block px-2 py-1 rounded-full text-xs font-semibold ${getPaymentStatusStyles(
-                        selectedQuota.paymentStatus
-                      )}`}
-                    >
-                      {selectedQuota.paymentStatus}
-                    </span>
-                  </p>
-                </>
-              )}
-            </div>
-            {activeTab === "requests" && (
-              <div className="flex justify-between gap-4 mt-6">
-                <button
-                  onClick={() => setIsAcceptModalOpen(true)}
-                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-                  disabled={actionLoading}
-                >
-                  Accept Job
-                </button>
-                <button
-                  onClick={handleRejectBooking}
-                  className="flex-1 bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors"
-                  disabled={actionLoading}
-                >
-                  Reject Job
-                </button>
-              </div>
-            )}
-            {activeTab === "scheduled" && !selectedQuota && (
-              <button
-                onClick={handleGenerateQuota}
-                className="mt-6 w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                disabled={actionLoading}
-              >
-                Generate Quota
-              </button>
-            )}
-          </div>
-        </div>
-      )}
 
       <ConfirmationModal
         isOpen={isAcceptModalOpen}
@@ -700,14 +588,14 @@ const JobManagementPage = () => {
               <div className="flex justify-between gap-4">
                 <button
                   onClick={handleCancelQuota}
-                  className="flex-1 bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+                  className="flex-1 border border-[#032b44] text-[#032b44] px-4 py-2 rounded-md hover:bg-[#054869]/10 transition-colors"
                   disabled={actionLoading}
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmGenerateQuota}
-                  className="flex-1 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                  className="flex-1 bg-[#032b44] text-white px-4 py-2 rounded-md hover:bg-[#054869] transition-colors"
                   disabled={actionLoading}
                 >
                   Generate
@@ -727,6 +615,13 @@ const JobManagementPage = () => {
         customTitle="Confirm Quota Generation"
         isProcessing={actionLoading}
         error={error}
+      />
+
+      <RaiseComplaintModal
+        open={complaintOpen}
+        onClose={() => { setComplaintOpen(false); setComplaintBooking(null); }}
+        onSubmit={handleSubmitComplaint}
+        bookingSummary={complaintBooking ? `${complaintBooking.category.name} with ${complaintBooking.user.name} on ${formatDate(new Date(complaintBooking.preferredDate))}` : undefined}
       />
     </div>
   );

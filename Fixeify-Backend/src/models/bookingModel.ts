@@ -51,6 +51,8 @@ export interface IBooking {
   rejectedReason?: string;
   cancelReason?: string;
   isRated?: boolean;
+  hasComplaintRaisedByPro?: boolean;
+  hasComplaintRaisedByUser?: boolean;
   adminRevenue?: number;
   proRevenue?: number;
   createdAt: Date;
@@ -79,6 +81,8 @@ const bookingSchema = new Schema<BookingDocument>(
     rejectedReason: { type: String },
     cancelReason: { type: String },
     isRated: { type: Boolean, default: false },
+    hasComplaintRaisedByPro: { type: Boolean, default: false },
+    hasComplaintRaisedByUser: { type: Boolean, default: false },
     adminRevenue: { type: Number },
     proRevenue: { type: Number },
     createdAt: { type: Date, default: Date.now },

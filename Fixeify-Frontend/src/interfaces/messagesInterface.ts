@@ -54,6 +54,7 @@ export interface NotificationItem {
   type: "message" | "booking" | "quota" | "wallet" | "general";
   userId?: string;
   proId?: string;
+  adminId?: string;
   chatId?: string;
   bookingId?: string;
   quotaId?: string;

@@ -2,7 +2,7 @@ import { FC, useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { format } from "date-fns";
-import { fetchConversations, updateOnlineStatus, addMessage, updateConversationReadStatus } from "../../store/chatSlice";
+import { fetchConversations, updateOnlineStatus, addIncomingMessage, updateConversationReadStatus, setConversationLastMessageStatus, updateMessageStatus, updateConversation } from "../../store/chatSlice";
 import { RotateCcw, Image as ImageIcon } from "lucide-react";
 import { getSocket, isSocketConnected } from "../../services/socket";
 
@@ -30,59 +30,69 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
   }, [user, role, dispatch]);
 
 
-  useEffect(() => {
-    if (!socket || !isConnected || !user || !conversations.length) return;
-    const participantId = user.id;
-    const participantModel = role === "pro" ? "ApprovedPro" : "User";
-
-    conversations.forEach(conv => {
-      socket.emit("joinChat", { chatId: conv.id, participantId, participantModel });
-      console.log(`[SOCKET][ChatInbox] joinChat emitted for chatId: ${conv.id}, participantId: ${participantId}, participantModel: ${participantModel}`);
-    });
-   
-    return () => {
-      conversations.forEach(conv => {
-        socket.emit("leaveChat", { chatId: conv.id });
-        console.log(`[SOCKET][ChatInbox] leaveChat emitted for chatId: ${conv.id}`);
-      });
-    };
-  }, [socket, isConnected, user?.id, role, conversations.length]);
+  // ChatInbox should NOT auto-join chats - only listen for updates
+  // Joining chats should only happen when MessageBox is opened
 
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    const handleNewMessage = (message: any) => {
-      console.log('[SOCKET][ChatInbox] newMessage received:', message);
-     
-      dispatch(addMessage(message));
+    const handleNewMessage = (raw: any) => {
+      console.log('[SOCKET][ChatInbox] newMessage received:', raw);
+      // Normalize payload to our Message shape
+      const message = {
+        id: raw.id || raw._id || raw.messageId,
+        chatId: raw.chatId,
+        senderId: raw.senderId,
+        senderModel: raw.senderModel,
+        content: raw.content ?? raw.body ?? "",
+        timestamp: raw.timestamp || raw.createdAt || new Date().toISOString(),
+        status: raw.status || (raw.isRead ? 'read' : 'delivered'),
+        isRead: typeof raw.isRead === 'boolean' ? raw.isRead : raw.status === 'read',
+        attachments: raw.attachments,
+        type: raw.type,
+      } as any;
+      if (user) {
+        dispatch(addIncomingMessage({ message, currentUserId: user.id, activeChatId: selectedConversationId }));
+      }
     };
 
-    const handleMessageRead = ({ chatId }: { chatId: string }) => {
-     
+    const handleMessageRead = ({ chatId, messageId, messageIds }: { chatId: string; messageId?: string; messageIds?: string[] }) => {
       dispatch(updateConversationReadStatus({ chatId }));
+      dispatch(setConversationLastMessageStatus({ chatId, status: 'read' }));
+      // If server specifies messages, mark them read locally too
+      const ids = messageIds || (messageId ? [messageId] : []);
+      ids.forEach(id => dispatch(updateMessageStatus({ chatId, messageId: id, status: 'read' })));
     };
 
-    const handleMessagesRead = ({ chatId }: { chatId: string }) => {
-     
+    const handleMessagesRead = ({ chatId, messageIds }: { chatId: string; messageIds?: string[] }) => {
       dispatch(updateConversationReadStatus({ chatId }));
+      dispatch(setConversationLastMessageStatus({ chatId, status: 'read' }));
+      (messageIds || []).forEach(id => dispatch(updateMessageStatus({ chatId, messageId: id, status: 'read' })));
     };
 
     const handleOnlineStatus = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
       dispatch(updateOnlineStatus({ userId, isOnline }));
     };
 
+    const handleConversationUpdated = (updatedConversation: any) => {
+      // Update the conversation in the list with fresh data from backend
+      dispatch(updateConversation(updatedConversation));
+    };
+
     socket.on("newMessage", handleNewMessage);
     socket.on("messageRead", handleMessageRead);
     socket.on("messagesRead", handleMessagesRead);
     socket.on("onlineStatus", handleOnlineStatus);
+    socket.on("conversationUpdated", handleConversationUpdated);
 
     return () => {
       socket.off("newMessage", handleNewMessage);
       socket.off("messageRead", handleMessageRead);
       socket.off("messagesRead", handleMessagesRead);
       socket.off("onlineStatus", handleOnlineStatus);
+      socket.off("conversationUpdated", handleConversationUpdated);
     };
-  }, [socket, isConnected, user?.id, role, dispatch]);
+  }, [socket, isConnected, user?.id, role, dispatch, selectedConversationId]);
 
   const formatTimestamp = (timestamp: string) => {
     return format(new Date(timestamp), "MMM d");
