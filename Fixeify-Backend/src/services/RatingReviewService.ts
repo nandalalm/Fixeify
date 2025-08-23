@@ -6,19 +6,20 @@ import { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
 import { RatingReviewResponse } from "../dtos/response/ratingReviewDtos";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
+import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class RatingReviewService implements IRatingReviewService {
   constructor(
     @inject(TYPES.IRatingReviewRepository)
     private _ratingReviewRepository: IRatingReviewRepository
-  ) {}
+  ) { }
 
   async createRatingReview(
     data: CreateRatingReviewRequest
   ): Promise<RatingReviewResponse> {
     if (data.rating < 1 || data.rating > 5) {
-      throw new HttpError(400, MESSAGES.RATING_BETWEEN_1_5);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.RATING_BETWEEN_1_5);
     }
 
     const alreadyReviewed = await this._ratingReviewRepository.hasUserReviewedBookingOrQuota(
@@ -27,7 +28,7 @@ export class RatingReviewService implements IRatingReviewService {
       data.quotaId
     );
     if (alreadyReviewed) {
-      throw new HttpError(400, MESSAGES.ALREADY_REVIEWED);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALREADY_REVIEWED);
     }
 
     const saved = await this._ratingReviewRepository.create({
@@ -59,21 +60,15 @@ export class RatingReviewService implements IRatingReviewService {
     page: number;
     limit: number;
   }> {
-    const { items, total } = await this._ratingReviewRepository.findByProId(
-      proId,
-      page,
-      limit
-    );
+    const { items, total } = await this._ratingReviewRepository.findByProId(proId,page,limit);
 
     return {
       items: items.map((doc) => new RatingReviewResponse(doc as any)),
-      total,
-      page,
-      limit,
+      total,page,limit,
     };
   }
 
-    async getRatingReviewsByUser(
+  async getRatingReviewsByUser(
     userId: string,
     page: number = 1,
     limit: number = 5
@@ -83,29 +78,22 @@ export class RatingReviewService implements IRatingReviewService {
     page: number;
     limit: number;
   }> {
-    const { items, total } = await this._ratingReviewRepository.findByUserId(
-      userId,
-      page,
-      limit
-    );
+    const { items, total } = await this._ratingReviewRepository.findByUserId(userId,page,limit);
     return {
       items: items.map((doc) => new RatingReviewResponse(doc as any)),
-      total,
-      page,
-      limit,
+      total,page,limit,
     };
   }
 
   async getAllRatingReviews(
     page: number = 1,
-    limit: number = 5
+    limit: number = 5,
+    sortBy?: "latest" | "oldest" | "lowest" | "highest"
   ): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }> {
-    const { items, total } = await this._ratingReviewRepository.findAll(page, limit);
+    const { items, total } = await this._ratingReviewRepository.findAll(page, limit, sortBy);
     return {
       items: items.map((doc) => new RatingReviewResponse(doc as any)),
-      total,
-      page,
-      limit,
+      total,page,limit,
     };
   }
 

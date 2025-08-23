@@ -11,7 +11,7 @@ import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class AdminController {
-  constructor(@inject(TYPES.IAdminService) private _adminService: IAdminService) {}
+  constructor(@inject(TYPES.IAdminService) private _adminService: IAdminService) { }
 
   async getBookings(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -82,7 +82,8 @@ export class AdminController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { users, total } = await this._adminService.getUsers(page, limit);
+      const sortBy = (req.query.sortBy as "latest" | "oldest") || "latest";
+      const { users, total } = await this._adminService.getUsers(page, limit, sortBy);
       res.status(HttpStatus.OK).json({ users, total });
     } catch (error) {
       next(error);
@@ -125,7 +126,8 @@ export class AdminController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { pros, total } = await this._adminService.getPendingPros(page, limit);
+      const sortBy = (req.query.sortBy as "latest" | "oldest") || "latest";
+      const { pros, total } = await this._adminService.getPendingPros(page, limit, sortBy);
       res.status(HttpStatus.OK).json({ pros, total });
     } catch (error) {
       next(error);
@@ -229,7 +231,8 @@ export class AdminController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { pros, total } = await this._adminService.getApprovedPros(page, limit);
+      const sortBy = (req.query.sortBy as "latest" | "oldest") || "latest";
+      const { pros, total } = await this._adminService.getApprovedPros(page, limit, sortBy);
       res.status(HttpStatus.OK).json({ pros, total });
     } catch (error) {
       next(error);
@@ -250,7 +253,9 @@ export class AdminController {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { withdrawals, total, pros } = await this._adminService.getWithdrawalRequests(page, limit);
+      const sortBy = (req.query.sortBy as "latest" | "oldest") || "latest";
+      const status = req.query.status as "pending" | "approved" | "rejected" | undefined;
+      const { withdrawals, total, pros } = await this._adminService.getWithdrawalRequests(page, limit, sortBy, status);
       res.status(HttpStatus.OK).json({ withdrawals, total, pros });
     } catch (error) {
       next(error);

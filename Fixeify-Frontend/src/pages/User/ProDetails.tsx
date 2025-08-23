@@ -7,6 +7,7 @@ import {
   Clock,
   Calendar,
   CalendarDays,
+  User as UserIcon,
 } from "lucide-react";
 import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
 import Navbar from "../../components/User/Navbar";
@@ -88,6 +89,38 @@ const ProDetails = () => {
     };
     fetchLatestAvailability();
   }, [proFromState?._id]);
+
+  // Local Avatar component for review user images: preload and fallback to icon
+  const Avatar: React.FC<{ src?: string | null; alt: string; className?: string }> = ({ src, alt, className }) => {
+    const placeholder = "/placeholder-user.jpg";
+    const [displayedSrc, setDisplayedSrc] = useState<string>(placeholder);
+
+    useEffect(() => {
+      const url = (src || "").trim();
+      if (!url) {
+        setDisplayedSrc(placeholder);
+        return;
+      }
+      let cancelled = false;
+      const img = new Image();
+      img.onload = () => { if (!cancelled) setDisplayedSrc(url); };
+      img.onerror = () => { if (!cancelled) setDisplayedSrc(placeholder); };
+      img.src = url;
+      return () => { cancelled = true; };
+    }, [src]);
+
+    if (displayedSrc === placeholder) {
+      return (
+        <div
+          aria-label={alt}
+          className={(className || "w-10 h-10 rounded-full") + " bg-gray-200 dark:bg-gray-600 border flex items-center justify-center text-gray-500 dark:text-gray-300"}
+        >
+          <UserIcon className="w-5 h-5" />
+        </div>
+      );
+    }
+    return <img src={displayedSrc} alt={alt} className={className || "w-10 h-10 rounded-full object-cover"} />;
+  };
 
   if (!pro) {
     return (
@@ -233,12 +266,8 @@ const ProDetails = () => {
                       {reviews.slice(0, visibleCount).map((review, index) => (
                         <div key={index} className="bg-gray-50 dark:bg-gray-800/60 rounded-md p-4 shadow-sm">
                           <div className="flex items-center gap-3 mb-3">
-                            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 overflow-hidden">
-                              <img
-                                src={review.user.photo || "/placeholder.svg"}
-                                alt={review.user.name}
-                                className="w-full h-full object-cover"
-                              />
+                            <div className="w-10 h-10 rounded-full overflow-hidden">
+                              <Avatar src={review.user.photo} alt={review.user.name} className="w-full h-full rounded-full object-cover" />
                             </div>
                             <div>
                               <div className="font-medium text-base text-gray-900 dark:text-gray-200">{review.user.name}</div>

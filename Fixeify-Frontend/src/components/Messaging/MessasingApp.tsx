@@ -29,7 +29,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
   const currentUser: User = {
     id: user?.id || "",
     name: user?.name || "User",
-    avatar: user?.photo || "/placeholder.svg?height=40&width=40",
+    avatar: user?.photo || undefined,
     isOnline: true,
     role: user?.role || role,
   };
@@ -147,8 +147,8 @@ export default function MessagingApp({ role }: MessagingAppProps) {
       id: isCurrentUserPro ? participant.userId : participant.proId,
       name: isCurrentUserPro ? participant.userName : participant.proName,
       avatar: isCurrentUserPro 
-        ? participant.userPhoto || "/placeholder.svg?height=40&width=40"
-        : participant.proPhoto || "/placeholder.svg?height=40&width=40",
+        ? (participant.userPhoto ?? undefined)
+        : (participant.proPhoto ?? undefined),
       isOnline: false,
       role: isCurrentUserPro ? "user" : "pro",
     };
@@ -175,7 +175,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
               otherUser={getOtherUser(selectedConversationId) || {
                 id: "",
                 name: "Unknown",
-                avatar: "/placeholder.svg?height=40&width=40",
+                avatar: undefined,
                 isOnline: false,
                 role: role === "user" ? "pro" : "user",
               }}

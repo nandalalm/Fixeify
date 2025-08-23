@@ -123,6 +123,18 @@ export class MongoTicketRepository implements ITicketRepository {
       .populate('resolvedBy', 'name');
   }
 
+  async updateBanStatus(ticketId: string, isUserBanned?: boolean, isProBanned?: boolean): Promise<TicketDocument | null> {
+    const updateFields: any = {};
+    if (isUserBanned !== undefined) updateFields.isUserBanned = isUserBanned;
+    if (isProBanned !== undefined) updateFields.isProBanned = isProBanned;
+    
+    return await Ticket.findByIdAndUpdate(ticketId, updateFields, { new: true })
+      .populate('complainantId', 'name firstName lastName')
+      .populate('againstId', 'name firstName lastName')
+      .populate('bookingId', 'issueDescription preferredDate status')
+      .populate('resolvedBy', 'name');
+  }
+
   async getTicketStats(): Promise<{ pending: number; underReview: number; resolved: number; total: number }> {
     const [pending, underReview, resolved, total] = await Promise.all([
       Ticket.countDocuments({ status: 'pending' }),
@@ -152,6 +164,8 @@ export class MongoTicketRepository implements ITicketRepository {
       adminComment: ticket.adminComment,
       resolvedBy: ticket.resolvedBy?._id.toString(),
       resolvedAt: ticket.resolvedAt,
+      isUserBanned: ticket.isUserBanned,
+      isProBanned: ticket.isProBanned,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt
     };

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Eye, Phone, X } from "lucide-react";
+import { Eye, Phone, X, User as UserIcon } from "lucide-react";
 import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
 import { fetchBookingById as fetchUserBookingById, fetchQuotaByBookingId as fetchUserQuotaByBookingId } from "@/api/userApi";
@@ -16,14 +16,12 @@ interface BookingDetailsProps {
   onBack?: () => void;
   onRate?: (booking: BookingCompleteResponse) => void;
   onRaiseComplaint?: (booking: BookingCompleteResponse) => void;
-  // Pro actions (optional)
   onAccept?: (booking: BookingCompleteResponse) => void;
   onReject?: (booking: BookingCompleteResponse) => void;
   onGenerateQuota?: (booking: BookingCompleteResponse) => void;
-  // External refresh token to force re-fetch
   refreshKey?: number;
-  // Control quota section visibility so parents like OngoingRequest can render custom billing/payment UI
   showQuotaSection?: boolean;
+  onReady?: () => void;
 }
 
 const LabelValue: React.FC<{ label: React.ReactNode; value?: React.ReactNode }>=({ label, value }) => (
@@ -32,6 +30,71 @@ const LabelValue: React.FC<{ label: React.ReactNode; value?: React.ReactNode }>=
     <span className="text-sm text-gray-900 dark:text-gray-100 break-all">{value ?? "-"}</span>
   </div>
 );
+
+// Avatar component: prevents flicker by showing placeholder until real image loads
+const Avatar: React.FC<{
+  src: string;
+  placeholder: string;
+  alt: string;
+  className?: string;
+  onSrcChange?: (displayedSrc: string) => void;
+}> = ({ src, placeholder, alt, className, onSrcChange }) => {
+  const [displayedSrc, setDisplayedSrc] = useState<string>(placeholder);
+
+  useEffect(() => {
+    // If src equals placeholder, just show placeholder
+    if (!src || src === placeholder) {
+      setDisplayedSrc(placeholder);
+      onSrcChange && onSrcChange(placeholder);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) {
+        setDisplayedSrc(src);
+        onSrcChange && onSrcChange(src);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) {
+        setDisplayedSrc(placeholder);
+        onSrcChange && onSrcChange(placeholder);
+      }
+    };
+    img.src = src;
+    return () => { cancelled = true; };
+  }, [src, placeholder, onSrcChange]);
+
+  // If we're in placeholder state (no src or src equals placeholder), render a polished icon avatar instead of an image
+  const isTrulyPlaceholder = !src || src === placeholder;
+
+  if (displayedSrc === placeholder && isTrulyPlaceholder) {
+    return (
+      <div
+        aria-label={alt}
+        className={
+          (className || "") +
+          " bg-gray-200 dark:bg-gray-700 border flex items-center justify-center text-gray-500 dark:text-gray-300"
+        }
+      >
+        <UserIcon className="w-5 h-5" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={displayedSrc}
+      alt={alt}
+      className={className}
+      onError={() => {
+        setDisplayedSrc(placeholder);
+        onSrcChange && onSrcChange(placeholder);
+      }}
+    />
+  );
+};
 
 const Section: React.FC<{ title: string; rightSlot?: React.ReactNode; children: React.ReactNode }>=({ title, rightSlot, children }) => (
   <div className="bg-white dark:bg-gray-900 rounded-md border dark:border-gray-700 p-4">
@@ -74,12 +137,25 @@ const formatTo12h = (time?: string) => {
   return `${hour12}:${mm} ${period}`;
 };
 
-const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, onBack, onRate, onRaiseComplaint, onAccept, onReject, onGenerateQuota, refreshKey = 0, showQuotaSection = true }) => {
+const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, onBack, onRate, onRaiseComplaint, onAccept, onReject, onGenerateQuota, refreshKey = 0, showQuotaSection = true, onReady }) => {
   const [booking, setBooking] = useState<BookingCompleteResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [userDisplaySrc, setUserDisplaySrc] = useState<string>("/placeholder-user.jpg");
+  const [proDisplaySrc, setProDisplaySrc] = useState<string>("/placeholder.jpg");
+
+  // Precompute image sources to avoid flicker when image is missing
+  const userImageSrc = useMemo(() => {
+    const src = booking?.user?.photo?.trim();
+    return src ? src : "/placeholder-user.jpg";
+  }, [booking?.user?.photo]);
+
+  const proImageSrc = useMemo(() => {
+    const src = booking?.pro?.profilePhoto?.trim();
+    return src ? src : "/placeholder.jpg";
+  }, [booking?.pro?.profilePhoto]);
 
   useEffect(() => {
     let mounted = true;
@@ -91,7 +167,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
       } catch (e) {
         if (mounted) setError("Failed to load booking details");
       }
-      // Quota: try user first, then pro fallback
       try {
         const q = await fetchUserQuotaByBookingId(bookingId);
         if (mounted) setQuota(q);
@@ -101,7 +176,11 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
           if (mounted) setQuota(q2 as any);
         } catch {}
       }
-      if (mounted) setLoading(false);
+      if (mounted) {
+        setLoading(false);
+        // Notify parent that details view finished its internal loading
+        try { onReady && onReady(); } catch {}
+      }
     };
     load();
     return () => { mounted = false; };
@@ -113,7 +192,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
     if (!booking || booking.status !== "completed") return false;
     if (viewerRole === "user") return !(booking as any).hasComplaintRaisedByUser;
     if (viewerRole === "pro") return !(booking as any).hasComplaintRaisedByPro;
-    return false; // admin can't raise
+    return false; 
   }, [viewerRole, booking]);
 
   const handleDownloadInvoice = () => {
@@ -165,13 +244,18 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
               type="button"
               className="relative group shrink-0"
               aria-label="View user image"
-              onClick={() => setImagePreview(booking.user?.photo || "/images/avatar-user.png")}
+              onClick={() => {
+                if (userDisplaySrc !== "/placeholder-user.jpg") {
+                  setImagePreview(userDisplaySrc);
+                }
+              }}
             >
-              <img
-                src={booking.user?.photo || "/images/avatar-user.png"}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/avatar-user.png"; }}
+              <Avatar
+                src={userImageSrc}
+                placeholder="/placeholder-user.jpg"
                 alt="User"
                 className="w-10 h-10 rounded-full object-cover border transition filter group-hover:blur-[1px]"
+                onSrcChange={setUserDisplaySrc}
               />
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                 <Eye className="w-4 h-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" />
@@ -188,7 +272,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
           </div>
         </Section>
         <Section
-          title="Pro Details"
+          title="Professional Details"
           rightSlot={(
             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-blue-500 text-blue-700 whitespace-nowrap">
               {booking.category?.name || "Service"}
@@ -200,13 +284,14 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
               type="button"
               className="relative group shrink-0"
               aria-label="View pro image"
-              onClick={() => setImagePreview(booking.pro?.profilePhoto || "/images/avatar-pro.png")}
+              onClick={() => setImagePreview(proDisplaySrc)}
             >
-              <img
-                src={booking.pro?.profilePhoto || "/images/avatar-pro.png"}
-                onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/avatar-pro.png"; }}
+              <Avatar
+                src={proImageSrc}
+                placeholder="/placeholder.jpg"
                 alt="Pro"
                 className="w-10 h-10 rounded-full object-cover border transition filter group-hover:blur-[1px]"
+                onSrcChange={setProDisplaySrc}
               />
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                 <Eye className="w-4 h-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" />
@@ -226,6 +311,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
 
       {/* Booking */}
       <Section title="Booking Details">
+        <LabelValue label="Booking ID" value={booking.bookingId} />
         <LabelValue label="Issue Description" value={booking.issueDescription} />
         <LabelValue label="Service Category" value={booking.category?.name} />
         <LabelValue label="Preferred Date" value={new Date(booking.preferredDate).toLocaleDateString()} />

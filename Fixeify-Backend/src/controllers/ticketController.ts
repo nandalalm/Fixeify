@@ -8,7 +8,7 @@ import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class TicketController {
-  constructor(@inject(TYPES.ITicketService) private _ticketService: ITicketService) {}
+  constructor(@inject(TYPES.ITicketService) private _ticketService: ITicketService) { }
 
   createTicket = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
@@ -20,12 +20,10 @@ export class TicketController {
     }
   };
 
-
   getTicketById = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { id } = req.params;
       const ticket = await this._ticketService.getTicketById(id);
-
       if (!ticket) {
         res.status(HttpStatus.NOT_FOUND).json({
           success: false,
@@ -33,7 +31,6 @@ export class TicketController {
         });
         return;
       }
-
       res.status(HttpStatus.OK).json({
         success: true,
         data: ticket
@@ -43,7 +40,6 @@ export class TicketController {
     }
   };
 
-
   getTicketByTicketId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { ticketId } = req.params;
@@ -52,11 +48,10 @@ export class TicketController {
       if (!ticket) {
         res.status(HttpStatus.NOT_FOUND).json({
           success: false,
-          message: "Ticket not found"
+          message: MESSAGES.TICKET_NOT_FOUND
         });
         return;
       }
-
       res.status(HttpStatus.OK).json({
         success: true,
         data: ticket
@@ -75,9 +70,7 @@ export class TicketController {
       const { complainantId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-
       const result = await this._ticketService.getTicketsByComplainant(complainantId, page, limit);
-      
       res.status(HttpStatus.OK).json({
         success: true,
         data: result
@@ -87,15 +80,13 @@ export class TicketController {
     }
   };
 
-  
+
   getTicketsAgainst = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { againstId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
-
       const result = await this._ticketService.getTicketsByAgainst(againstId, page, limit);
-      
       res.status(HttpStatus.OK).json({
         success: true,
         data: result
@@ -105,15 +96,13 @@ export class TicketController {
     }
   };
 
- 
+
   getAllTickets = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const status = req.query.status as string;
-
       const result = await this._ticketService.getAllTickets(page, limit, status);
-      
       res.status(HttpStatus.OK).json({
         success: true,
         data: result
@@ -137,7 +126,6 @@ export class TicketController {
         });
         return;
       }
-
       res.status(HttpStatus.OK).json({
         success: true,
         message: MESSAGES.TICKET_STATUS_UPDATED_SUCCESS,
@@ -148,11 +136,32 @@ export class TicketController {
     }
   };
 
-  
+  updateTicketBanStatus = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { isUserBanned, isProBanned } = req.body;
+      const ticket = await this._ticketService.updateTicketBanStatus(id, isUserBanned, isProBanned);
+
+      if (!ticket) {
+        res.status(HttpStatus.NOT_FOUND).json({
+          success: false,
+          message: MESSAGES.TICKET_NOT_FOUND
+        });
+        return;
+      }
+      res.status(HttpStatus.OK).json({
+        success: true,
+        message: "Ban status updated successfully",
+        data: ticket
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
   getTicketStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const stats = await this._ticketService.getTicketStats();
-      
       res.status(HttpStatus.OK).json({
         success: true,
         data: stats

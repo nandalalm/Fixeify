@@ -50,7 +50,7 @@ const AdminReviewManagement: FC = () => {
 
   const [selectedReview, setSelectedReview] = useState<RatingReviewResponse | null>(null);
 
-  // Search and sort state for frontend-only filtering/sorting
+  // Search and sort state (sorting delegated to backend; search is frontend)
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "lowest" | "highest">("latest");
 
@@ -62,19 +62,8 @@ const AdminReviewManagement: FC = () => {
     return proName.includes(term) || userName.includes(term);
   });
 
-  // Sort reviews according to sortOption (frontend only)
-  const sortedReviews = [...filteredReviews].sort((a, b) => {
-    if (sortOption === "latest") {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    } else if (sortOption === "oldest") {
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    } else if (sortOption === "lowest") {
-      return a.rating - b.rating;
-    } else if (sortOption === "highest") {
-      return b.rating - a.rating;
-    }
-    return 0;
-  });
+  // Backend provides sorted order; we only filter client-side
+  const orderedAndFiltered = filteredReviews;
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
@@ -83,10 +72,10 @@ const AdminReviewManagement: FC = () => {
     }
   }, [user, navigate]);
 
-  const fetchReviews = useCallback(async (pageNum: number) => {
+  const fetchReviews = useCallback(async (pageNum: number, sortBy: typeof sortOption) => {
     setLoading(true);
     try {
-      const data: PaginatedReviews = await getAllReviews(pageNum, limit);
+      const data: PaginatedReviews = await getAllReviews(pageNum, limit, sortBy);
       setReviews(data.items);
       setTotal(data.total);
       setPage(data.page);
@@ -103,9 +92,9 @@ const AdminReviewManagement: FC = () => {
 
   useEffect(() => {
     if (user) {
-      fetchReviews(1);
+      fetchReviews(1, sortOption);
     }
-  }, [user, fetchReviews]);
+  }, [user, sortOption, fetchReviews]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -124,12 +113,12 @@ const AdminReviewManagement: FC = () => {
 
   const handlePrev = () => {
     if (page === 1) return;
-    fetchReviews(page - 1);
+    fetchReviews(page - 1, sortOption);
   };
 
   const handleNext = () => {
     if (page * limit >= total) return;
-    fetchReviews(page + 1);
+    fetchReviews(page + 1, sortOption);
   };
 
   const handleView = (review: RatingReviewResponse) => {
@@ -140,10 +129,90 @@ const AdminReviewManagement: FC = () => {
     setSelectedReview(null);
   };
 
-  if (loading) {
+  // Show skeleton only for the table while keeping the header and filters visible
+  if (loading && reviews.length === 0) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="spinner border-t-4 border-blue-500 rounded-full w-12 h-12 animate-spin"></div>
+      <div className="flex flex-col h-screen bg-gray-50">
+        <AdminTopNavbar 
+          sidebarOpen={sidebarOpen} 
+          setSidebarOpen={setSidebarOpen} 
+          userName={user.name}
+          isLargeScreen={isLargeScreen}
+        />
+        <div className="flex flex-1 overflow-visible">
+          <AdminNavbar isOpen={sidebarOpen} />
+          <main className="flex-1 overflow-y-auto p-6 transition-all duration-300">
+            <div className="max-w-7xl mx-auto mb-[50px]">
+              <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Ratings & Reviews</h1>
+              
+              {/* Search & Sort Controls - Keep these visible */}
+              <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                <div className="relative w-full sm:w-5/6">
+                  <input
+                    type="text"
+                    placeholder="Search by pro name or user name..."
+                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled
+                  />
+                </div>
+                <div className="relative w-full sm:w-1/6">
+                  <select
+                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                    disabled
+                  >
+                    <option>Sort by Latest</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Skeleton for reviews table */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">S.No</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">User</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Professional</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Service</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Rating</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                      {[...Array(5)].map((_, i) => (
+                        <tr key={i} className="animate-pulse">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="h-4 w-6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} className="h-4 w-4 text-gray-200 dark:text-gray-700 mr-0.5" fill="currentColor" />
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -161,10 +230,15 @@ const AdminReviewManagement: FC = () => {
         <main
           className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
-          <div className="max-w-7xl mx-auto mb-[50px]">
+          <div className="max-w-7xl mx-auto mb-[50px] min-h-[calc(100vh-200px)]">
             {/* If a review is selected, show details view */}
             {selectedReview ? (
-              <ReviewDetails review={selectedReview} onBack={handleBackFromDetails} />
+              <div className="space-y-4">
+                <div className="text-center">
+                  <h2 className="text-xl font-semibold text-gray-900">Rating Details</h2>
+                </div>
+                <ReviewDetails review={selectedReview} onBack={handleBackFromDetails} />
+              </div>
             ) : (
               <>
                 <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Ratings & Reviews</h1>
@@ -175,7 +249,7 @@ const AdminReviewManagement: FC = () => {
 
                 {reviews.length === 0 ? (
                   <p className="text-center text-gray-600">No reviews currently.</p>
-                ) : sortedReviews.length === 0 ? (
+                ) : orderedAndFiltered.length === 0 ? (
                   <div className="text-center text-gray-600 space-y-2">
                     <p>No results match the provided search criteria.</p>
                     <button
@@ -231,7 +305,7 @@ const AdminReviewManagement: FC = () => {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {reviews.map((review, idx) => (
+                          {orderedAndFiltered.map((review, idx) => (
                             <tr key={review.id}>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{(page - 1) * limit + idx + 1}</td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{review.user?.name || '-'}</td>
@@ -278,10 +352,10 @@ const AdminReviewManagement: FC = () => {
                             >
                               <ChevronLeft className="h-5 w-5" />
                             </button>
-                            <span className="text-sm text-black">Page {page}</span>
+                            <span className="text-sm text-black">Page {page} of {Math.ceil(total / limit)}</span>
                             <button
                               onClick={handleNext}
-                              disabled={reviews.length < limit}
+                              disabled={page * limit >= total}
                               className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
                             >
                               <ChevronRight className="h-5 w-5" />
@@ -293,7 +367,7 @@ const AdminReviewManagement: FC = () => {
 
                     {/* Mobile Cards (visible on <lg) */}
                     <div className="space-y-4 lg:hidden">
-                      {reviews.map((review, idx) => (
+                      {orderedAndFiltered.map((review, idx) => (
                         <div key={review.id} className="bg-white shadow rounded-lg p-4 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="font-semibold">{review.user?.name || '-'}</span>
@@ -313,7 +387,7 @@ const AdminReviewManagement: FC = () => {
                           </p>
                           <button
                             onClick={() => handleView(review)}
-                            className="mt-2 border border-gray-500 text-gray-600 dark:text-gray-300 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 px-4 py-1.5 transition-colors"
+                            className="mt-2 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors"
                           >
                             View
                           </button>

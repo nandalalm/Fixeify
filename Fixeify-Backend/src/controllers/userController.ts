@@ -8,14 +8,12 @@ import { AuthRequest } from "../middleware/authMiddleware";
 import Stripe from "stripe";
 import { HttpStatus } from "../enums/httpStatus";
 
-type PaymentIntentStatus = Stripe.PaymentIntent.Status;
-
 @injectable()
 export class UserController {
-  private stripe: Stripe;
+  private _stripe: Stripe;
 
   constructor(@inject(TYPES.IUserService) private _userService: IUserService) {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    this._stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2025-06-30.basil",
     });
   }
@@ -61,11 +59,11 @@ export class UserController {
       if (!categoryId || !longitude || !latitude) {
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CATEGORY_LONG_LAT_REQUIRED);
       }
-      
+
       const pageNum = parseInt(page as string);
       const limitNum = parseInt(limit as string);
       const skip = (pageNum - 1) * limitNum;
-      
+
       const result = await this._userService.getNearbyPros(
         categoryId as string,
         parseFloat(longitude as string),
@@ -75,7 +73,7 @@ export class UserController {
         sortBy as string,
         availabilityFilter as string
       );
-      
+
       res.status(HttpStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -90,7 +88,7 @@ export class UserController {
       if (!proId || !categoryId || !issueDescription || !location || !phoneNumber || !preferredDate || !preferredTime) {
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
       }
-      
+
       const bookingResponse = await this._userService.createBooking(userId, proId, {
         categoryId,
         issueDescription,
@@ -106,16 +104,16 @@ export class UserController {
   }
 
   async fetchBookingDetails(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const { userId } = req.params;
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 5;
-    const { bookings, total } = await this._userService.fetchBookingDetails(userId, page, limit);
-    res.status(HttpStatus.OK).json({ bookings, total });
-  } catch (error) {
-    next(error);
+    try {
+      const { userId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 5;
+      const { bookings, total } = await this._userService.fetchBookingDetails(userId, page, limit);
+      res.status(HttpStatus.OK).json({ bookings, total });
+    } catch (error) {
+      next(error);
+    }
   }
-}
 
   async fetchBookingHistoryDetails(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -128,7 +126,7 @@ export class UserController {
       next(error);
     }
   }
-  
+
   async createPaymentIntent(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const { bookingId, amount } = req.body;
@@ -177,28 +175,28 @@ export class UserController {
   }
 
   async handleWebhook(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
-  try {
-    const sig = req.headers["stripe-signature"] as string;
-    const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-    if (!endpointSecret) throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED);
-
-    let event;
     try {
-      const rawBody = req.body; // req.body is a Buffer from express.raw()
-      if (!rawBody || !(rawBody instanceof Buffer)) {
-        throw new Error(MESSAGES.RAW_BODY_NOT_AVAILABLE_OR_INVALID);
-      }
-      event = this.stripe.webhooks.constructEvent(rawBody.toString(), sig, endpointSecret);
-    } catch (err: unknown) {
-      const error = err as Error;
-      console.error(`${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
-      throw new HttpError(HttpStatus.BAD_REQUEST, `${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
-    }
+      const sig = req.headers["stripe-signature"] as string;
+      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!endpointSecret) throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED);
 
-    await this._userService.handleWebhookEvent(event);
-    res.status(HttpStatus.OK).json({ received: true });
-  } catch (error) {
-    next(error);
+      let event;
+      try {
+        const rawBody = req.body;
+        if (!rawBody || !(rawBody instanceof Buffer)) {
+          throw new Error(MESSAGES.RAW_BODY_NOT_AVAILABLE_OR_INVALID);
+        }
+        event = this._stripe.webhooks.constructEvent(rawBody.toString(), sig, endpointSecret);
+      } catch (err: unknown) {
+        const error = err as Error;
+        console.error(`${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
+        throw new HttpError(HttpStatus.BAD_REQUEST, `${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
+      }
+
+      await this._userService.handleWebhookEvent(event);
+      res.status(HttpStatus.OK).json({ received: true });
+    } catch (error) {
+      next(error);
+    }
   }
-}
 }

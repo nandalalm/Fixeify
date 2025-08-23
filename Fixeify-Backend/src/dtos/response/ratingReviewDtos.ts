@@ -32,7 +32,6 @@ export class RatingReviewResponse {
       phoneNumber: (doc as any).proId?.phoneNumber || null,
       profilePhoto: (doc as any).proId?.profilePhoto || null,
     };
-    // Set category object if available
     if ((doc as any).categoryId?.name) {
       this.category = {
         id: (doc as any).categoryId?._id?.toString() || (doc as any).categoryId?.toString(),

@@ -59,9 +59,15 @@ export const updateProAvailability = async (userId: string, data: { availability
   return response.data;
 };
 
-export const fetchProBookings = async (proId: string, page: number = 1, limit: number = 5, status?: string): Promise<{ bookings: BookingResponse[]; total: number }> => {
+export const fetchProBookings = async (
+  proId: string,
+  page: number = 1,
+  limit: number = 5,
+  status?: string,
+  sortBy?: "latest" | "oldest"
+): Promise<{ bookings: BookingResponse[]; total: number }> => {
   const response = await api.get(`${ProBase}/bookings/${proId}`, {
-    params: { page, limit, status },
+    params: { page, limit, status, sortBy },
     withCredentials: true,
   });
   return response.data;
@@ -120,10 +126,12 @@ export const requestWithdrawal = async (
 export const fetchProWithdrawalRequests = async (
   proId: string,
   page: number,
-  limit: number
+  limit: number,
+  sortBy?: "latest" | "oldest",
+  status?: "pending" | "approved" | "rejected"
 ): Promise<{ withdrawals: IWithdrawalRequest[]; total: number }> => {
   const response = await api.get(`${ProBase}/withdrawalRequests/${proId}`, {
-    params: { page, limit },
+    params: { page, limit, sortBy, status },
     withCredentials: true,
   });
   return response.data;

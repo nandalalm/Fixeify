@@ -84,9 +84,16 @@ export class MongoRatingReviewRepository
 
   async findAll(
     page: number = 1,
-    limit: number = 5
+    limit: number = 5,
+    sortBy?: "latest" | "oldest" | "lowest" | "highest"
   ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }> {
     const skip = (page - 1) * limit;
+
+    // Determine sort object based on sortBy
+    let sort: Record<string, 1 | -1> = { createdAt: -1 }; // default latest
+    if (sortBy === "oldest") sort = { createdAt: 1 };
+    else if (sortBy === "lowest") sort = { rating: 1, createdAt: -1 };
+    else if (sortBy === "highest") sort = { rating: -1, createdAt: -1 };
 
     const [items, total] = await Promise.all([
       RatingReview.find()
@@ -94,8 +101,7 @@ export class MongoRatingReviewRepository
         .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
         .populate({ path: "categoryId", select: "name image" })
         .populate({ path: "bookingId", select: "issueDescription" })
-        
-        .sort({ createdAt: -1 })
+        .sort(sort)
         .skip(skip)
         .limit(limit),
       RatingReview.countDocuments(),

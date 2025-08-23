@@ -10,5 +10,6 @@ export interface ITicketRepository {
   findByAgainst(againstId: string, page: number, limit: number): Promise<{ tickets: TicketResponse[]; total: number }>;
   findAll(page: number, limit: number, status?: string): Promise<{ tickets: TicketResponse[]; total: number }>;
   updateStatus(id: string, updateData: UpdateTicketStatusRequest): Promise<TicketDocument | null>;
+  updateBanStatus(ticketId: string, isUserBanned?: boolean, isProBanned?: boolean): Promise<TicketDocument | null>;
   getTicketStats(): Promise<{ pending: number; underReview: number; resolved: number; total: number }>;
 }

@@ -115,21 +115,7 @@ const ProSlotManagement = () => {
     return null;
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="spinner border-t-4 border-blue-500 rounded-full w-12 h-12 animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex justify-center items-center min-h-screen text-red-500">
-        Error: {error}
-      </div>
-    );
-  }
+  // Note: loading & error are rendered inside the content area to keep navbars visible
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -153,79 +139,110 @@ const ProSlotManagement = () => {
             />
           ) : (
             <div className="max-w-7xl mx-auto mb-[50px]">
-              <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Slot Management</h1>
-              {successMessage && (
-                <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-md text-center">
-                  {successMessage}
-                </div>
-              )}
-              {isUnavailable && (
-                <p className="text-red-500 text-center mb-4">Status: Currently Inactive</p>
-              )}
-              <div className="flex flex-col items-center">
-                <div className="w-full">
-                  {Object.keys(availability).length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                      {daysOfWeek.map((day) => {
-                        const slots = availability[day as keyof Availability];
-                        if (!slots || slots.length === 0) return null;
-                        return (
-                          <div
-                            key={day}
-                            className={`p-4 rounded-lg shadow-md ${
-                              isUnavailable ? "bg-gray-200 opacity-50" : "bg-white"
-                            }`}
-                          >
-                            <h3
-                              className={`text-lg font-medium capitalize mb-4 ${
-                                isUnavailable ? "text-gray-500" : "text-gray-800"
-                              }`}
-                            >
-                              {day}
-                            </h3>
-                            <div className="space-y-2">
-                              {slots.map((slot: TimeSlot, index: number) => {
-                                const start = convertTo12Hour(slot.startTime);
-                                const end = convertTo12Hour(slot.endTime);
-                                return (
-                                  <div
-                                    key={index}
-                                    className={`flex justify-between items-center p-2 rounded-md ${
-                                      slot.booked
-                                        ? "bg-blue-100 text-blue-700"
-                                        : isUnavailable
-                                        ? "bg-gray-300 text-gray-500"
-                                        : "bg-gray-100 text-gray-700"
-                                    }`}
-                                  >
-                                    <span>
-                                      {start.time} {start.period} - {end.time} {end.period}
-                                      {slot.booked && " (Booked)"}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-center">
-                      {isUnavailable ? "No availability set (Currently Inactive)" : "No availability set."}
-                    </p>
-                  )}
+              {loading ? (
+                <div className="animate-pulse">
+                  {/* Heading skeleton */}
+                  <div className="h-8 bg-gray-200 rounded w-64 mx-auto mb-8"></div>
+                  {/* Status/message skeleton */}
+                  <div className="h-6 bg-gray-200 rounded w-80 mx-auto mb-6"></div>
+                  {/* Cards grid skeleton */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="p-4 rounded-lg shadow-md bg-white">
+                        <div className="h-5 bg-gray-200 rounded w-24 mb-4"></div>
+                        <div className="space-y-2">
+                          {Array.from({ length: 3 }).map((__, j) => (
+                            <div key={j} className="h-8 bg-gray-200 rounded"></div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Edit button skeleton */}
                   <div className="flex justify-center mt-8">
-                    <button
-                      onClick={handleEditSlots}
-                      className="bg-[#032B44] text-white py-3 px-6 rounded-md hover:bg-[#054869] transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Edit Slots
-                    </button>
+                    <div className="h-10 w-36 bg-gray-200 rounded"></div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <>
+                  <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Slot Management</h1>
+                  {error && (
+                    <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-center">Error: {error}</div>
+                  )}
+                  {successMessage && (
+                    <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-md text-center">
+                      {successMessage}
+                    </div>
+                  )}
+                  {isUnavailable && (
+                    <p className="text-red-500 text-center mb-4">Status: Currently Inactive</p>
+                  )}
+                  <div className="flex flex-col items-center">
+                    <div className="w-full">
+                      {Object.keys(availability).length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                          {daysOfWeek.map((day) => {
+                            const slots = availability[day as keyof Availability];
+                            if (!slots || slots.length === 0) return null;
+                            return (
+                              <div
+                                key={day}
+                                className={`p-4 rounded-lg shadow-md ${
+                                  isUnavailable ? "bg-gray-200 opacity-50" : "bg-white"
+                                }`}
+                              >
+                                <h3
+                                  className={`text-lg font-medium capitalize mb-4 ${
+                                    isUnavailable ? "text-gray-500" : "text-gray-800"
+                                  }`}
+                                >
+                                  {day}
+                                </h3>
+                                <div className="space-y-2">
+                                  {slots.map((slot: TimeSlot, index: number) => {
+                                    const start = convertTo12Hour(slot.startTime);
+                                    const end = convertTo12Hour(slot.endTime);
+                                    return (
+                                      <div
+                                        key={index}
+                                        className={`flex justify-between items-center p-2 rounded-md ${
+                                          slot.booked
+                                            ? "bg-blue-100 text-blue-700"
+                                            : isUnavailable
+                                            ? "bg-gray-300 text-gray-500"
+                                            : "bg-gray-100 text-gray-700"
+                                        }`}
+                                      >
+                                        <span>
+                                          {start.time} {start.period} - {end.time} {end.period}
+                                          {slot.booked && " (Booked)"}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-center">
+                          {isUnavailable ? "No availability set (Currently Inactive)" : "No availability set."}
+                        </p>
+                      )}
+                      <div className="flex justify-center mt-8">
+                        <button
+                          onClick={handleEditSlots}
+                          className="bg-[#032B44] text-white py-3 px-6 rounded-md hover:bg-[#054869] transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Edit className="w-4 h-4" />
+                          Edit Slots
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </main>

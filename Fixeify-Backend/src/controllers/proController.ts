@@ -100,7 +100,8 @@ export class ProController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const status = req.query.status as string; // New status filter
-      const { bookings, total } = await this._proService.fetchProBookings(proId, page, limit, status);
+      const sortBy = (req.query.sortBy as "latest" | "oldest") || undefined;
+      const { bookings, total } = await this._proService.fetchProBookings(proId, page, limit, status, sortBy);
       res.status(HttpStatus.OK).json({ bookings, total });
     } catch (error) {
       next(error);
@@ -250,7 +251,9 @@ export class ProController {
       const { proId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { withdrawals, total } = await this._proService.getWithdrawalRequestsByProIdPaginated(proId, page, limit);
+      const sortBy = (req.query.sortBy as "latest" | "oldest") || undefined;
+      const status = (req.query.status as "pending" | "approved" | "rejected") || undefined;
+      const { withdrawals, total } = await this._proService.getWithdrawalRequestsByProIdPaginated(proId, page, limit, sortBy, status);
       res.status(HttpStatus.OK).json({ withdrawals, total });
     } catch (error) {
       next(error);

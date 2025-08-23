@@ -7,7 +7,6 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Refresh coordination to avoid parallel refresh attempts
 let isRefreshing = false as boolean;
 let refreshSubscribers: Array<(token: string) => void> = [];
 
@@ -24,7 +23,6 @@ const onRefreshed = (token: string) => {
 api.interceptors.request.use((config) => {
   const token = store.getState().auth.accessToken;
   console.log("Request interceptor: Current token:", token);
-  // Respect explicitly provided Authorization header (e.g., during refresh flow)
   const hasAuthHeader = Boolean((config.headers as any)?.Authorization);
   if (token && config.url !== "/auth/refresh-token" && !hasAuthHeader) {
     config.headers = {
@@ -60,7 +58,6 @@ api.interceptors.response.use(
       console.log(`${status} detected, attempting token refresh for:`, originalRequest.url);
 
       if (isRefreshing) {
-        // Queue this request until refresh finishes
         return new Promise((resolve, reject) => {
           subscribeTokenRefresh((token: string) => {
             try {
@@ -90,7 +87,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (err) {
         console.error("Token refresh failed:", err);
-        onRefreshed(""); // unblock subscribers; they should handle logout after rejection
+        onRefreshed(""); 
         store.dispatch({ type: "auth/logoutUserSync" });
         window.location.href = "/";
         return Promise.reject(err);

@@ -14,10 +14,10 @@ export interface IRatingReviewRepository {
     limit: number
   ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }>;  
   
-  // Admin: fetch all reviews paginated
   findAll(
     page: number,
-    limit: number
+    limit: number,
+    sortBy?: "latest" | "oldest" | "lowest" | "highest"
   ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }>;
 
   

@@ -14,7 +14,7 @@ interface AuthRequest extends Request {
 
 @injectable()
 export class AuthController {
-  constructor(@inject(TYPES.IAuthService) private _authService: IAuthService) {}
+  constructor(@inject(TYPES.IAuthService) private _authService: IAuthService) { }
 
   async sendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -73,7 +73,7 @@ export class AuthController {
     }
   }
 
-   async googleLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async googleLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { credential, role } = req.body;
       if (!credential || !role) {

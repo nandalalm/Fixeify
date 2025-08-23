@@ -25,6 +25,7 @@ const ProConflicts: React.FC = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<TicketResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState<boolean>(false);
   const [anyTicketsExist, setAnyTicketsExist] = useState<boolean>(true);
 
   // caches to avoid duplicate lookups
@@ -123,6 +124,8 @@ const ProConflicts: React.FC = () => {
     setPage(1);
   };
 
+  const isListLoading = loading && !selected;
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
       <ProTopNavbar 
@@ -136,37 +139,54 @@ const ProConflicts: React.FC = () => {
         />
         <main className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}>
           <div className="max-w-7xl mx-auto mb-[50px] space-y-4">
-            <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Your Conflicts</h1>
+            {isListLoading ? (
+              <div className="animate-pulse flex justify-center mb-6">
+                <div className="h-8 bg-gray-200 rounded w-64" />
+              </div>
+            ) : (
+              <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Your Conflicts</h1>
+            )}
 
             {anyTicketsExist ? (
               <>
-                {!selected && (
-                  <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-                    <div className="relative w-full sm:w-5/6">
-                      <input
-                        type="text"
-                        placeholder="Search by subject, description, party..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
+                {!selected && !detailLoading && (
+                  isListLoading ? (
+                    <div className="animate-pulse mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                      <div className="w-full sm:w-5/6">
+                        <div className="h-10 bg-gray-200 rounded" />
+                      </div>
+                      <div className="w-full sm:w-1/6">
+                        <div className="h-10 bg-gray-200 rounded" />
+                      </div>
                     </div>
-                    <div className="relative w-full sm:w-1/6">
-                      <select
-                        value={sort}
-                        onChange={(e) => { setPage(1); setSort(e.target.value); }}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                      >
-                        <option value="-createdAt">Latest</option>
-                        <option value="createdAt">Oldest</option>
-                        <option value="priority:desc">Priority High-Low</option>
-                        <option value="priority:asc">Priority Low-High</option>
-                      </select>
+                  ) : (
+                    <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                      <div className="relative w-full sm:w-5/6">
+                        <input
+                          type="text"
+                          placeholder="Search by subject, description, party..."
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="relative w-full sm:w-1/6">
+                        <select
+                          value={sort}
+                          onChange={(e) => { setPage(1); setSort(e.target.value); }}
+                          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                        >
+                          <option value="-createdAt">Latest</option>
+                          <option value="createdAt">Oldest</option>
+                          <option value="priority:desc">Priority High-Low</option>
+                          <option value="priority:asc">Priority Low-High</option>
+                        </select>
+                      </div>
                     </div>
-                  </div>
+                  )
                 )}
 
-                {!selected && (filtered.length === 0) ? (
+                {!selected && !detailLoading && !isListLoading && (filtered.length === 0) ? (
                   <div className="flex flex-col items-center justify-center py-10">
                     <p className="text-gray-500 mb-2">No results found with the search or sort criteria.</p>
                     <button
@@ -176,16 +196,23 @@ const ProConflicts: React.FC = () => {
                       <RotateCcw className="w-4 h-4 mr-1" /> Clear Filter
                     </button>
                   </div>
+                ) : detailLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <div className="h-10 w-10 rounded-full border-4 border-gray-300 border-t-[#032B44] animate-spin" />
+                  </div>
                 ) : !selected ? (
                   <TicketTable
                     tickets={filtered}
                     loading={loading}
                     onView={async (t) => {
+                      setDetailLoading(true);
                       try {
                         const fresh = await getTicketById(t._id);
                         setSelected(fresh);
                       } catch {
                         setSelected(t);
+                      } finally {
+                        setDetailLoading(false);
                       }
                     }}
                     pagination={{ page, limit, total, onPageChange: setPage }}
@@ -193,7 +220,7 @@ const ProConflicts: React.FC = () => {
                     showTypeBadges={false}
                   />
                 ) : (
-                  <TicketDetails ticket={selected} onBack={() => { setSelected(null); load(); }} />
+                  <TicketDetails ticket={selected} onBack={() => { setSelected(null); setDetailLoading(false); load(); }} />
                 )}
               </>
             ) : (

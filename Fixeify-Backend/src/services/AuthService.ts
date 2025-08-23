@@ -9,7 +9,7 @@ import { IUser } from "../models/userModel";
 import { IAdmin } from "../models/adminModel";
 import { ApprovedProDocument } from "../models/approvedProModel";
 import { UserResponse } from "../dtos/response/userDtos";
-import { createClient } from "redis";
+import RedisConnector from "../config/redisConnector";
 import nodemailer from "nodemailer";
 import { UserRole } from "../enums/roleEnum";
 import { getOtpEmailTemplate, getResetPasswordEmailTemplate } from "../utils/emailTemplates";
@@ -23,16 +23,11 @@ import { Request, Response } from "express";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { INotificationService } from "./INotificationService";
+import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class AuthService implements IAuthService {
-  private _redisClient = createClient({
-    url: process.env.REDIS_URL || "redis://localhost:6379",
-    socket: {
-      keepAlive: 10000,
-      reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
-    },
-  });
+  private _redisConnector: RedisConnector;
   private _transporter = nodemailer.createTransport({
     service: "gmail",
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
@@ -46,22 +41,22 @@ export class AuthService implements IAuthService {
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository,
     @inject(TYPES.IProRepository) private _proRepository: IProRepository,
-    @inject(TYPES.INotificationService) private _notificationService: INotificationService
+    @inject(TYPES.INotificationService) private _notificationService: INotificationService,
+    @inject(TYPES.RedisConnector) redisConnector: RedisConnector
   ) {
-    this._redisClient.connect().catch((err) => logger.error(MESSAGES.REDIS_CONNECT_FAILED + ":", err));
-    this._redisClient.on("error", (err) => logger.error(MESSAGES.REDIS_ERROR + ":", err));
+    this._redisConnector = redisConnector;
   }
 
   async sendOtp(email: string): Promise<void> {
     const existingUser = await this._userRepository.findUserByEmail(email);
-    if (existingUser) throw new HttpError(400, MESSAGES.EMAIL_ALREADY_REGISTERED);
+    if (existingUser) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
     const existingAdmin = await this._adminRepository.findAdminByEmail(email);
-    if (existingAdmin) throw new HttpError(400, MESSAGES.EMAIL_ALREADY_REGISTERED);
+    if (existingAdmin) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
     const existingPro = await this._proRepository.findApprovedProByEmail(email);
-    if (existingPro) throw new HttpError(400, MESSAGES.EMAIL_ALREADY_REGISTERED);
+    if (existingPro) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    await this._redisClient.setEx(`otp:${email}`, 60, otp);
+    await this._redisConnector.getClient().setEx(`otp:${email}`, 60, otp);
 
     try {
       await this._transporter.sendMail({
@@ -72,22 +67,22 @@ export class AuthService implements IAuthService {
       });
     } catch (error) {
       logger.error(MESSAGES.FAILED_SEND_OTP_EMAIL + ":", error);
-      throw new HttpError(500, MESSAGES.FAILED_SEND_OTP_EMAIL);
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_OTP_EMAIL);
     }
   }
 
   async verifyOtp(email: string, otp: string): Promise<boolean> {
-    const storedOtp = await this._redisClient.get(`otp:${email}`);
+    const storedOtp = await this._redisConnector.getClient().get(`otp:${email}`);
     if (storedOtp && storedOtp === otp) {
-      await this._redisClient.setEx(`verified:${email}`, 3600, "true");
-      await this._redisClient.del(`otp:${email}`);
+      await this._redisConnector.getClient().setEx(`verified:${email}`, 3600, "true");
+      await this._redisConnector.getClient().del(`otp:${email}`);
       return true;
     }
-    throw new HttpError(400, MESSAGES.INVALID_OTP);
+    throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INVALID_OTP);
   }
 
   async isEmailVerified(email: string): Promise<boolean> {
-    const verified = await this._redisClient.get(`verified:${email}`);
+    const verified = await this._redisConnector.getClient().get(`verified:${email}`);
     return verified === "true";
   }
 
@@ -95,11 +90,9 @@ export class AuthService implements IAuthService {
     const hashedPassword = await bcrypt.hash(password, 10);
     const userData = mapUserDtoToModel({ name, email, password: hashedPassword });
     let newUser: IUser | IAdmin;
-    
+
     if (role === UserRole.USER) {
       newUser = await this._userRepository.createUser(userData);
-      
-      // Send welcome notification to new user
       try {
         await this._notificationService.createNotification({
           type: "general",
@@ -110,12 +103,12 @@ export class AuthService implements IAuthService {
       } catch (error) {
         logger.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
       }
-      
+
       return newUser;
     } else if (role === UserRole.ADMIN) {
       return this._adminRepository.createAdmin(userData);
     } else {
-      throw new HttpError(400, MESSAGES.ACCESS_DENIED);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ACCESS_DENIED);
     }
   }
 
@@ -144,37 +137,37 @@ export class AuthService implements IAuthService {
       if (role !== UserRole.USER) {
         otherUser = await this._userRepository.findUserByEmail(email);
         if (otherUser && (await bcrypt.compare(password, otherUser.password))) {
-          throw new HttpError(400, MESSAGES.INVALID_ROLE);
+          throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INVALID_ROLE);
         }
       }
       if (role !== UserRole.PRO) {
         otherUser = await this._proRepository.findApprovedProByEmail(email);
         if (otherUser && (await bcrypt.compare(password, otherUser.password))) {
-          throw new HttpError(400, MESSAGES.INVALID_ROLE);
+          throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INVALID_ROLE);
         }
       }
       if (role !== UserRole.ADMIN) {
         otherUser = await this._adminRepository.findAdminByEmail(email);
         if (otherUser && (await bcrypt.compare(password, otherUser.password))) {
-          throw new HttpError(400, MESSAGES.INVALID_ROLE);
+          throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INVALID_ROLE);
         }
       }
-      throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+      throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new HttpError(422, MESSAGES.INCORRECT_PASSWORD);
+      throw new HttpError(HttpStatus.UNPROCESSABLE_ENTITY, MESSAGES.INCORRECT_PASSWORD);
     }
 
     if ("isBanned" in user && user.isBanned) {
-      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
     }
 
     const accessToken = generateAccessToken(user.id, role);
     const refreshToken = generateRefreshToken(user.id, role);
 
-    await this._redisClient.setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
+    await this._redisConnector.getClient().setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -214,7 +207,7 @@ export class AuthService implements IAuthService {
     user: UserResponse;
   }> {
     if (role !== UserRole.USER) {
-      throw new HttpError(400, MESSAGES.GOOGLE_LOGIN_USERS_ONLY);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.GOOGLE_LOGIN_USERS_ONLY);
     }
 
     let ticket;
@@ -225,12 +218,12 @@ export class AuthService implements IAuthService {
       });
     } catch (error) {
       logger.error(MESSAGES.TOKEN_VERIFICATION_FAILED + ":", error);
-      throw new HttpError(400, MESSAGES.INVALID_GOOGLE_CREDENTIAL);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INVALID_GOOGLE_CREDENTIAL);
     }
 
     const payload = ticket.getPayload();
     if (!payload || !payload.email || !payload.name) {
-      throw new HttpError(400, MESSAGES.INVALID_GOOGLE_USER_DATA);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INVALID_GOOGLE_USER_DATA);
     }
 
     let user = await this._userRepository.findUserByEmail(payload.email);
@@ -244,8 +237,7 @@ export class AuthService implements IAuthService {
       });
       user = await this._userRepository.createUser(userData);
       created = true;
-      
-      // Send welcome notification to new Google user
+
       try {
         await this._notificationService.createNotification({
           type: "general",
@@ -259,13 +251,13 @@ export class AuthService implements IAuthService {
     }
 
     if ("isBanned" in user && user.isBanned) {
-      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
     }
 
     const accessToken = generateAccessToken(user.id, role);
     const refreshToken = generateRefreshToken(user.id, role);
 
-    await this._redisClient.setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
+    await this._redisConnector.getClient().setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, refreshToken);
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -282,7 +274,7 @@ export class AuthService implements IAuthService {
       isBanned: user.isBanned || false,
       phoneNo: user.phoneNo || null,
       address: user.address || null,
-      photo:  null,
+      photo: null,
     });
 
     return {
@@ -294,28 +286,27 @@ export class AuthService implements IAuthService {
 
   async refreshAccessToken(req: Request, res: Response): Promise<string> {
     const secret = process.env.REFRESH_TOKEN_SECRET;
-    if (!secret) throw new HttpError(500, MESSAGES.SERVER_ERROR);
+    if (!secret) throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.SERVER_ERROR);
 
     const refreshToken = req.cookies.refreshToken;
-    if (!refreshToken) throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+    if (!refreshToken) throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.INVALID_TOKEN);
 
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, secret) as { userId: string };
     } catch (err) {
       console.error(MESSAGES.TOKEN_VERIFICATION_FAILED + ":", err);
-      throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+      throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.INVALID_TOKEN);
     }
 
-    const storedToken = await this._redisClient.get(`refresh:${decoded.userId}`);
+    const storedToken = await this._redisConnector.getClient().get(`refresh:${decoded.userId}`);
     if (!storedToken || storedToken !== refreshToken) {
-      throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+      throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.INVALID_TOKEN);
     }
 
     let user: IUser | IAdmin | ApprovedProDocument | null = null;
     let userRole: "user" | "pro" | "admin";
-    
-    // Determine user and role based on which repository finds the user
+
     user = await this._userRepository.findUserById(decoded.userId);
     if (user) {
       userRole = "user";
@@ -328,19 +319,19 @@ export class AuthService implements IAuthService {
         if (user) {
           userRole = "pro";
         } else {
-          throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+          throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.INVALID_TOKEN);
         }
       }
     }
 
     if ("isBanned" in user && user.isBanned) {
-      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
     }
 
     const newAccessToken = generateAccessToken(user.id, userRole);
     const newRefreshToken = generateRefreshToken(user.id, userRole);
 
-    await this._redisClient.setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, newRefreshToken);
+    await this._redisConnector.getClient().setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, newRefreshToken);
 
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
@@ -365,10 +356,10 @@ export class AuthService implements IAuthService {
       role = UserRole.PRO;
     }
 
-    if (!user) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+    if (!user) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
 
     if ("isBanned" in user && user.isBanned) {
-      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
     }
 
     return new UserResponse({
@@ -388,13 +379,13 @@ export class AuthService implements IAuthService {
 
   async logout(refreshToken: string, role: UserRole, res: Response): Promise<void> {
     const secret = process.env.REFRESH_TOKEN_SECRET;
-    if (!secret) throw new HttpError(500, MESSAGES.SERVER_ERROR);
+    if (!secret) throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.SERVER_ERROR);
 
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, secret) as { userId: string };
     } catch (err) {
-      throw new HttpError(401, MESSAGES.INVALID_TOKEN);
+      throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.INVALID_TOKEN);
     }
 
     let user: IUser | IAdmin | ApprovedProDocument | null = null;
@@ -405,14 +396,14 @@ export class AuthService implements IAuthService {
     } else if (role === UserRole.PRO) {
       user = await this._proRepository.findApprovedProById(decoded.userId);
     } else {
-      throw new HttpError(400, MESSAGES.ACCESS_DENIED);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ACCESS_DENIED);
     }
 
     if (!user) {
-      throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+      throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
     }
 
-    await this._redisClient.del(`refresh:${decoded.userId}`);
+    await this._redisConnector.getClient().del(`refresh:${decoded.userId}`);
     res.clearCookie("refreshToken", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -425,7 +416,7 @@ export class AuthService implements IAuthService {
     if (!user) {
       user = await this._proRepository.findApprovedProById(userId);
     }
-    if (!user) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+    if (!user) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
 
     return { isBanned: user.isBanned || false };
   }
@@ -438,16 +429,16 @@ export class AuthService implements IAuthService {
       role = UserRole.PRO;
     }
     if (!user) {
-      throw new HttpError(404, MESSAGES.EMAIL_NOT_REGISTERED);
+      throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.EMAIL_NOT_REGISTERED);
     }
 
     if ("isBanned" in user && user.isBanned) {
-      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
     }
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetTokenKey = `reset:${user.id}`;
-    await this._redisClient.setEx(resetTokenKey, 3600, resetToken);
+    await this._redisConnector.getClient().setEx(resetTokenKey, 3600, resetToken);
 
     const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&id=${user.id}`;
 
@@ -460,16 +451,16 @@ export class AuthService implements IAuthService {
       });
     } catch (error) {
       logger.error(MESSAGES.FAILED_SEND_PASSWORD_RESET_EMAIL + ":", error);
-      await this._redisClient.del(resetTokenKey);
-      throw new HttpError(500, MESSAGES.FAILED_SEND_PASSWORD_RESET_EMAIL);
+      await this._redisConnector.getClient().del(resetTokenKey);
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_PASSWORD_RESET_EMAIL);
     }
   }
 
   async resetPassword(userId: string, token: string, newPassword: string): Promise<void> {
     const resetTokenKey = `reset:${userId}`;
-    const storedToken = await this._redisClient.get(resetTokenKey);
+    const storedToken = await this._redisConnector.getClient().get(resetTokenKey);
     if (!storedToken || storedToken !== token) {
-      throw new HttpError(400, MESSAGES.INVALID_OR_EXPIRED_RESET_TOKEN);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INVALID_OR_EXPIRED_RESET_TOKEN);
     }
 
     let user: IUser | ApprovedProDocument | null = await this._userRepository.findUserById(userId);
@@ -480,11 +471,11 @@ export class AuthService implements IAuthService {
       role = UserRole.PRO;
     }
     if (!user) {
-      throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
+      throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
     }
 
     if ("isBanned" in user && user.isBanned) {
-      throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -495,6 +486,6 @@ export class AuthService implements IAuthService {
       await this._proRepository.updateApprovedPro(userId, { password: hashedPassword } as Partial<ApprovedProDocument>);
     }
 
-    await this._redisClient.del(resetTokenKey);
+    await this._redisConnector.getClient().del(resetTokenKey);
   }
 }

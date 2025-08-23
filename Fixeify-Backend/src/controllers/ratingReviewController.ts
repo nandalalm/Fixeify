@@ -11,7 +11,7 @@ export class RatingReviewController {
   constructor(
     @inject(TYPES.IRatingReviewService)
     private _ratingReviewService: IRatingReviewService
-  ) {}
+  ) { }
 
   createRatingReview = async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -47,12 +47,12 @@ export class RatingReviewController {
     }
   };
 
-  // Admin: get paginated list of all reviews
   getAllRatingReviews = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const result = await this._ratingReviewService.getAllRatingReviews(page, limit);
+      const sortBy = (req.query.sortBy as "latest" | "oldest" | "lowest" | "highest") || undefined;
+      const result = await this._ratingReviewService.getAllRatingReviews(page, limit, sortBy);
       res.json(result);
     } catch (error) {
       next(error);

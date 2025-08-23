@@ -59,11 +59,13 @@ export const getSingleReview = async (id: string): Promise<RatingReviewResponse>
   return data;
 };
 
-// Admin: fetch all reviews paginated
 export const getAllReviews = async (
   page: number = 1,
-  limit: number = 5
+  limit: number = 5,
+  sortBy?: "latest" | "oldest" | "lowest" | "highest"
 ): Promise<PaginatedReviews> => {
-  const { data } = await axiosInstance.get(`${ReviewBase}/all`, { params: { page, limit } });
+  const params: Record<string, any> = { page, limit };
+  if (sortBy) params.sortBy = sortBy;
+  const { data } = await axiosInstance.get(`${ReviewBase}/all`, { params });
   return data;
 };

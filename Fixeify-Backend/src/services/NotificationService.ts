@@ -4,14 +4,17 @@ import { INotificationRepository } from "../repositories/INotificationRepository
 import { NotificationResponse, CreateNotificationRequest } from "../dtos/response/notificationDtos";
 import { TYPES } from "../types";
 import mongoose from "mongoose";
+import { HttpError } from "../middleware/errorMiddleware";
+import { HttpStatus } from "../enums/httpStatus";
+import { MESSAGES } from "../constants/messages";
 
 @injectable()
 export class NotificationService implements INotificationService {
-  constructor(@inject(TYPES.INotificationRepository) private _notificationRepository: INotificationRepository) {}
+  constructor(@inject(TYPES.INotificationRepository) private _notificationRepository: INotificationRepository) { }
 
   async createNotification(data: CreateNotificationRequest): Promise<NotificationResponse> {
     if (!data.type || !data.title || !data.description) {
-      throw new Error("type, title, and description are required");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     }
     const notification = await this._notificationRepository.createNotification(data);
     const response = {
@@ -56,8 +59,8 @@ export class NotificationService implements INotificationService {
     limit: number,
     filter: 'all' | 'unread' = 'all'
   ): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!participantId) throw new Error("participantId is required");
-    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new Error("Invalid participantId");
+    if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
+    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     if (participantModel === "User") {
       return this._notificationRepository.findNotificationsByUser(participantId, page, limit, filter);
     } else if (participantModel === "ApprovedPro") {
@@ -68,14 +71,14 @@ export class NotificationService implements INotificationService {
   }
 
   async markNotificationAsRead(notificationId: string): Promise<void> {
-    if (!notificationId) throw new Error("notificationId is required");
-    if (!mongoose.Types.ObjectId.isValid(notificationId)) throw new Error("Invalid notificationId");
+    if (!notificationId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.NOTIFICATIONID_REQUIRED);
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     await this._notificationRepository.markNotificationAsRead(notificationId);
   }
 
   async markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void> {
-    if (!participantId) throw new Error("participantId is required");
-    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new Error("Invalid participantId");
+    if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
+    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     await this._notificationRepository.markAllNotificationsAsRead(participantId, participantModel);
   }
 }

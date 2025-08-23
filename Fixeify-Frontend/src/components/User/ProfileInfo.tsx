@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../store/store";
 import { useNavigate } from "react-router-dom";
-import { User, Mail, Phone, Home, Edit, Lock } from "lucide-react";
+import { User, Mail, Phone, Home, Edit, Lock, User as UserIcon } from "lucide-react";
 import { getUserProfile } from "@/api/userApi";
 import { updateUser } from "@/store/authSlice";
+import { SkeletonLine } from "@/components/Reuseable/Skeleton";
 
 interface ProfileInfoProps {
   onEdit: () => void;
@@ -17,6 +18,8 @@ const ProfileInfo = ({ onEdit, onChangePassword }: ProfileInfoProps) => {
   const user = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [initialLoading, setInitialLoading] = useState<boolean>(true);
+  const [isEditing, setIsEditing] = useState<boolean>(false);
 
   // Fetch latest profile details (e.g., updated Google photo) on mount and when user.id changes
   useEffect(() => {
@@ -39,17 +42,110 @@ const ProfileInfo = ({ onEdit, onChangePassword }: ProfileInfoProps) => {
       } catch (e) {
         // Non-blocking: fail silently to avoid disrupting profile view
         console.warn("Failed to refresh latest user profile", e);
+      } finally {
+        setInitialLoading(false);
       }
     };
-    syncLatestProfile();
+    // If user exists but we don't need a network fetch (no id), stop loading
+    if (!user?.id) {
+      setInitialLoading(false);
+    } else {
+      setInitialLoading(true);
+      syncLatestProfile();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // Local Avatar component: preloads the image and falls back to an icon placeholder
+  const Avatar: React.FC<{ src?: string | null; alt: string; className?: string }> = ({ src, alt, className }) => {
+    const placeholder = "/placeholder-user.jpg";
+    const [displayedSrc, setDisplayedSrc] = useState<string>(placeholder);
+
+    useEffect(() => {
+      const url = (src || "").trim();
+      if (!url) {
+        setDisplayedSrc(placeholder);
+        return;
+      }
+      let cancelled = false;
+      const img = new Image();
+      img.onload = () => { if (!cancelled) setDisplayedSrc(url); };
+      img.onerror = () => { if (!cancelled) setDisplayedSrc(placeholder); };
+      img.src = url;
+      return () => { cancelled = true; };
+    }, [src]);
+
+    if (displayedSrc === placeholder) {
+      return (
+        <div
+          aria-label={alt}
+          className={(className || "w-full h-full rounded-full") + " bg-gray-200 dark:bg-gray-700 border flex items-center justify-center text-gray-500 dark:text-gray-300"}
+        >
+          <UserIcon className="w-10 h-10" />
+        </div>
+      );
+    }
+    return <img src={displayedSrc} alt={alt} className={className || "w-full h-full rounded-full object-cover"} />;
+  };
 
   if (!user) {
     navigate("/login");
     return null;
   }
 
+
+  if (initialLoading) {
+    return (
+      <div className="flex-1 p-6 md:p-10 mb-[70px] mt-5">
+        <h1 className="text-3xl font-bold mb-8 text-center dark:text-gray-200">Profile Info</h1>
+        <div className="flex flex-col items-center">
+          {/* Avatar skeleton */}
+          <div className="w-32 h-32 rounded-full overflow-hidden mb-8">
+            <div className="bg-gray-200 dark:bg-gray-700 rounded-full w-full h-full animate-pulse" />
+          </div>
+          <div className="w-full max-w-md space-y-6">
+            {/* Name */}
+            <div className="flex items-start gap-4">
+              <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-md" />
+              <div className="flex-1">
+                <SkeletonLine width="w-24" height="h-4" className="mb-2" />
+                <SkeletonLine width="w-40" height="h-5" />
+              </div>
+            </div>
+            {/* Email */}
+            <div className="flex items-start gap-4">
+              <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-md" />
+              <div className="flex-1">
+                <SkeletonLine width="w-20" height="h-4" className="mb-2" />
+                <SkeletonLine width="w-56" height="h-5" />
+              </div>
+            </div>
+            {/* Phone */}
+            <div className="flex items-start gap-4">
+              <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-md" />
+              <div className="flex-1">
+                <SkeletonLine width="w-28" height="h-4" className="mb-2" />
+                <SkeletonLine width="w-40" height="h-5" />
+              </div>
+            </div>
+            {/* Address */}
+            <div className="flex items-start gap-4">
+              <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-md" />
+              <div className="flex-1">
+                <SkeletonLine width="w-40" height="h-4" className="mb-2" />
+                <SkeletonLine width="w-64" height="h-5" />
+              </div>
+            </div>
+            {/* Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 mt-8">
+              <SkeletonLine width="w-full" height="h-12" />
+              <SkeletonLine width="w-full" height="h-12" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 p-6 md:p-10 mb-[70px] mt-5">
@@ -58,15 +154,7 @@ const ProfileInfo = ({ onEdit, onChangePassword }: ProfileInfoProps) => {
       <div className="flex flex-col items-center">
         {/* Profile Image */}
         <div className="w-32 h-32 rounded-full overflow-hidden mb-8">
-          <img
-            src={user.photo || "/placeholder.svg?height=128&width=128"}
-            alt="Profile"
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              // Fallback if URL is invalid; avoids broken image until refresh completes
-              (e.currentTarget as HTMLImageElement).src = "/placeholder.svg?height=128&width=128";
-            }}
-          />
+          <Avatar src={user.photo} alt="Profile" className="w-full h-full rounded-full object-cover" />
         </div>
 
         {/* Profile Information */}
@@ -118,11 +206,24 @@ const ProfileInfo = ({ onEdit, onChangePassword }: ProfileInfoProps) => {
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 mt-8">
             <button
-              onClick={onEdit}
-              className="flex-1 bg-[#032B44] text-white py-3 px-6 rounded-md hover:bg-[#054869] transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white flex items-center justify-center gap-2"
+              onClick={async () => {
+                try {
+                  setIsEditing(true);
+                  await Promise.resolve(onEdit());
+                } finally {
+                  // Usually navigates away; if not, re-enable after a short delay for UX
+                  setTimeout(() => setIsEditing(false), 800);
+                }
+              }}
+              disabled={isEditing}
+              className={`flex-1 py-3 px-6 rounded-md transition-colors flex items-center justify-center gap-2 ${isEditing ? "bg-[#054869] cursor-not-allowed" : "bg-[#032B44] hover:bg-[#054869]"} text-white dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white`}
             >
-              <Edit className="w-4 h-4" />
-              Edit Profile
+              {isEditing ? (
+                <span className="inline-block w-4 h-4 border-2 border-white border-b-transparent rounded-full animate-spin" aria-label="loading" />
+              ) : (
+                <Edit className="w-4 h-4" />
+              )}
+              {isEditing ? "Processing..." : "Edit Profile"}
             </button>
             <button
               onClick={onChangePassword}

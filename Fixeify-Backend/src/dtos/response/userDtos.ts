@@ -14,6 +14,7 @@ export class UserResponse {
     coordinates: { type: "Point"; coordinates: [number, number] };
   } | null;
   public isBanned: boolean;
+  public createdAt?: Date;
 
   constructor({
     id,
@@ -24,6 +25,7 @@ export class UserResponse {
     phoneNo = null,
     address = null,
     isBanned,
+    createdAt,
   }: {
     id: string;
     name: string;
@@ -33,6 +35,7 @@ export class UserResponse {
     phoneNo?: string | null;
     address?: { address: string; city: string; state: string; coordinates: { type: "Point"; coordinates: [number, number] } } | null;
     isBanned: boolean;
+    createdAt?: Date;
   }) {
     this.id = id;
     this.name = name;
@@ -42,6 +45,7 @@ export class UserResponse {
     this.phoneNo = phoneNo;
     this.address = address;
     this.isBanned = isBanned;
+    this.createdAt = createdAt;
   }
 }
 

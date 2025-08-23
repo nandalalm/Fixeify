@@ -87,6 +87,9 @@ const AdminBookingManagement: FC = () => {
     }
   };
 
+  // Check if there are no bookings at all (initial load without filters)
+  const hasNoBookingsAtAll = !loading && bookings.length === 0 && !searchTerm && sortOption === "latest" && currentPage === 1;
+
   const handleViewBooking = async (booking: BookingResponse) => {
     setSelectedBooking(booking);
   };
@@ -107,13 +110,7 @@ const AdminBookingManagement: FC = () => {
   // Server-side returns already filtered/sorted page of results
   const displayBookings = bookings;
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="spinner border-t-4 border-blue-500 rounded-full w-12 h-12 animate-spin"></div>
-      </div>
-    );
-  }
+  // while loading, we will keep heading/search/sort visible and only skeletonize the table below
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -143,71 +140,123 @@ const AdminBookingManagement: FC = () => {
               </div>
             )}
 
-            {bookings.length === 0 ? (
-              <div className="text-center text-gray-600">
-                <p>No booking history available.</p>
+            {/* Filters (only visible when there are bookings and not in details view) */}
+            {!selectedBooking && !hasNoBookingsAtAll && (
+              <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                <div className="relative w-full sm:w-5/6">
+                  <input
+                    type="text"
+                    placeholder="Search by issue or location..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="relative w-full sm:w-1/6">
+                  <select
+                    value={sortOption}
+                    onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
+                    className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                  >
+                    <option value="latest">Sort by Latest</option>
+                    <option value="oldest">Sort by Oldest</option>
+                    <option value="pending">Sort by Pending</option>
+                    <option value="accepted">Sort by Accepted</option>
+                    <option value="completed">Sort by Completed</option>
+                    <option value="rejected">Sort by Rejected</option>
+                    <option value="cancelled">Sort by Cancelled</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {/* Content area */}
+            {selectedBooking ? (
+              <div className="mt-4">
+                <BookingDetails
+                  bookingId={selectedBooking.bookingId}
+                  viewerRole="admin"
+                  onBack={async () => { setSelectedBooking(null); await fetchBookings(); }}
+                />
+              </div>
+            ) : loading ? (
+              // Responsive skeleton that mirrors BookingTable layout
+              <div className="w-full">
+                {/* Mobile skeleton cards */}
+                <div className="md:hidden flex flex-col gap-4">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="bg-white p-4 rounded-md shadow border border-gray-200 animate-pulse">
+                      <div className="h-4 w-20 bg-gray-200 rounded mb-2" />
+                      <div className="h-4 w-3/4 bg-gray-200 rounded mb-2" />
+                      <div className="h-4 w-1/2 bg-gray-200 rounded mb-2" />
+                      <div className="h-6 w-24 bg-gray-200 rounded mb-3" />
+                      <div className="h-8 w-20 bg-gray-200 rounded" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop skeleton table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-1/12">S.No</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-3/6">Issue</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Booking Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <tr key={i} className="animate-pulse">
+                            <td className="py-3 px-4">
+                              <div className="h-4 w-10 bg-gray-200 rounded" />
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="h-4 w-5/6 bg-gray-200 rounded" />
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="h-4 w-28 bg-gray-200 rounded" />
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="h-6 w-28 bg-gray-200 rounded-full" />
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="h-8 w-20 bg-gray-200 rounded" />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            ) : hasNoBookingsAtAll ? (
+              <div className="text-center text-gray-600 space-y-2">
+                <p>No bookings currently</p>
+              </div>
+            ) : displayBookings.length === 0 ? (
+              <div className="text-center text-gray-600 space-y-2">
+                <p>No results found for your search or sort criteria.</p>
+                <button
+                  onClick={handleClearFilter}
+                  className="text-blue-600 flex items-center justify-center mx-auto"
+                  aria-label="Clear search and sort filters"
+                >
+                  Clear filter
+                  <RotateCcw className="ml-2 h-5 w-5 text-blue-600" />
+                </button>
               </div>
             ) : (
-              <>
-                {!selectedBooking && (
-                  <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-                    <div className="relative w-full sm:w-5/6">
-                      <input
-                        type="text"
-                        placeholder="Search by issue or location..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                    </div>
-                    <div className="relative w-full sm:w-1/6">
-                      <select
-                        value={sortOption}
-                        onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                      >
-                        <option value="latest">Sort by Latest</option>
-                        <option value="oldest">Sort by Oldest</option>
-                        <option value="pending">Sort by Pending</option>
-                        <option value="accepted">Sort by Accepted</option>
-                        <option value="completed">Sort by Completed</option>
-                        <option value="rejected">Sort by Rejected</option>
-                        <option value="cancelled">Sort by Cancelled</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                {displayBookings.length === 0 ? (
-                  <div className="text-center text-gray-600 space-y-2">
-                    <p>No results found for your search or sort criteria.</p>
-                    <button
-                      onClick={handleClearFilter}
-                      className="text-blue-600 flex items-center justify-center mx-auto"
-                      aria-label="Clear search and sort filters"
-                    >
-                      Clear filter
-                      <RotateCcw className="ml-2 h-5 w-5 text-blue-600" />
-                    </button>
-                  </div>
-                ) : selectedBooking ? (
-                  <div className="mt-4">
-                    <BookingDetails
-                      bookingId={selectedBooking.id}
-                      viewerRole="admin"
-                      onBack={async () => { setSelectedBooking(null); await fetchBookings(); }}
-                    />
-                  </div>
-                ) : (
-                  <BookingTable
-                    bookings={displayBookings}
-                    onViewDetails={handleViewBooking}
-                    totalPages={totalPages}
-                    currentPage={currentPage}
-                    onPageChange={handlePageChange}
-                  />
-                )}
-              </>
+              <BookingTable
+                bookings={displayBookings}
+                onViewDetails={handleViewBooking}
+                totalPages={totalPages}
+                currentPage={currentPage}
+                onPageChange={handlePageChange}
+              />
             )}
           </div>
         </main>

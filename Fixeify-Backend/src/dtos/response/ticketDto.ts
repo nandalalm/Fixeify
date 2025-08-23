@@ -15,6 +15,8 @@ export interface TicketResponse {
   adminComment?: string;
   resolvedBy?: string;
   resolvedAt?: Date;
+  isUserBanned?: boolean;
+  isProBanned?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

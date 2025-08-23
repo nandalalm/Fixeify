@@ -3,18 +3,18 @@ import { IMessage } from "../models/messageModel";
 import { MessageResponse } from "../dtos/response/chatDtos";
 import mongoose from "mongoose";
 
-interface PopulatedUser {
+export interface PopulatedUser {
   _id: mongoose.Types.ObjectId;
   name: string;
 }
 
-interface PopulatedPro {
+export interface PopulatedPro {
   _id: mongoose.Types.ObjectId;
   firstName: string;
   lastName: string;
 }
 
-type PopulatedChat = Omit<IChat, "participants" | "lastMessage"> & {
+export type PopulatedChat = Omit<IChat, "participants" | "lastMessage"> & {
   participants: {
     userId: PopulatedUser;
     proId: PopulatedPro;

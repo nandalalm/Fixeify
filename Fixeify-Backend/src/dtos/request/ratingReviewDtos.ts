@@ -1,9 +1,9 @@
 export interface CreateRatingReviewRequest {
-  userId: string; // current logged user
+  userId: string;
   proId: string;
   categoryId: string;
   bookingId?: string;
   quotaId?: string;
-  rating: number; // 1-5
+  rating: number;
   review?: string;
 }

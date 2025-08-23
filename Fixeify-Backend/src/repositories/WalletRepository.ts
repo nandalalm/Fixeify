@@ -84,7 +84,6 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
   }
 
   private async fetchTransactionsForPro(proId: string) {
-    // Exclude admin-credited transactions from pro view
     const txs = await TransactionModel.find({
       proId: new Types.ObjectId(proId),
       $or: [
@@ -98,6 +97,7 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
       .exec();
     return txs.map((t: any) => ({
       _id: t._id.toString(),
+      transactionId: t.transactionId,
       amount: t.amount,
       type: t.type,
       date: t.date,

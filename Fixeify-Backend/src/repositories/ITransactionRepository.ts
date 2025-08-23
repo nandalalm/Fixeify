@@ -2,6 +2,7 @@ import { TransactionDocument } from "../models/transactionModel";
 
 export interface TransactionResponseDTO {
   id: string;
+  transactionId: string;
   proId: string;
   walletId?: string;
   amount: number;

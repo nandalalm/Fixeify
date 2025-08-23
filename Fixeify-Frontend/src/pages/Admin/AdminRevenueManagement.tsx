@@ -25,11 +25,11 @@ const formatDateIST = (date: Date): string => {
 const getStatusStyles = (status: string) => {
   switch (status) {
     case "pending":
-      return "bg-yellow-100 text-yellow-800";
+      return "bg-yellow-200 text-yellow-800";
     case "approved":
-      return "bg-green-600 text-white";
+      return "bg-green-100 text-green-800";
     case "rejected":
-      return "bg-red-600 text-white";
+      return "bg-red-100 text-red-800";
     default:
       return "bg-gray-100 text-gray-800";
   }
@@ -56,6 +56,10 @@ const AdminRevenueManagement: FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const limit = 5;
   // Revenue metrics state
+  // Loading states
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState<boolean>(false);
+  const [adminTxnsLoading, setAdminTxnsLoading] = useState<boolean>(false);
+  
   const [revenueLoading, setRevenueLoading] = useState(false);
   const [totalRevenue, setTotalRevenue] = useState<number>(0);
   const [yearlyRevenue, setYearlyRevenue] = useState<number>(0);
@@ -77,7 +81,11 @@ const AdminRevenueManagement: FC = () => {
   // Helpers to refresh data so we can call on view/back
   const refreshWithdrawals = async () => {
     try {
-      const { withdrawals, total, pros } = await fetchWithdrawalRequests(currentPage, limit);
+      setWithdrawalsLoading(true);
+      const isStatus = ["pending", "approved", "rejected"].includes(sortBy);
+      const backendSortBy = (sortBy === "latest" || sortBy === "oldest") ? (sortBy as "latest" | "oldest") : undefined;
+      const statusParam = isStatus ? (sortBy as "pending" | "approved" | "rejected") : undefined;
+      const { withdrawals, total, pros } = await fetchWithdrawalRequests(currentPage, limit, backendSortBy, statusParam);
       setWithdrawals(withdrawals);
       const proMap: { [key: string]: IApprovedPro } = {};
       for (const pro of pros) {
@@ -89,17 +97,22 @@ const AdminRevenueManagement: FC = () => {
     } catch (error: any) {
       console.error("Failed to fetch withdrawals:", error);
       setError(error?.response?.data?.message || "Failed to load withdrawal requests");
+    } finally {
+      setWithdrawalsLoading(false);
     }
   };
 
   const refreshAdminTransactions = async () => {
     if (!user) return;
     try {
+      setAdminTxnsLoading(true);
       const { transactions, total } = await fetchAdminTransactions(user.id, adminTxnPage, 5);
       setAdminTxns(transactions);
       setAdminTxnTotalPages(Math.max(1, Math.ceil(total / 5)));
     } catch (err) {
       console.error('Failed to fetch admin transactions', err);
+    } finally {
+      setAdminTxnsLoading(false);
     }
   };
 
@@ -132,7 +145,7 @@ const AdminRevenueManagement: FC = () => {
       refreshAdminTransactions();
       refreshWithdrawals();
     }
-  }, [user, navigate, currentPage, adminTxnPage]);
+  }, [user, navigate, currentPage, adminTxnPage, sortBy]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -185,7 +198,7 @@ const AdminRevenueManagement: FC = () => {
 
   const handleViewAdminTransaction = async (t: AdminTransactionDTO) => {
     await refreshAdminTransactions();
-    setSelectedAdminTransaction({ _id: t.id, amount: t.amount, type: t.type as any, date: new Date(t.date) as any, description: t.description, bookingId: (t as any).bookingId });
+    setSelectedAdminTransaction({ _id: t.id, amount: t.amount, type: t.type as any, date: new Date(t.date) as any, description: t.description, bookingId: (t as any).bookingId, transactionId: (t as any).transactionId });
   };
 
   const handleAcceptWithdrawal = async () => {
@@ -244,33 +257,14 @@ const AdminRevenueManagement: FC = () => {
     setCurrentPage(1);
   };
 
-  const sortWithdrawals = (withdrawals: IWithdrawalRequest[]): IWithdrawalRequest[] => {
-    const sorted = [...withdrawals];
-    switch (sortBy) {
-      case "latest":
-        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      case "oldest":
-        return sorted.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      case "pending":
-        return sorted.filter((w) => w.status === "pending");
-      case "approved":
-        return sorted.filter((w) => w.status === "approved");
-      case "rejected":
-        return sorted.filter((w) => w.status === "rejected");
-      default:
-        return sorted;
-    }
-  };
-
-  const filteredWithdrawals = sortWithdrawals(
-    withdrawals.filter((withdrawal) =>
-      pros[withdrawal.proId]?.firstName
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      pros[withdrawal.proId]?.lastName
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase())
-    )
+  // Backend returns already sorted/filtered; only apply local search by pro name
+  const filteredWithdrawals = withdrawals.filter((withdrawal) =>
+    pros[withdrawal.proId]?.firstName
+      ?.toLowerCase()
+      .includes(searchQuery.toLowerCase()) ||
+    pros[withdrawal.proId]?.lastName
+      ?.toLowerCase()
+      .includes(searchQuery.toLowerCase())
   );
 
   if (!user || user.role !== "admin") return null;
@@ -311,7 +305,7 @@ const AdminRevenueManagement: FC = () => {
             )}
 
             {/* Early empty state: hide tabs when both empty */}
-            {adminTxns.length === 0 && withdrawals.length === 0 ? (
+            {adminTxns.length === 0 && withdrawals.length === 0 && !adminTxnsLoading && !withdrawalsLoading ? (
               <div className="bg-white rounded-lg shadow-sm p-8 text-center text-gray-600">No transactions yet.</div>
             ) : (
               <div className="bg-white rounded-lg shadow-sm mb-6">
@@ -333,8 +327,28 @@ const AdminRevenueManagement: FC = () => {
             )}
 
             {/* Withdrawals tab empty-state without search/sort when none exist (below tabs) */}
-            {activeTab === 'withdrawals' && withdrawals.length === 0 && !(adminTxns.length === 0 && withdrawals.length === 0) && (
-              <div className="bg-white rounded-lg shadow-sm p-8 text-center text-gray-600">No withdrawal requests at the moment.</div>
+            {activeTab === 'withdrawals' && withdrawals.length === 0 && !(adminTxns.length === 0 && withdrawals.length === 0) && !withdrawalsLoading && (
+              (() => {
+                const isStatusFilter = ["pending", "approved", "rejected"].includes(sortBy);
+                if (isStatusFilter || searchQuery.trim().length > 0) {
+                  return (
+                    <div className="text-center text-gray-600 space-y-2 bg-white rounded-lg shadow-sm p-8">
+                      <p>No results found for your search or sort criteria.</p>
+                      <button
+                        onClick={handleResetFilters}
+                        className="text-blue-600 flex items-center justify-center mx-auto"
+                        aria-label="Clear search and sort filters"
+                      >
+                        Clear filter
+                        <RotateCcw className="ml-2 h-5 w-5 text-blue-600" />
+                      </button>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="bg-white rounded-lg shadow-sm p-8 text-center text-gray-600">No withdrawal requests at the moment.</div>
+                );
+              })()
             )}
 
             {/* Withdrawals Tab Content */}
@@ -382,7 +396,34 @@ const AdminRevenueManagement: FC = () => {
                     </div>
                   </div>
 
-                  {filteredWithdrawals.length === 0 ? (
+                  {withdrawalsLoading ? (
+                    <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-100">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Serial No.</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-3/12">Professional</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Payment Mode</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Status</th>
+                              <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <tr key={i}>
+                                <td className="px-6 py-4"><div className="h-4 w-10 bg-gray-200 rounded animate-pulse" /></td>
+                                <td className="px-6 py-4"><div className="h-4 w-32 bg-gray-200 rounded animate-pulse" /></td>
+                                <td className="px-6 py-4"><div className="h-4 w-16 bg-gray-200 rounded animate-pulse" /></td>
+                                <td className="px-6 py-4"><div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse" /></td>
+                                <td className="px-6 py-4"><div className="h-8 w-16 bg-gray-200 rounded-md animate-pulse" /></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : filteredWithdrawals.length === 0 ? (
                     <div className="text-center text-gray-600 space-y-2">
                       <p>No results found for your search or sort criteria.</p>
                       <button
@@ -396,14 +437,70 @@ const AdminRevenueManagement: FC = () => {
                     </div>
                   ) : (
                     <>
-                      {/* Withdrawals Table */}
-                      <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+                      {/* Withdrawals - Mobile Cards */}
+                      <div className="sm:hidden space-y-3">
+                        {filteredWithdrawals.map((withdrawal, index) => (
+                          <div key={withdrawal.id} className="bg-white shadow rounded-lg p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-xs text-gray-600 mb-1">
+                                  <strong>S.No:</strong> {(currentPage - 1) * limit + index + 1}
+                                </p>
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {pros[withdrawal.proId]?.firstName && pros[withdrawal.proId]?.lastName
+                                    ? `${pros[withdrawal.proId].firstName} ${pros[withdrawal.proId].lastName}`
+                                    : "Unknown"}
+                                </p>
+                                <p className="text-sm text-gray-700">Payment Mode: {withdrawal.paymentMode === "bank" ? "Bank" : "UPI"}</p>
+                                <p className="mt-1">
+                                  <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${getStatusStyles(withdrawal.status)}`}>
+                                    {withdrawal.status}
+                                  </span>
+                                </p>
+                              </div>
+                              <div className="flex-shrink-0">
+                                <button
+                                  onClick={() => handleViewWithdrawal(withdrawal)}
+                                  className="bg-[#032B44] text-white px-3 py-2 rounded-md text-sm hover:bg-[#054869] transition-colors"
+                                >
+                                  View
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {/* Mobile Pagination */}
+                        {!withdrawalsLoading && (
+                          <div className="bg-white px-4 py-3 flex items-center justify-center border border-gray-200 rounded-md">
+                            <nav className="flex items-center space-x-2" aria-label="Pagination">
+                              <button
+                                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                              >
+                                <ChevronLeft className="h-5 w-5" />
+                              </button>
+                              <span>{`Page ${currentPage} of ${totalPages}`}</span>
+                              <button
+                                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                              >
+                                <ChevronRight className="h-5 w-5" />
+                              </button>
+                            </nav>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Withdrawals Table (>= sm) */}
+                      <div className="hidden sm:block bg-white shadow-lg rounded-lg overflow-hidden">
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-100">
                               <tr>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Serial No.</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-3/12">Pro Name</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-3/12">Professional</th>
                                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Payment Mode</th>
                                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Status</th>
                                 <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Action</th>
@@ -446,26 +543,28 @@ const AdminRevenueManagement: FC = () => {
                           </table>
                         </div>
 
-                        {/* Pagination */}
-                        <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200 sm:px-6">
-                          <nav className="flex items-center space-x-2" aria-label="Pagination">
-                            <button
-                              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                              disabled={currentPage === 1}
-                              className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
-                            >
-                              <ChevronLeft className="h-5 w-5" />
-                            </button>
-                            <span>{`Page ${currentPage} of ${totalPages}`}</span>
-                            <button
-                              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                              disabled={currentPage === totalPages}
-                              className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
-                            >
-                              <ChevronRight className="h-5 w-5" />
-                            </button>
-                          </nav>
-                        </div>
+                        {/* Pagination (>= sm) */}
+                        {!withdrawalsLoading && (
+                          <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200 sm:px-6">
+                            <nav className="flex items-center space-x-2" aria-label="Pagination">
+                              <button
+                                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                                className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                              >
+                                <ChevronLeft className="h-5 w-5" />
+                              </button>
+                              <span>{`Page ${currentPage} of ${totalPages}`}</span>
+                              <button
+                                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages}
+                                className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                              >
+                                <ChevronRight className="h-5 w-5" />
+                              </button>
+                            </nav>
+                          </div>
+                        )}
                       </div>
                     </>
                   )}
@@ -475,7 +574,37 @@ const AdminRevenueManagement: FC = () => {
 
             {activeTab === 'revenue' ? (
               revenueLoading ? (
-                <div className="text-center text-gray-500">Loading...</div>
+                <>
+                  {/* Revenue metrics skeleton */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="relative overflow-hidden rounded-xl border border-gray-200 shadow-sm">
+                        <div className="p-5">
+                          <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                          <div className="mt-4 h-8 w-40 bg-gray-200 rounded animate-pulse" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Admin Transactions skeleton while metrics loading */}
+                  <div className="mt-8">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-3">Admin Transactions</h3>
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                      <div className="p-4 space-y-3">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <div key={i} className="flex items-center justify-between">
+                            <div className="h-4 w-10 bg-gray-200 rounded animate-pulse" />
+                            <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />
+                            <div className="h-6 w-16 bg-gray-200 rounded-full animate-pulse" />
+                            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse" />
+                            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+                            <div className="h-8 w-16 bg-gray-200 rounded-md animate-pulse" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
               ) : totalRevenue === 0 ? (
                 <div className="text-center text-gray-600">No revenue credited yet</div>
               ) : (
@@ -566,6 +695,55 @@ const AdminRevenueManagement: FC = () => {
                         showRevenueSplit
                       />
                     </div>
+                  ) : adminTxnsLoading ? (
+                    <>
+                      {/* Mobile cards skeleton */}
+                      {!isLargeScreen ? (
+                        <div className="flex flex-col gap-4">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="bg-white p-4 rounded-md shadow border border-gray-200">
+                              <div className="h-4 w-16 bg-gray-200 rounded animate-pulse mb-2" />
+                              <div className="h-4 w-40 bg-gray-200 rounded animate-pulse mb-2" />
+                              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-2" />
+                              <div className="h-4 w-28 bg-gray-200 rounded animate-pulse mb-2" />
+                              <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-2" />
+                              <div className="h-8 w-20 bg-gray-200 rounded-md animate-pulse" />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                            <table className="min-w-full divide-y divide-gray-200">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
+                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Description</th>
+                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Transaction ID</th>
+                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Type</th>
+                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Amount</th>
+                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
+                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="bg-white divide-y divide-gray-200">
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <tr key={i}>
+                                    <td className="py-3 px-4"><div className="h-4 w-10 bg-gray-200 rounded animate-pulse" /></td>
+                                    <td className="py-3 px-4"><div className="h-4 w-48 bg-gray-200 rounded animate-pulse" /></td>
+                                    <td className="py-3 px-4"><div className="h-4 w-56 bg-gray-200 rounded animate-pulse" /></td>
+                                    <td className="py-3 px-4"><div className="h-6 w-16 bg-gray-200 rounded-full animate-pulse" /></td>
+                                    <td className="py-3 px-4"><div className="h-4 w-20 bg-gray-200 rounded animate-pulse" /></td>
+                                    <td className="py-3 px-4"><div className="h-4 w-24 bg-gray-200 rounded animate-pulse" /></td>
+                                    <td className="py-3 px-4"><div className="h-8 w-16 bg-gray-200 rounded-md animate-pulse" /></td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : adminTxns.length === 0 ? (
                     <div className="text-center text-gray-500">No admin transactions yet.</div>
                   ) : !isLargeScreen ? (
@@ -575,6 +753,7 @@ const AdminRevenueManagement: FC = () => {
                           <div key={t.id} className="bg-white p-4 rounded-md shadow border border-gray-200">
                             <p className="text-sm text-gray-700"><strong>S.No:</strong> {idx + 1 + (adminTxnPage - 1) * 5}</p>
                             <p className="text-sm text-gray-700"><strong>Description:</strong> {t.description || '-'}</p>
+                            <p className="text-sm text-gray-700"><strong>Transaction ID:</strong> {(t as any).transactionId || t.id}</p>
                             <p className="text-sm text-gray-700">
                               <strong>Type:</strong>{' '}
                               <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${t.type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{t.type}</span>
@@ -587,7 +766,7 @@ const AdminRevenueManagement: FC = () => {
                           </div>
                         ))}
                       </div>
-                      {adminTxnTotalPages >= 1 && (
+                      {adminTxnTotalPages >= 1 && !adminTxnsLoading && (
                         <div className="bg-white px-4 py-3 mt-2 flex items-center justify-center border border-gray-200 rounded-md">
                           <nav className="flex items-center space-x-2" aria-label="Pagination">
                             <button onClick={() => setAdminTxnPage((p) => Math.max(1, p - 1))} disabled={adminTxnPage === 1} className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50">
@@ -609,6 +788,7 @@ const AdminRevenueManagement: FC = () => {
                             <tr>
                               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
                               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Description</th>
+                              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Transaction ID</th>
                               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Type</th>
                               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Amount</th>
                               <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
@@ -620,6 +800,7 @@ const AdminRevenueManagement: FC = () => {
                               <tr key={t.id} className="hover:bg-gray-50">
                                 <td className="py-3 px-4 text-sm text-gray-900 border-b">{idx + 1 + (adminTxnPage - 1) * 5}</td>
                                 <td className="py-3 px-4 text-sm text-gray-700 border-b">{t.description || '-'}</td>
+                                <td className="py-3 px-4 text-sm text-gray-700 border-b">{(t as any).transactionId || t.id}</td>
                                 <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                   <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${t.type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{t.type}</span>
                                 </td>
@@ -632,6 +813,7 @@ const AdminRevenueManagement: FC = () => {
                             ))}
                           </tbody>
                         </table>
+                        {!adminTxnsLoading && (
                         <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200">
                           <nav className="flex items-center space-x-2" aria-label="Pagination">
                             <button onClick={() => setAdminTxnPage((p) => Math.max(1, p - 1))} disabled={adminTxnPage === 1} className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50">
@@ -643,6 +825,7 @@ const AdminRevenueManagement: FC = () => {
                             </button>
                           </nav>
                         </div>
+                        )}
                       </div>
                     </div>
                   )}

@@ -8,7 +8,6 @@ export default function createProRoutes(container: Container): Router {
   const router = express.Router();
   const proController = container.get<ProController>(TYPES.ProController);
 
-  // Public routes
   router.post("/apply", proController.applyPro.bind(proController));
   router.get("/fetchProfile/:id", proController.getProfile.bind(proController));
   router.get("/fetchCategories", proController.getAllCategories.bind(proController));

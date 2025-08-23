@@ -15,6 +15,7 @@ export default function createTicketRoutes(container: Container): Router {
   router.get("/:id", authenticateToken, ticketController.getTicketById.bind(ticketController));
   router.get("/", authenticateToken, ticketController.getAllTickets.bind(ticketController));
   router.put("/:id/status", authenticateToken, ticketController.updateTicketStatus.bind(ticketController));
+  router.put("/:id/ban-status", authenticateToken, ticketController.updateTicketBanStatus.bind(ticketController));
   router.get("/admin/stats", authenticateToken, ticketController.getTicketStats.bind(ticketController));
 
   return router;

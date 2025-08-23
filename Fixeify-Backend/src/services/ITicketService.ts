@@ -9,5 +9,6 @@ export interface ITicketService {
   getTicketsByAgainst(againstId: string, page: number, limit: number): Promise<TicketListResponse>;
   getAllTickets(page: number, limit: number, status?: string): Promise<TicketListResponse>;
   updateTicketStatus(id: string, updateData: UpdateTicketStatusRequest): Promise<TicketResponse | null>;
+  updateTicketBanStatus(ticketId: string, isUserBanned?: boolean, isProBanned?: boolean): Promise<TicketResponse | null>;
   getTicketStats(): Promise<{ pending: number; underReview: number; resolved: number; total: number }>;
 }

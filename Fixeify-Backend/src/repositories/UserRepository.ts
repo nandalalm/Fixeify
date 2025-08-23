@@ -24,13 +24,15 @@ export class MongoUserRepository extends BaseRepository<IUser> implements IUserR
   }
 
   async getAllUsers(): Promise<UserResponse[]> {
-    const users = await this._model.find({}, { password: 0, createdAt: 0, updatedAt: 0, __v: 0 }).exec();
+    const users = await this._model.find({}, { password: 0, updatedAt: 0, __v: 0 }).exec();
     return users.map((user) => this.mapToUserResponse(user));
   }
 
-  async getUsersWithPagination(skip: number, limit: number): Promise<UserResponse[]> {
+  async getUsersWithPagination(skip: number, limit: number, sortBy?: "latest" | "oldest"): Promise<UserResponse[]> {
+    const sortDirection = sortBy === "oldest" ? 1 : -1; // default to latest
     const users = await this._model
-      .find({}, { password: 0, createdAt: 0, updatedAt: 0, __v: 0 })
+      .find({}, { password: 0, updatedAt: 0, __v: 0 })
+      .sort({ createdAt: sortDirection })
       .skip(skip)
       .limit(limit)
       .exec();
@@ -69,6 +71,7 @@ export class MongoUserRepository extends BaseRepository<IUser> implements IUserR
         coordinates: user.address.coordinates,
       } : null,
       isBanned: user.isBanned,
+      createdAt: user.createdAt,
     });
   }
 }

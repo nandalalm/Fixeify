@@ -11,6 +11,7 @@ import BookingTable from "../../components/Reuseable/BookingTable";
 import RaiseComplaintModal from "../Modals/RaiseComplaintModal";
 import RatingModal from "../Modals/RatingModal";
 import BookingDetails from "../../components/Reuseable/BookingDetails";
+import { SkeletonLine, SkeletonBlock } from "../../components/Reuseable/Skeleton";
 
 import { RotateCcw } from "lucide-react";
 import { fetchReviewsByUser } from "../../store/ratingReviewSlice";
@@ -139,11 +140,19 @@ const BookingHistory: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="text-center py-8">
-        <svg className="animate-spin h-8 w-8 text-[#032B44] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z" />
-        </svg>
+      <div className="p-6 mb-[350px] mt-8">
+        <div className="mb-6">
+          <SkeletonLine width="w-1/3" height="h-8" className="mb-4" />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <SkeletonLine width="w-full sm:w-5/6" height="h-10" />
+            <SkeletonLine width="w-full sm:w-1/6" height="h-10" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <SkeletonBlock height="h-20" />
+          <SkeletonBlock height="h-20" />
+          <SkeletonBlock height="h-20" />
+        </div>
       </div>
     );
   }

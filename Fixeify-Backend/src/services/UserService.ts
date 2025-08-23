@@ -16,15 +16,14 @@ import { IBooking } from "../models/bookingModel";
 import { WalletDocument } from "../models/walletModel";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
+import { HttpStatus } from "../enums/httpStatus";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import Stripe from "stripe";
 import { ApprovedProDocument } from "../models/approvedProModel";
-import { UpdateQuery } from "mongoose";
 import { IAdminRepository } from "../repositories/IAdminRepository";
 import { INotificationService } from "./INotificationService";
 import { ITransactionRepository } from "../repositories/ITransactionRepository";
-import { ITicketRepository } from "../repositories/ITicketRepository";
 
 @injectable()
 export class UserService implements IUserService {
@@ -47,7 +46,6 @@ export class UserService implements IUserService {
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository,
     @inject(TYPES.INotificationService) private _notificationService: INotificationService,
     @inject(TYPES.ITransactionRepository) private _transactionRepository: ITransactionRepository,
-    @inject(TYPES.ITicketRepository) private _ticketRepository: ITicketRepository
   ) {
     this._stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2025-06-30.basil",
@@ -112,7 +110,7 @@ export class UserService implements IUserService {
 
     const isPasswordValid = await bcrypt.compare(data.currentPassword, user.password);
     if (!isPasswordValid) {
-      throw new HttpError(400, MESSAGES.INCORRECT_PASSWORD);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INCORRECT_PASSWORD);
     }
 
     const hashedNewPassword = await bcrypt.hash(data.newPassword, 10);
@@ -169,19 +167,19 @@ export class UserService implements IUserService {
     }
   ): Promise<BookingResponse> {
     const user = await this._userRepository.findUserById(userId);
-    if (!user) throw new HttpError(404, MESSAGES.USER_NOT_FOUND);
-    if (user.isBanned) throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
+    if (!user) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
+    if (user.isBanned) throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
 
     const pro = await this._proRepository.findApprovedProById(proId);
-    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
-    if (pro.isBanned) throw new HttpError(403, MESSAGES.ACCOUNT_BANNED);
-    if (pro.isUnavailable) throw new HttpError(400, MESSAGES.PRO_CURRENTLY_UNAVAILABLE);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
+    if (pro.isBanned) throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
+    if (pro.isUnavailable) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.PRO_CURRENTLY_UNAVAILABLE);
 
     const preferredDate = new Date(bookingData.preferredDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (preferredDate < today) {
-      throw new HttpError(400, MESSAGES.PREFERRED_DATE_IN_PAST);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.PREFERRED_DATE_IN_PAST);
     }
 
     const existingBookings = await this._bookingRepository.findBookingsByUserProDateTime(
@@ -193,7 +191,7 @@ export class UserService implements IUserService {
     );
 
     if (existingBookings.length > 0) {
-      throw new HttpError(400, MESSAGES.BOOKING_ALREADY_IN_PROGRESS);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_ALREADY_IN_PROGRESS);
     }
 
     const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
@@ -206,7 +204,7 @@ export class UserService implements IUserService {
           slot.endTime === selectedSlot.endTime
       );
       if (!slotExists) {
-        throw new HttpError(400, `Time slot ${selectedSlot.startTime}-${selectedSlot.endTime} is not available`);
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.TIME_SLOT_NOT_AVAILABLE);
       }
       if (availableSlots.find(
         (slot) =>
@@ -214,7 +212,7 @@ export class UserService implements IUserService {
           slot.endTime === selectedSlot.endTime &&
           slot.booked
       )) {
-        throw new HttpError(400, `Time slot ${selectedSlot.startTime}-${selectedSlot.endTime} is already booked`);
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.TIME_SLOT_ALREADY_BOOKED);
       }
     }
    
@@ -226,7 +224,7 @@ export class UserService implements IUserService {
 
     const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, true);
     if (!availabilityUpdate) {
-      throw new HttpError(400, MESSAGES.FAILED_UPDATE_PRO_AVAIL_SELECTED_SLOTS);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAIL_SELECTED_SLOTS);
     }
 
     const booking: Partial<IBooking> = {
@@ -301,17 +299,17 @@ export class UserService implements IUserService {
       metadata: { bookingId },
     });
     if (!paymentIntent.client_secret) {
-      throw new HttpError(500, MESSAGES.FAILED_CREATE_PAYMENT_INTENT);
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_CREATE_PAYMENT_INTENT);
     }
     return { clientSecret: paymentIntent.client_secret };
   }
 
   async completeBookingPayment(bookingId: string): Promise<void> {
     const booking = await this._bookingRepository.findBookingById(bookingId);
-    if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
+    if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
 
     const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
-    if (!quota) throw new HttpError(404, MESSAGES.QUOTA_NOT_FOUND);
+    if (!quota) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.QUOTA_NOT_FOUND);
 
     await this._quotaRepository.updateQuota(quota.id, { paymentStatus: "completed" });
 
@@ -330,7 +328,7 @@ export class UserService implements IUserService {
     } as Partial<WalletDocument>);
 
     if (!updatedWallet) {
-      throw new HttpError(500, MESSAGES.FAILED_UPDATE_PRO_WALLET);
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_UPDATE_PRO_WALLET);
     }
 
    
@@ -373,11 +371,10 @@ export class UserService implements IUserService {
     }
 
     const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
-    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     const preferredDate = new Date(booking.preferredDate);
     const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
-    const availableSlots = pro.availability[dayOfWeek as keyof ApprovedProDocument["availability"]] || [];
 
     const updatedSlots = booking.preferredTime.map((slot) => ({
       startTime: slot.startTime,
@@ -387,8 +384,8 @@ export class UserService implements IUserService {
 
     const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
     if (!availabilityUpdate) {
-      console.log("Availability update failed. Pro document:", await this._proRepository.findApprovedProById(pro.id));
-      throw new HttpError(400, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
+      console.error(MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY + ":", await this._proRepository.findApprovedProById(pro.id));
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
     }
 
     await this._bookingRepository.updateBooking(bookingId, {
@@ -422,13 +419,13 @@ export class UserService implements IUserService {
 
  async cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }> {
     const booking = await this._bookingRepository.findBookingById(bookingId);
-    if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
-    if (booking.userId.toString() !== userId) throw new HttpError(403, MESSAGES.UNAUTHORIZED_CANCEL_BOOKING);
-    if (booking.status !== "pending") throw new HttpError(400, MESSAGES.ONLY_PENDING_CAN_BE_CANCELLED);
+    if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
+    if (booking.userId.toString() !== userId) throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.UNAUTHORIZED_CANCEL_BOOKING);
+    if (booking.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ONLY_PENDING_CAN_BE_CANCELLED);
 
    
     const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
-    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     const preferredDate = new Date(booking.preferredDate);
     const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
@@ -440,8 +437,8 @@ export class UserService implements IUserService {
 
     const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
     if (!availabilityUpdate) {
-      console.log("Availability update failed. Pro document:", await this._proRepository.findApprovedProById(pro.id));
-      throw new HttpError(400, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
+      console.error(MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY + ":", await this._proRepository.findApprovedProById(pro.id));
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
     }
 
     await this._bookingRepository.updateBooking(bookingId, {
@@ -481,7 +478,7 @@ export class UserService implements IUserService {
   
   async handlePaymentFailure(bookingId: string): Promise<void> {
     const booking = await this._bookingRepository.findBookingById(bookingId);
-    if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
+    if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
 
     const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
     if (quota) {
@@ -503,29 +500,7 @@ export class UserService implements IUserService {
           await this.handlePaymentFailure(failedPaymentIntent.metadata.bookingId);
         }
         break;
-      case "payment_intent.created":
-        console.log(`Received payment_intent.created for PaymentIntent ${event.data.object.id}`);
-        break;
-      case "charge.succeeded":
-        const charge = event.data.object as Stripe.Charge;
-        if (charge.payment_intent) {
-          console.log(`Charge Succeeded for PaymentIntent ${charge.payment_intent}`);
-        }
-        break;
-      case "charge.failed":
-        const failCharge = event.data.object as Stripe.Charge;
-        if (failCharge.payment_intent) {
-          console.log(`Charge failed for PaymentIntent ${failCharge.payment_intent}`);
-        }
-        break;
-      case "charge.updated":
-        const updatedCharge = event.data.object as Stripe.Charge;
-        if (updatedCharge.payment_intent) {
-          console.log(`Charge updated for PaymentIntent ${updatedCharge.payment_intent}`);
-        }
-        break;
       default:
-        console.log(`Unhandled event type ${event.type}`);
     }
   }
 

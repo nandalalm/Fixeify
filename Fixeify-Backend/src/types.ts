@@ -1,5 +1,6 @@
 export const TYPES = {
   DatabaseConnector: Symbol.for("DatabaseConnector"),
+  RedisConnector: Symbol.for("RedisConnector"),
   IUserRepository: Symbol.for("IUserRepository"),
   IAdminRepository: Symbol.for("IAdminRepository"),
   IProRepository: Symbol.for("IProRepository"),

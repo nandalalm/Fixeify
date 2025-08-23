@@ -5,13 +5,14 @@ import { ICategoryRepository } from "../repositories/ICategoryRepository";
 import { IBookingRepository } from "../repositories/IBookingRepository";
 import { IWithdrawalRequestRepository } from "../repositories/IWithdrawalRequestRepository";
 import { IPendingPro, PendingProDocument } from "../models/pendingProModel";
-import { IProService, IAvailability, ITimeSlot } from "./IProService";
+import { IProService, IAvailability } from "./IProService";
 import { ProProfileResponse, ProResponse, PendingProResponse } from "../dtos/response/proDtos";
 import { UserResponse } from "../dtos/response/userDtos";
 import { CategoryResponse } from "../dtos/response/categoryDtos";
 import { BookingResponse } from "../dtos/response/bookingDtos";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
+import { HttpStatus } from "../enums/httpStatus";
 import { ApprovedProDocument } from "../models/approvedProModel";
 import { UserRole } from "../enums/roleEnum";
 import bcrypt from "bcryptjs";
@@ -35,18 +36,18 @@ export class ProService implements IProService {
     @inject(TYPES.IWithdrawalRequestRepository) private _withdrawalRequestRepository: IWithdrawalRequestRepository,
     @inject(TYPES.INotificationService) private _notificationService: INotificationService,
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
-  ) {}
+  ) { }
 
   async applyPro(proData: Partial<IPendingPro>): Promise<{ message: string; pendingPro: IPendingPro }> {
     const existingPending = await this._proRepository.findPendingProByEmail(proData.email!);
     const existingApproved = await this._proRepository.findApprovedProByEmail(proData.email!);
 
     if (existingPending && !existingPending.isRejected) {
-      throw new HttpError(400, MESSAGES.APPLICATION_ALREADY_PENDING);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.APPLICATION_ALREADY_PENDING);
     }
 
-     if (existingApproved) {
-      throw new HttpError(400, MESSAGES.APPLICATION_ALREADY_APPROVED);
+    if (existingApproved) {
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.APPLICATION_ALREADY_APPROVED);
     }
 
     let pendingPro: PendingProDocument;
@@ -58,41 +59,55 @@ export class ProService implements IProService {
         createdAt: new Date(),
       });
       if (!updatedPro) {
-        throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+        throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
       }
       pendingPro = updatedPro;
     } else {
       pendingPro = await this._proRepository.createPendingPro(proData);
     }
 
+    // Notify admin about new/re-submitted pro application
+    try {
+      const admin = await this._adminRepository.find();
+      if (admin) {
+        await this._notificationService.createNotification({
+          type: "general",
+          title: "New Pro Application Received",
+          description: `${proData.firstName ?? ""} ${proData.lastName ?? ""} (${proData.email ?? "unknown email"}) has applied to become a Fixeify Pro.`,
+          adminId: admin.id,
+        });
+      }
+    } catch (error) {
+      console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+    }
+
     return { message: MESSAGES.APPLICATION_SUBMITTED_SUCCESSFULLY, pendingPro };
   }
-  
+
   async getProfile(proId: string): Promise<ProProfileResponse> {
     const pro = await this._proRepository.findApprovedProByIdAsProfile(proId);
-    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
     return pro;
   }
 
   async updateProfile(proId: string, data: Partial<ProProfileResponse>): Promise<ProProfileResponse> {
     const existingPro = await this._proRepository.findApprovedProById(proId);
-    if (!existingPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!existingPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     const updateData = this.mapToApprovedProDocument(data, existingPro);
 
-    if (!updateData.firstName) throw new HttpError(400, MESSAGES.FIRST_NAME_REQUIRED);
-    if (!updateData.lastName) throw new HttpError(400, MESSAGES.LAST_NAME_REQUIRED);
-    if (!updateData.phoneNumber) throw new HttpError(400, MESSAGES.PHONE_NUMBER_REQUIRED);
-    if (!updateData.location) throw new HttpError(400, MESSAGES.LOCATION_REQUIRED);
-    if (!updateData.profilePhoto) throw new HttpError(400, MESSAGES.PROFILE_PHOTO_REQUIRED);
+    if (!updateData.firstName) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FIRST_NAME_REQUIRED);
+    if (!updateData.lastName) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.LAST_NAME_REQUIRED);
+    if (!updateData.phoneNumber) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.PHONE_NUMBER_REQUIRED);
+    if (!updateData.location) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.LOCATION_REQUIRED);
+    if (!updateData.profilePhoto) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.PROFILE_PHOTO_REQUIRED);
 
     const updatedPro = await this._proRepository.updateApprovedPro(proId, updateData);
-    if (!updatedPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!updatedPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     const profile = await this._proRepository.findApprovedProByIdAsProfile(proId);
-    if (!profile) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!profile) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
-    // Send profile update notification
     try {
       await this._notificationService.createNotification({
         type: "general",
@@ -112,11 +127,11 @@ export class ProService implements IProService {
     data: { currentPassword: string; newPassword: string }
   ): Promise<UserResponse | null> {
     const pro = await this._proRepository.findApprovedProById(proId);
-    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     const isPasswordValid = await bcrypt.compare(data.currentPassword, pro.password);
     if (!isPasswordValid) {
-      throw new HttpError(400, MESSAGES.INCORRECT_PASSWORD);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INCORRECT_PASSWORD);
     }
 
     const hashedNewPassword = await bcrypt.hash(data.newPassword, 10);
@@ -126,7 +141,7 @@ export class ProService implements IProService {
     };
 
     const updatedPro = await this._proRepository.updateApprovedPro(proId, updateData);
-    if (!updatedPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!updatedPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     try {
       await this._notificationService.createNotification({
@@ -144,25 +159,25 @@ export class ProService implements IProService {
 
   async getAvailability(proId: string): Promise<{ availability: IAvailability; isUnavailable: boolean }> {
     const pro = await this._proRepository.findApprovedProById(proId);
-    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
     return { availability: pro.availability || {}, isUnavailable: pro.isUnavailable };
   }
 
   async updateAvailability(proId: string, data: { availability: ProResponse['availability']; isUnavailable: boolean }): Promise<{ availability: ProResponse['availability']; isUnavailable: boolean }> {
     const existingPro = await this._proRepository.findApprovedProById(proId);
-    if (!existingPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!existingPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     if (data.isUnavailable) {
       const hasBookedSlots = Object.values(data.availability).some(
         (slots: any[] | undefined) => slots?.some((slot: any) => slot.booked)
       );
       if (hasBookedSlots) {
-        throw new HttpError(400, MESSAGES.CANNOT_MARK_UNAVAILABLE_WITH_BOOKED_SLOTS);
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CANNOT_MARK_UNAVAILABLE_WITH_BOOKED_SLOTS);
       }
     }
 
     const updatedPro = await this._proRepository.updateApprovedPro(proId, { availability: data.availability, isUnavailable: data.isUnavailable });
-    if (!updatedPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!updatedPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     return { availability: updatedPro.availability || {}, isUnavailable: updatedPro.isUnavailable };
   }
@@ -171,25 +186,25 @@ export class ProService implements IProService {
     return this._categoryRepository.getCategoriesWithPagination(0, 100);
   }
 
-  async fetchProBookings(proId: string, page?: number, limit?: number, status?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
-  const pro = await this._proRepository.findApprovedProById(proId);
-  if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
-  return this._bookingRepository.fetchProBookings(proId, page, limit, status);
-}
+  async fetchProBookings(proId: string, page?: number, limit?: number, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const pro = await this._proRepository.findApprovedProById(proId);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
+    return this._bookingRepository.fetchProBookings(proId, page, limit, status, sortBy);
+  }
 
- async getBookingById(id: string): Promise<BookingResponse> {
-  const booking = await this._bookingRepository.findBookingById(id);
-  if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
-  return booking as unknown as BookingResponse;
-}
+  async getBookingById(id: string): Promise<BookingResponse> {
+    const booking = await this._bookingRepository.findBookingById(id);
+    if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
+    return booking as unknown as BookingResponse;
+  }
 
   async acceptBooking(bookingId: string): Promise<{ message: string }> {
     const session = await mongoose.startSession();
     session.startTransaction();
     try {
       const booking = await this._bookingRepository.findBookingById(bookingId);
-      if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
-      if (booking.status !== "pending") throw new HttpError(400, MESSAGES.BOOKING_NOT_PENDING);
+      if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
+      if (booking.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_NOT_PENDING);
 
       const currentDateTime = new Date();
       const currentIST = new Date(currentDateTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
@@ -201,7 +216,7 @@ export class ProService implements IProService {
       const preferredDateOnly = new Date(preferredDateIST.getFullYear(), preferredDateIST.getMonth(), preferredDateIST.getDate());
 
       if (preferredDateOnly < currentDateOnly) {
-        throw new HttpError(400, MESSAGES.BOOKING_PREFERRED_DATE_PASSED);
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_PREFERRED_DATE_PASSED);
       }
 
       const isPastTimeSlot = booking.preferredTime.some(slot => {
@@ -212,11 +227,11 @@ export class ProService implements IProService {
       });
 
       if (isPastTimeSlot) {
-        throw new HttpError(400, MESSAGES.BOOKING_PREFERRED_SLOTS_PASSED);
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_PREFERRED_SLOTS_PASSED);
       }
 
       const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
-      if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+      if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
       const dayOfWeek = preferredDateIST.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
       const availableSlots = pro.availability[dayOfWeek as keyof ApprovedProDocument["availability"]] || [];
@@ -226,10 +241,8 @@ export class ProService implements IProService {
           (s) => s.startTime === slot.startTime && s.endTime === slot.endTime
         );
         if (!matchingSlot) {
-          throw new HttpError(400, `Time slot ${slot.startTime}-${slot.endTime} is not available`);
+          throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAIL_SELECTED_SLOTS);
         }
-        // Note: slots are marked booked at creation time to prevent double-booking.
-        // Do not reject if matchingSlot.booked is true.
       }
 
       const updatedSlots = booking.preferredTime.map((slot) => ({
@@ -240,8 +253,8 @@ export class ProService implements IProService {
 
       const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, true);
       if (!availabilityUpdate) {
-        console.log("Availability update failed. Pro document:", await this._proRepository.findApprovedProById(pro.id));
-        throw new HttpError(400, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
+        console.log(MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY + " Pro document:", await this._proRepository.findApprovedProById(pro.id));
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
       }
 
       const conflictingBookings = await this._bookingRepository.findBookingsByProAndDate(
@@ -288,12 +301,11 @@ export class ProService implements IProService {
 
   async rejectBooking(bookingId: string, reason: string): Promise<{ message: string }> {
     const booking = await this._bookingRepository.findBookingById(bookingId);
-    if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
-    if (booking.status !== "pending") throw new HttpError(400, MESSAGES.BOOKING_NOT_PENDING);
+    if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
+    if (booking.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_NOT_PENDING);
 
-    // Revert the previously blocked slots back to available
     const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
-    if (!pro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     const preferredDate = new Date(booking.preferredDate);
     const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
@@ -305,8 +317,8 @@ export class ProService implements IProService {
 
     const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
     if (!availabilityUpdate) {
-      console.log("Availability update failed. Pro document:", await this._proRepository.findApprovedProById(pro.id));
-      throw new HttpError(400, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
+      console.log(MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY + " Pro document:", await this._proRepository.findApprovedProById(pro.id));
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
     }
 
     await this._bookingRepository.updateBooking(bookingId, {
@@ -315,7 +327,6 @@ export class ProService implements IProService {
       preferredTime: updatedSlots.map((slot) => ({ ...slot })),
     });
 
-    // Send booking rejection notification to user
     try {
       await this._notificationService.createNotification({
         type: "booking",
@@ -333,8 +344,8 @@ export class ProService implements IProService {
 
   async generateQuota(bookingId: string, data: QuotaRequest): Promise<QuotaResponse> {
     const booking = await this._bookingRepository.findBookingById(bookingId);
-    if (!booking) throw new HttpError(404, MESSAGES.BOOKING_NOT_FOUND);
-    if (booking.status !== "accepted") throw new HttpError(400, MESSAGES.BOOKING_MUST_BE_ACCEPTED_TO_GENERATE_QUOTA);
+    if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
+    if (booking.status !== "accepted") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_MUST_BE_ACCEPTED_TO_GENERATE_QUOTA);
 
     const quotaData = {
       userId: booking.userId,
@@ -350,7 +361,6 @@ export class ProService implements IProService {
 
     const quota = await this._quotaRepository.createQuota(quotaData);
 
-    // Send quota generation notification to user
     try {
       await this._notificationService.createNotification({
         type: "quota",
@@ -372,23 +382,22 @@ export class ProService implements IProService {
     return quota;
   }
 
- async getWallet(proId: string): Promise<WalletResponseDTO | null> {
+  async getWallet(proId: string): Promise<WalletResponseDTO | null> {
     return this._walletRepository.findWalletByProId(proId);
   }
 
   async getWalletWithPagination(proId: string, page: number, limit: number): Promise<{ wallet: WalletResponseDTO | null; total: number }> {
     return this._walletRepository.findWalletByProIdAndPagination(proId, page, limit);
   }
-  
+
   async requestWithdrawal(
     proId: string,
     data: { amount: number; paymentMode: "bank" | "upi"; bankName?: string; accountNumber?: string; ifscCode?: string; branchName?: string; upiCode?: string; bookingId?: string }
   ): Promise<WithdrawalRequestResponse> {
     const wallet = await this._walletRepository.findWalletByProId(proId);
-    if (!wallet) throw new HttpError(404, MESSAGES.WALLET_NOT_FOUND);
-    if (wallet.balance < data.amount) throw new HttpError(400, MESSAGES.INSUFFICIENT_BALANCE);
+    if (!wallet) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WALLET_NOT_FOUND);
+    if (wallet.balance < data.amount) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INSUFFICIENT_BALANCE);
 
-    // Optionally attach bookingId and quotaId if provided / found
     let bookingObjectId: mongoose.Types.ObjectId | undefined;
     let quotaObjectId: mongoose.Types.ObjectId | undefined;
     if (data.bookingId) {
@@ -396,7 +405,7 @@ export class ProService implements IProService {
       try {
         const quota = await this._quotaRepository.findQuotaByBookingId(data.bookingId);
         if (quota?.id) quotaObjectId = new mongoose.Types.ObjectId(quota.id);
-      } catch {}
+      } catch { }
     }
 
     const withdrawalRequest = await this._withdrawalRequestRepository.createWithdrawalRequest({
@@ -415,7 +424,6 @@ export class ProService implements IProService {
       status: "pending",
     });
 
-    // Notify pro that withdrawal request is submitted to admin
     try {
       await this._notificationService.createNotification({
         type: "wallet",
@@ -427,7 +435,6 @@ export class ProService implements IProService {
       console.error(MESSAGES.FAILED_SEND_WITHDRAWAL_SUBMISSION_NOTIFICATION + ":", error);
     }
 
-    // Notify admin of new withdrawal request
     try {
       const admin = await this._adminRepository.find();
       if (admin) {
@@ -439,7 +446,7 @@ export class ProService implements IProService {
         });
       }
     } catch (error) {
-      console.error("Failed to send admin notification for withdrawal request:", error);
+      console.error(MESSAGES.FAILED_SEND_WITHDRAWAL_SUBMISSION_NOTIFICATION + ":", error);
     }
 
     return withdrawalRequest;
@@ -449,18 +456,26 @@ export class ProService implements IProService {
     return this._withdrawalRequestRepository.findWithdrawalRequestsByProId(proId);
   }
 
-  async getWithdrawalRequestsByProIdPaginated(proId: string, page: number, limit: number): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number }> {
-    const p = Math.max(1, page || 1);
-    const l = Math.max(1, limit || 5);
-    const skip = (p - 1) * l;
-    const [withdrawals, total] = await Promise.all([
-      this._withdrawalRequestRepository.findWithdrawalRequestsByProIdPaginated(proId, skip, l),
-      this._withdrawalRequestRepository.getTotalWithdrawalRequestsCountByProId(proId)
-    ]);
+  async getWithdrawalRequestsByProIdPaginated(
+    proId: string,
+    page: number,
+    limit: number,
+    sortBy?: "latest" | "oldest",
+    status?: "pending" | "approved" | "rejected"
+  ): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number }> {
+    const skip = (page - 1) * limit;
+    const withdrawals = await this._withdrawalRequestRepository.findWithdrawalRequestsByProIdPaginated(proId, skip, limit, sortBy, status);
+    // If status filter applied, total should reflect it; otherwise count all by proId
+    const total = status
+      ? (await this._withdrawalRequestRepository.getAllWithdrawalRequests(0, 0, sortBy, status)).filter(w => w.proId === proId).length
+      : await this._withdrawalRequestRepository.getTotalWithdrawalRequestsCountByProId(proId);
     return { withdrawals, total };
   }
 
-  private mapToApprovedProDocument(data: Partial<ProProfileResponse>, existingPro: ApprovedProDocument): Partial<ApprovedProDocument> {
+  private mapToApprovedProDocument(
+    data: Partial<ProProfileResponse>,
+    existingPro: ApprovedProDocument
+  ): Partial<ApprovedProDocument> {
     return {
       firstName: data.firstName !== undefined ? data.firstName : existingPro.firstName,
       lastName: data.lastName !== undefined ? data.lastName : existingPro.lastName,
@@ -470,6 +485,9 @@ export class ProService implements IProService {
       profilePhoto: data.profilePhoto !== undefined ? data.profilePhoto : existingPro.profilePhoto,
       about: data.about !== undefined ? data.about : existingPro.about,
       isBanned: existingPro.isBanned,
+      availability: existingPro.availability,
+      isUnavailable: existingPro.isUnavailable,
+      categoryId: existingPro.categoryId,
     };
   }
 
@@ -483,73 +501,73 @@ export class ProService implements IProService {
       phoneNo: pro.phoneNumber ?? null,
       address: pro.location
         ? {
-            address: pro.location.address,
-            city: pro.location.city,
-            state: pro.location.state,
-            coordinates: pro.location.coordinates,
-          }
+          address: pro.location.address,
+          city: pro.location.city,
+          state: pro.location.state,
+          coordinates: pro.location.coordinates,
+        }
         : null,
       isBanned: pro.isBanned,
     });
   }
 
-async getPendingProById(pendingProId: string): Promise<PendingProResponse> {
-  const pendingPro = await this._proRepository.findById(pendingProId);
-  if (!pendingPro) throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
-  const category = await this._categoryRepository.findCategoryById(pendingPro.categoryId.toString());
-  if (!category) throw new HttpError(404, MESSAGES.CATEGORY_NOT_FOUND);
-  return {
-    _id: pendingPro._id.toString(),
-    firstName: pendingPro.firstName,
-    lastName: pendingPro.lastName,
-    email: pendingPro.email,
-    phoneNumber: pendingPro.phoneNumber,
-    category: {
-      id: category.id,
-      name: category.name,
-      image: category.image || "",
-    },
-    customService: pendingPro.customService,
-    location: pendingPro.location,
-    profilePhoto: pendingPro.profilePhoto,
-    idProof: pendingPro.idProof,
-    accountHolderName: pendingPro.accountHolderName,
-    accountNumber: pendingPro.accountNumber,
-    bankName: pendingPro.bankName,
-    availability: pendingPro.availability,
-    createdAt: pendingPro.createdAt,
-  };
-}
+  async getPendingProById(pendingProId: string): Promise<PendingProResponse> {
+    const pendingPro = await this._proRepository.findById(pendingProId);
+    if (!pendingPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
+    const category = await this._categoryRepository.findCategoryById(pendingPro.categoryId.toString());
+    if (!category) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
+    return {
+      _id: pendingPro._id.toString(),
+      firstName: pendingPro.firstName,
+      lastName: pendingPro.lastName,
+      email: pendingPro.email,
+      phoneNumber: pendingPro.phoneNumber,
+      category: {
+        id: category.id,
+        name: category.name,
+        image: category.image || "",
+      },
+      customService: pendingPro.customService,
+      location: pendingPro.location,
+      profilePhoto: pendingPro.profilePhoto,
+      idProof: pendingPro.idProof,
+      accountHolderName: pendingPro.accountHolderName,
+      accountNumber: pendingPro.accountNumber,
+      bankName: pendingPro.bankName,
+      availability: pendingPro.availability,
+      createdAt: pendingPro.createdAt,
+    };
+  }
 
-async getDashboardMetrics(proId: string): Promise<{
-  totalRevenue: number;
-  monthlyRevenue: number;
-  yearlyRevenue: number;
-  dailyRevenue: number;
-  completedJobs: number;
-  pendingJobs: number;
-  averageRating: number;
-  walletBalance: number;
-  totalWithdrawn: number;
-}> {
-  const [bookingMetrics, wallet, totalWithdrawn] = await Promise.all([
-    this._bookingRepository.getProDashboardMetrics(proId),
-    this._walletRepository.findWalletByProId(proId),
-    this._withdrawalRequestRepository.getTotalWithdrawnByProId(proId),
-  ]);
+  async getDashboardMetrics(proId: string): Promise<{
+    totalRevenue: number;
+    monthlyRevenue: number;
+    yearlyRevenue: number;
+    dailyRevenue: number;
+    completedJobs: number;
+    pendingJobs: number;
+    averageRating: number;
+    walletBalance: number;
+    totalWithdrawn: number;
+  }> {
+    const [bookingMetrics, wallet, totalWithdrawn] = await Promise.all([
+      this._bookingRepository.getProDashboardMetrics(proId),
+      this._walletRepository.findWalletByProId(proId),
+      this._withdrawalRequestRepository.getTotalWithdrawnByProId(proId),
+    ]);
 
-  return {
-    totalRevenue: bookingMetrics.totalRevenue,
-    monthlyRevenue: bookingMetrics.monthlyRevenue,
-    yearlyRevenue: bookingMetrics.yearlyRevenue,
-    dailyRevenue: bookingMetrics.dailyRevenue,
-    completedJobs: bookingMetrics.completedJobs,
-    pendingJobs: bookingMetrics.pendingJobs,
-    averageRating: bookingMetrics.averageRating,
-    walletBalance: wallet?.balance || 0,
-    totalWithdrawn: totalWithdrawn || 0,
-  };
-}
+    return {
+      totalRevenue: bookingMetrics.totalRevenue,
+      monthlyRevenue: bookingMetrics.monthlyRevenue,
+      yearlyRevenue: bookingMetrics.yearlyRevenue,
+      dailyRevenue: bookingMetrics.dailyRevenue,
+      completedJobs: bookingMetrics.completedJobs,
+      pendingJobs: bookingMetrics.pendingJobs,
+      averageRating: bookingMetrics.averageRating,
+      walletBalance: wallet?.balance || 0,
+      totalWithdrawn: totalWithdrawn || 0,
+    };
+  }
 
   async getMonthlyRevenueSeries(proId: string, lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>> {
     return this._bookingRepository.getProMonthlyRevenueSeries(proId, lastNMonths);

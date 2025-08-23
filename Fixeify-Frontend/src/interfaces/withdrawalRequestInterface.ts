@@ -6,7 +6,7 @@ export interface WithdrawalFormData {
   ifscCode?: string;
   branchName?: string;
   upiCode?: string;
-  bookingId?: string; // optional: link this withdrawal to a booking
+  bookingId?: string; 
 }
 
 export interface IWithdrawalRequest {

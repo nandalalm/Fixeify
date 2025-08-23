@@ -1,42 +1,10 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { IQuotaRepository } from "./IQuotaRepository";
+import { IQuotaRepository, PopulatedQuotaDocument } from "./IQuotaRepository";
 import Quota, { QuotaDocument } from "../models/quotaModel";
 import { QuotaResponse } from "../dtos/response/quotaDtos";
 import { Types } from "mongoose";
-
-interface PopulatedUser {
-  _id: Types.ObjectId;
-  name: string;
-  email: string;
-}
-
-interface PopulatedPro {
-  _id: Types.ObjectId;
-  firstName: string;
-  lastName: string;
-}
-
-interface PopulatedCategory {
-  _id: Types.ObjectId;
-  name: string;
-  image?: string;
-}
-
-interface PopulatedQuotaDocument extends Document {
-  _id: Types.ObjectId;
-  userId: PopulatedUser;
-  proId: PopulatedPro;
-  bookingId: Types.ObjectId;
-  categoryId: PopulatedCategory;
-  laborCost: number;
-  materialCost: number;
-  additionalCharges: number;
-  totalCost: number;
-  paymentStatus: "pending" | "completed" | "failed";
-  createdAt: Date;
-  updatedAt: Date;
-}
+import Booking from "../models/bookingModel";
 
 @injectable()
 export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implements IQuotaRepository {
@@ -59,8 +27,18 @@ export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implemen
   }
 
   async findQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null> {
+    let bookingObjectId: Types.ObjectId | null = null;
+    if (Types.ObjectId.isValid(bookingId)) {
+      bookingObjectId = new Types.ObjectId(bookingId);
+    } else {
+      const bookingDoc = await Booking.findOne({ bookingId }).select("_id").lean();
+      if (bookingDoc?._id) bookingObjectId = bookingDoc._id as Types.ObjectId;
+    }
+
+    if (!bookingObjectId) return null;
+
     const quota = await this._model
-      .findOne({ bookingId: new Types.ObjectId(bookingId) })
+      .findOne({ bookingId: bookingObjectId })
       .populate([
         { path: "userId", select: "name email" },
         { path: "proId", select: "firstName lastName" },

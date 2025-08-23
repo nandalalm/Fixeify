@@ -232,7 +232,7 @@ const NearbyPros = () => {
           {!loading && !error && (
             <>
               <h1 className="text-3xl font-bold text-center mb-2 dark:text-white">
-                Book Your {categoryName} Pro
+                Book Your {categoryName} Professional
               </h1>
               <p className="text-center text-gray-400 mb-4">
                 Find Experienced {categoryName} Professionals for your Home needs.

@@ -48,7 +48,6 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
     return "-";
   }, [ticket, against, booking]);
 
-  // Helper: format HH:mm to 12-hour time with AM/PM
   const formatTo12h = (time?: string) => {
     if (!time) return "-";
     const [hStr, mStr] = time.split(":");
@@ -61,7 +60,6 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
     return `${hour12}:${mm} ${period}`;
   };
 
-  // UI helpers: outline badges for priority and status
   const OutlineBadge: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = "" }) => (
     <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded border ${className}`}>{children}</span>
   );
@@ -92,7 +90,6 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
         if (mounted) setBooking(b);
       } catch {}
 
-      // Quota via user first, then pro fallback
       try {
         const q = await fetchUserQuotaByBookingId(ticket.bookingId);
         if (mounted) setQuota(q);
@@ -131,7 +128,7 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
         <div className="text-sm text-gray-600 dark:text-gray-400">Ticket ID: {ticket.ticketId}</div>
       </div>
 
-      {/* Ticket Details (paragraph style) */}
+      {/* Ticket Details */}
       <Section title="Ticket Details">
         <div className="space-y-2 text-sm">
           <div className="text-base font-semibold text-gray-800 dark:text-gray-100">{ticket.subject}</div>
@@ -178,19 +175,23 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
       </Section>
 
       <Section title="Raised Against">
-        {/* Do not show type label; show fields based on type */}
         <LabelValue label="Name" value={againstDisplayName} />
         {ticket.againstType === "pro" ? (
           <>
             <LabelValue label="Email" value={(against as ProProfile | null)?.email} />
             <LabelValue label="Phone" value={(against as ProProfile | null)?.phoneNumber} />
             <LabelValue label="Service Type" value={booking?.category?.name || "-"} />
+            {ticket.isProBanned && (
+              <LabelValue label="Action Taken" value="Pro Banned" />
+            )}
           </>
         ) : (
           <>
             <LabelValue label="Email" value={(against as UserProfile | null)?.email} />
             <LabelValue label="Phone" value={booking?.phoneNumber || "-"} />
-            {/* No Service Type row when againstType is user */}
+            {ticket.isUserBanned && (
+              <LabelValue label="Action Taken" value="User Banned" />
+            )}
           </>
         )}
       </Section>
@@ -199,6 +200,7 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title="Booking Details">
+          <LabelValue label="Booking ID" value={booking?.bookingId || ticket.bookingId} />
           <LabelValue label="Issue Description" value={booking?.issueDescription} />
           <LabelValue label="Preferred Date" value={booking ? new Date(booking.preferredDate).toLocaleDateString() : "-"} />
           <LabelValue

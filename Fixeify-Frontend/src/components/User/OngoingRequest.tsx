@@ -12,6 +12,7 @@ import { fetchQuotaByBookingId } from "../../api/proApi";
 import { loadStripe, type Stripe, type StripeError, type PaymentIntent } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { setPaymentSuccessData, UserRole } from "../../store/authSlice";
+import { SkeletonLine, SkeletonBlock } from "../../components/Reuseable/Skeleton";
 import { useNavigate } from "react-router-dom";
 
 const OngoingRequest = () => {
@@ -29,6 +30,7 @@ const OngoingRequest = () => {
   const navigate = useNavigate();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "">("latest");
@@ -61,6 +63,7 @@ const OngoingRequest = () => {
     setSelectedBooking(booking);
     setClientSecret(null);
     setQuota(null);
+    setDetailsLoading(true);
   };
 
   const handleBack = () => {
@@ -274,11 +277,19 @@ const OngoingRequest = () => {
 
   if (loading) {
     return (
-      <div className="text-center py-8">
-        <svg className="animate-spin h-8 w-8 text-[#032B44] mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z" />
-        </svg>
+      <div className="p-6 mb-[350px] mt-8">
+        <div className="mb-6">
+          <SkeletonLine width="w-1/3" height="h-8" className="mb-4" />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <SkeletonLine width="w-full sm:w-5/6" height="h-10" />
+            <SkeletonLine width="w-full sm:w-1/6" height="h-10" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <SkeletonBlock height="h-20" />
+          <SkeletonBlock height="h-20" />
+          <SkeletonBlock height="h-20" />
+        </div>
       </div>
     );
   }
@@ -290,14 +301,16 @@ const OngoingRequest = () => {
   if (selectedBooking) {
     return (
       <div className="p-6 mb-[350px] mt-8 space-y-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Ongoing Requests</h2>
         <BookingDetails
           bookingId={selectedBooking.id}
           viewerRole="user"
           showQuotaSection={false}
           onBack={handleBack}
+          onReady={() => setDetailsLoading(false)}
         />
-        {/* Cancel pending booking - outline button under details (below map) */}
-        {selectedBooking.status === "pending" && (
+        {/* Cancel pending booking - shown only after details side-effects finish */}
+        {!detailsLoading && selectedBooking.status === "pending" && (
           <div className="w-full">
             <button
               onClick={requestCancelBooking}
@@ -308,17 +321,19 @@ const OngoingRequest = () => {
           </div>
         )}
         {/* Confirmation Modal mounted in details view too */}
-        <ConfirmationModal
-          isOpen={showCancelModal}
-          onConfirm={confirmCancelBooking}
-          onCancel={() => setShowCancelModal(false)}
-          action="cancel"
-          entityType="booking"
-          customTitle="Confirm Cancellation"
-          isProcessing={isCancelling}
-        />
+        {!detailsLoading && (
+          <ConfirmationModal
+            isOpen={showCancelModal}
+            onConfirm={confirmCancelBooking}
+            onCancel={() => setShowCancelModal(false)}
+            action="cancel"
+            entityType="booking"
+            customTitle="Confirm Cancellation"
+            isProcessing={isCancelling}
+          />
+        )}
         {/* Quota / Payment Panel (bill-like) */}
-        {quota && (
+        {!detailsLoading && quota && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-sm overflow-hidden">
             <div className="px-6 py-4 flex items-center justify-between">
               <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">Bill Summary</h3>

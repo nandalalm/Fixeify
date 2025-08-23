@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { format } from "date-fns";
 import { fetchConversations, updateOnlineStatus, addIncomingMessage, updateConversationReadStatus, setConversationLastMessageStatus, updateMessageStatus, updateConversation } from "../../store/chatSlice";
-import { RotateCcw, Image as ImageIcon } from "lucide-react";
+import { RotateCcw, Image as ImageIcon, User as UserIcon } from "lucide-react";
 import { getSocket, isSocketConnected } from "../../services/socket";
 
 interface ChatInboxProps {
@@ -94,6 +94,38 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     };
   }, [socket, isConnected, user?.id, role, dispatch, selectedConversationId]);
 
+  // Local Avatar component: preload actual image; fallback to icon placeholder
+  const Avatar: React.FC<{ src?: string | null; alt: string; className?: string }> = ({ src, alt, className }) => {
+    const placeholder = "/placeholder-user.jpg";
+    const [displayedSrc, setDisplayedSrc] = useState<string>(placeholder);
+
+    useEffect(() => {
+      const url = (src || "").trim();
+      if (!url) {
+        setDisplayedSrc(placeholder);
+        return;
+      }
+      let cancelled = false;
+      const img = new Image();
+      img.onload = () => { if (!cancelled) setDisplayedSrc(url); };
+      img.onerror = () => { if (!cancelled) setDisplayedSrc(placeholder); };
+      img.src = url;
+      return () => { cancelled = true; };
+    }, [src]);
+
+    if (displayedSrc === placeholder) {
+      return (
+        <div
+          aria-label={alt}
+          className={(className || "w-10 h-10 rounded-full") + " bg-gray-200 dark:bg-gray-700 border flex items-center justify-center text-gray-500 dark:text-gray-300"}
+        >
+          <UserIcon className="w-5 h-5" />
+        </div>
+      );
+    }
+    return <img src={displayedSrc} alt={alt} className={className || "w-10 h-10 rounded-full object-cover"} />;
+  };
+
   const formatTimestamp = (timestamp: string) => {
     return format(new Date(timestamp), "MMM d");
   };
@@ -172,11 +204,11 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
               >
                 <div className="flex items-center">
                   <div className="relative">
-                    <img
+                    <Avatar
                       src={
                         user?.role === "user"
-                          ? conversation.participants.proPhoto || "/placeholder.svg"
-                          : conversation.participants.userPhoto || "/placeholder.svg"
+                          ? conversation.participants.proPhoto
+                          : conversation.participants.userPhoto
                       }
                       alt={
                         user?.role === "user"

@@ -1,7 +1,7 @@
 import { FC, useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
-import { Check, CheckCheck, Send, ArrowLeft, ChevronDown, X, Image as ImageIcon } from "lucide-react";
+import { Check, CheckCheck, Send, ArrowLeft, ChevronDown, X, Image as ImageIcon, User as UserIcon } from "lucide-react";
 import { Message, User } from "../../interfaces/messagesInterface";
 import { getSocket, isSocketConnected } from "../../services/socket";
 import { fetchConversationMessages, updateOnlineStatus, updateMessageStatus, addIncomingMessage, setConversationLastMessageStatus } from "../../store/chatSlice";
@@ -37,6 +37,73 @@ const MessageBox: FC<MessageBoxProps> = ({
   otherUser: initialOtherUser,
   onBack,
 }) => {
+  // Local Avatar component with preload + placeholder (no flicker)
+  const Avatar: FC<{ src?: string | null; alt?: string; size?: number; className?: string }> = ({ src, alt = "", size = 40, className = "" }) => {
+    const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+    const [errored, setErrored] = useState(false);
+
+    useEffect(() => {
+      if (!src) {
+        setLoadedSrc(null);
+        setErrored(true);
+        return;
+      }
+      let cancelled = false;
+      const img = new Image();
+      img.onload = () => {
+        if (!cancelled) {
+          setLoadedSrc(src);
+          setErrored(false);
+        }
+      };
+      img.onerror = () => {
+        if (!cancelled) {
+          setLoadedSrc(null);
+          setErrored(true);
+        }
+      };
+      img.src = src;
+      return () => {
+        cancelled = true;
+      };
+    }, [src]);
+
+    if (loadedSrc && !errored) {
+      return (
+        <img
+          src={loadedSrc}
+          alt={alt}
+          className={`rounded-full object-cover ${className}`}
+          style={{ width: size, height: size }}
+        />
+      );
+    }
+
+    return (
+      <div
+        className={`rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center overflow-hidden ${className}`}
+        style={{ width: size, height: size }}
+        aria-label={alt}
+        role="img"
+      >
+        {/* Try placeholder image if available; otherwise show icon */}
+        <img
+          src="/placeholder-user.jpg"
+          alt="placeholder"
+          className="w-full h-full object-cover hidden"
+          onError={(e) => {
+            // If placeholder missing, show icon visually
+            (e.currentTarget as HTMLImageElement).style.display = "none";
+          }}
+          onLoad={(e) => {
+            (e.currentTarget as HTMLImageElement).style.display = "block";
+          }}
+        />
+        <UserIcon className="w-1/2 h-1/2 text-white" />
+      </div>
+    );
+  };
+
   const [newMessage, setNewMessage] = useState("");
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -565,19 +632,13 @@ const MessageBox: FC<MessageBoxProps> = ({
   };
 
   const renderAvatar = () => {
-    if (initialOtherUser.avatar) {
-      return (
-        <img
-          src={initialOtherUser.avatar}
-          alt={initialOtherUser.name}
-          className="w-10 h-10 rounded-full object-cover"
-        />
-      );
-    }
     return (
-      <div className="w-10 h-10 rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center">
-        <span className="text-white text-lg font-medium">{initialOtherUser.name.charAt(0).toUpperCase()}</span>
-      </div>
+      <Avatar
+        src={initialOtherUser.avatar}
+        alt={initialOtherUser.name}
+        size={40}
+        className="w-10 h-10"
+      />
     );
   };
 

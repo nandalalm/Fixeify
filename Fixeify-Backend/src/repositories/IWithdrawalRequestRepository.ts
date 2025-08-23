@@ -5,10 +5,21 @@ export interface IWithdrawalRequestRepository {
   createWithdrawalRequest(data: Partial<WithdrawalRequestDocument>): Promise<WithdrawalRequestResponse>;
   findWithdrawalRequestById(id: string): Promise<WithdrawalRequestResponse | null>;
   findWithdrawalRequestsByProId(proId: string): Promise<WithdrawalRequestResponse[]>;
-  findWithdrawalRequestsByProIdPaginated(proId: string, skip: number, limit: number): Promise<WithdrawalRequestResponse[]>;
+  findWithdrawalRequestsByProIdPaginated(
+    proId: string,
+    skip: number,
+    limit: number,
+    sortBy?: "latest" | "oldest",
+    status?: "pending" | "approved" | "rejected"
+  ): Promise<WithdrawalRequestResponse[]>;
   updateWithdrawalRequest(id: string, data: Partial<WithdrawalRequestDocument>): Promise<WithdrawalRequestResponse | null>;
-  getAllWithdrawalRequests(skip: number, limit: number): Promise<WithdrawalRequestResponse[]>;
-  getTotalWithdrawalRequestsCount(): Promise<number>;
+  getAllWithdrawalRequests(
+    skip: number,
+    limit: number,
+    sortBy?: "latest" | "oldest",
+    status?: "pending" | "approved" | "rejected"
+  ): Promise<WithdrawalRequestResponse[]>;
+  getTotalWithdrawalRequestsCount(status?: "pending" | "approved" | "rejected"): Promise<number>;
   getTotalWithdrawalRequestsCountByProId(proId: string): Promise<number>;
   getTotalWithdrawnByProId(proId: string): Promise<number>;
 }

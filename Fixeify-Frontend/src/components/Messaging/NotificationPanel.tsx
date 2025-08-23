@@ -38,21 +38,26 @@ const NotificationPanel: FC<NotificationPanelProps> = ({
 
   const prevNotifCountRef = useRef<number>(notifications.length);
   const isInitialOpenRef = useRef<boolean>(false);
+  const prevFirstIdRef = useRef<string | undefined>(notifications[0]?.id);
+  const loadingMoreRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (isOpen && listRef.current) {
-      // Only scroll to top when panel first opens
+      // On first open, start at top
       if (!isInitialOpenRef.current) {
         listRef.current.scrollTop = 0;
         isInitialOpenRef.current = true;
-      }
-      // Or when a brand new unread notification arrives at the top (not from loading more)
-      else if (
-        notifications.length > prevNotifCountRef.current &&
-        notifications[0]?.isRead === false &&
-        prevNotifCountRef.current > 0
-      ) {
-        listRef.current.scrollTop = 0;
+      } else {
+        // Only auto-scroll when a new item is PREPENDED at the top (first ID changes)
+        const firstId = notifications[0]?.id;
+        const firstChanged = firstId && firstId !== prevFirstIdRef.current;
+        const grew = notifications.length > prevNotifCountRef.current;
+        const topIsUnread = notifications[0]?.isRead === false;
+
+        if (!loadingMoreRef.current && grew && firstChanged && topIsUnread) {
+          // A truly new unread notification arrived at the top
+          listRef.current.scrollTop = 0;
+        }
       }
     }
 
@@ -62,12 +67,21 @@ const NotificationPanel: FC<NotificationPanelProps> = ({
     }
 
     prevNotifCountRef.current = notifications.length;
+    prevFirstIdRef.current = notifications[0]?.id;
   }, [isOpen, notifications]);
+
+  // When loading completes (after load-more), clear the flag so future top-prepends can scroll to top
+  useEffect(() => {
+    if (!loading) {
+      loadingMoreRef.current = false;
+    }
+  }, [loading]);
 
   const handleScroll = () => {
     if (!listRef.current || loading || !hasMore) return;
     const { scrollTop, scrollHeight, clientHeight } = listRef.current;
     if (scrollHeight - scrollTop - clientHeight < 60) {
+      loadingMoreRef.current = true;
       onLoadMore();
     }
   };

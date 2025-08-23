@@ -42,3 +42,15 @@ export const getAllTickets = async (
   const res = await api.get(TicketBase + "/", { params: { page, limit, status, sort }, withCredentials: true });
   return res.data.data ?? res.data;
 };
+
+export const updateTicketBanStatus = async (
+  ticketId: string,
+  isUserBanned?: boolean,
+  isProBanned?: boolean
+): Promise<TicketResponse> => {
+  const res = await api.put(`${TicketBase}/${ticketId}/ban-status`, 
+    { isUserBanned, isProBanned }, 
+    { withCredentials: true }
+  );
+  return res.data.data ?? res.data;
+};

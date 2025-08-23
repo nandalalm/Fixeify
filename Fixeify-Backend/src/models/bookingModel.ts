@@ -39,6 +39,7 @@ const timeSlotSchema = new Schema<ITimeSlot>(
 );
 
 export interface IBooking {
+  bookingId: string;
   userId: mongoose.Types.ObjectId;
   proId: mongoose.Types.ObjectId;
   categoryId: mongoose.Types.ObjectId;
@@ -65,6 +66,19 @@ export interface BookingDocument extends IBooking, Document {
 
 const bookingSchema = new Schema<BookingDocument>(
   {
+    bookingId: {
+      type: String,
+      required: true,
+      unique: true,
+      default: function () {
+        return (
+          "BKG-" +
+          Date.now() +
+          "-" +
+          Math.random().toString(36).substr(2, 4).toUpperCase()
+        );
+      },
+    },
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     proId: { type: Schema.Types.ObjectId, ref: "ApprovedPro", required: true },
     categoryId: { type: Schema.Types.ObjectId, ref: "Category", required: true },

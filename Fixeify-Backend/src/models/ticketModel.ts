@@ -14,6 +14,8 @@ export interface ITicket {
   adminComment?: string;
   resolvedBy?: mongoose.Types.ObjectId;
   resolvedAt?: Date;
+  isUserBanned?: boolean;
+  isProBanned?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -86,6 +88,14 @@ const ticketSchema = new Schema<TicketDocument>(
       ref: "Admin" 
     },
     resolvedAt: { type: Date },
+    isUserBanned: { 
+      type: Boolean, 
+      default: false 
+    },
+    isProBanned: { 
+      type: Boolean, 
+      default: false 
+    },
   },
   { 
     timestamps: true 

@@ -58,7 +58,7 @@ const formatTo12h = (time?: string) => {
 interface TransactionDetailsProps {
   transaction: ITransaction;
   onClose: () => void;
-  showRevenueSplit?: boolean; // when true (admin context), show revenue split based on quota total
+  showRevenueSplit?: boolean;
 }
 
 const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, onClose, showRevenueSplit = false }) => {
@@ -97,10 +97,11 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, on
         >
           <ChevronLeft className="w-4 h-4" /> Back
         </button>
-        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Txn: {transaction._id}</div>
+        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Txn: {transaction.transactionId || transaction._id}</div>
       </div>
 
       <Section title="Transaction Details">
+        <LabelValue label="Transaction ID" value={transaction.transactionId || transaction._id} />
         <div className="py-1 flex flex-col sm:flex-row sm:items-center gap-1">
           <span className="w-44 text-sm font-medium text-gray-600 dark:text-gray-300">Type</span>
           <div className="flex items-center"><StatusBadge value={transaction.type} /></div>
@@ -120,6 +121,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, on
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {booking && (
             <Section title="Booking Details">
+              <LabelValue label="Booking ID" value={booking?.bookingId || transaction.bookingId} />
               <LabelValue label="Issue Description" value={booking.issueDescription} />
               <LabelValue label="Service Category" value={booking.category?.name} />
               <LabelValue label="Preferred Date" value={new Date(booking.preferredDate).toLocaleDateString()} />

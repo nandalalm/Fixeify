@@ -71,7 +71,7 @@ export const MESSAGES = {
   ADMIN_ID_REQUIRED: "Admin ID is required",
   WEBHOOK_SIGNATURE_VERIFICATION_FAILED: "Webhook signature verification failed",
   RAW_BODY_NOT_AVAILABLE_OR_INVALID: "Raw body not available or not a Buffer",
-  // Chat
+  
   USERID_AND_PROID_REQUIRED: "userId and proId are required",
   UNAUTHORIZED_OWN_CHATS: "Unauthorized: Can only access own chats",
   PROID_REQUIRED: "proId is required",
@@ -89,7 +89,7 @@ export const MESSAGES = {
   USER_NOT_AUTHORIZED_MARK_MESSAGES: "User not authorized to mark messages in this chat",
   MESSAGES_MARKED_AS_READ: "Messages marked as read",
   FAILED_TO_MARK_MESSAGES_AS_READ: "Failed to mark messages as read",
-  // Notifications
+ 
   NOTIFICATIONID_REQUIRED: "notificationId is required",
   NOTIFICATION_MARKED_AS_READ: "Notification marked as read",
   FAILED_TO_MARK_NOTIFICATION_AS_READ: "Failed to mark notification as read",
@@ -97,13 +97,14 @@ export const MESSAGES = {
   FAILED_TO_FETCH_NOTIFICATIONS: "Failed to fetch notifications",
   FAILED_TO_MARK_ALL_NOTIFICATIONS_AS_READ: "Failed to mark all notifications as read",
   FAILED_SEND_NOTIFICATION: "Failed to send notification",
-  // Tickets
+ 
   COMPLAINT_SUBMITTED_SUCCESS: "Complaint submitted successfully",
+  COMPLAINT_ALREADY_RAISED: "A complaint has already been raised for this booking by this account.",
   TICKET_NOT_FOUND: "Ticket not found",
   FAILED_TO_FETCH_TICKET: "Failed to fetch ticket",
   TICKET_STATUS_UPDATED_SUCCESS: "Ticket status updated successfully",
   NOT_FOUND: "Not found",
-  // Services: UserService
+  
   PRO_CURRENTLY_UNAVAILABLE: "Professional is currently unavailable",
   PREFERRED_DATE_IN_PAST: "Preferred date cannot be in the past",
   BOOKING_ALREADY_IN_PROGRESS: "You already have a booking in progress for this date and time slot. Please choose a different time.",
@@ -111,9 +112,11 @@ export const MESSAGES = {
   FAILED_CREATE_PAYMENT_INTENT: "Failed to create payment intent",
   FAILED_UPDATE_PRO_WALLET: "Failed to update pro wallet",
   FAILED_UPDATE_PRO_AVAILABILITY: "Failed to update pro availability",
+  TIME_SLOT_NOT_AVAILABLE: "Selected time slot is not available",
+  TIME_SLOT_ALREADY_BOOKED: "Selected time slot is already booked",
   UNAUTHORIZED_CANCEL_BOOKING: "Unauthorized to cancel this booking",
   ONLY_PENDING_CAN_BE_CANCELLED: "Only pending bookings can be cancelled",
-  // UserService console logs
+  
   FAILED_SEND_PROFILE_UPDATE_NOTIFICATION: "Failed to send profile update notification",
   FAILED_SEND_PASSWORD_CHANGE_NOTIFICATION: "Failed to send password change notification",
   FAILED_ROLLBACK_AVAILABILITY_AFTER_BOOKING_ERROR: "Failed to rollback availability after booking creation error",
@@ -123,10 +126,10 @@ export const MESSAGES = {
   FAILED_SEND_PAYMENT_COMPLETION_NOTIFICATIONS: "Failed to send payment completion notifications",
   FAILED_SEND_BOOKING_CANCELLATION_TO_USER: "Failed to send booking cancellation notification to user",
   FAILED_SEND_BOOKING_CANCELLATION_TO_PRO: "Failed to send booking cancellation notification to pro",
-  // Services: RatingReviewService
+  
   RATING_BETWEEN_1_5: "Rating must be between 1 and 5",
   ALREADY_REVIEWED: "You have already reviewed this booking or quota",
-  // Services: ProService
+  
   BOOKING_PREFERRED_DATE_PASSED: "This booking cannot be accepted as the preferred date has passed.",
   BOOKING_PREFERRED_SLOTS_PASSED: "This booking cannot be accepted as one or more preferred time slots have passed.",
   BOOKING_MUST_BE_ACCEPTED_TO_GENERATE_QUOTA: "Booking must be accepted to generate quota",
@@ -136,7 +139,7 @@ export const MESSAGES = {
   FAILED_SEND_WITHDRAWAL_SUBMISSION_NOTIFICATION: "Failed to send withdrawal submission notification",
   FAILED_SEND_PRO_PROFILE_UPDATE_NOTIFICATION: "Failed to send pro profile update notification",
   FAILED_SEND_PRO_PASSWORD_CHANGE_NOTIFICATION: "Failed to send pro password change notification",
-  // Services: AuthService
+  
   FAILED_SEND_OTP_EMAIL: "Failed to send OTP email",
   INVALID_GOOGLE_CREDENTIAL: "Invalid Google credential",
   INVALID_GOOGLE_USER_DATA: "Invalid Google user data",
@@ -144,7 +147,7 @@ export const MESSAGES = {
   FAILED_SEND_PASSWORD_RESET_EMAIL: "Failed to send password reset email",
   INVALID_OR_EXPIRED_RESET_TOKEN: "Invalid or expired reset token",
   TOKEN_VERIFICATION_FAILED: "Token verification failed",
-  // Services: AdminService
+ 
   WITHDRAWAL_NOT_PENDING: "Withdrawal request is not pending",
   FAILED_SEND_PRO_APPROVAL_NOTIFICATION: "Failed to send pro approval notification",
   FAILED_SEND_WITHDRAWAL_APPROVAL_NOTIFICATION: "Failed to send withdrawal approval notification",

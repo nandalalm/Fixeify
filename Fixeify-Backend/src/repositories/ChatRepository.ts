@@ -2,28 +2,9 @@ import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
 import { IChat, Chat } from "../models/chatModel";
 import { IMessage, MessageModel } from "../models/messageModel";
-import { IChatRepository } from "./IChatRepository";
+import { IChatRepository,PopulatedUser,PopulatedPro,PopulatedChat } from "./IChatRepository";
 import {  MessageResponse } from "../dtos/response/chatDtos";
 import mongoose from "mongoose";
-
-interface PopulatedUser {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-}
-
-interface PopulatedPro {
-  _id: mongoose.Types.ObjectId;
-  firstName: string;
-  lastName: string;
-}
-
-type PopulatedChat = Omit<IChat, "participants" | "lastMessage"> & {
-  participants: {
-    userId: PopulatedUser;
-    proId: PopulatedPro;
-  };
-  lastMessage?: IMessage;
-};
 
 @injectable()
 export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> implements IChatRepository {

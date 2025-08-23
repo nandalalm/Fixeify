@@ -14,7 +14,10 @@ export interface IRatingReviewService {
     limit: number
   ): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }>;
   getRatingReviewById(id: string): Promise<RatingReviewResponse | null>;
-  // Admin: fetch all reviews paginated
-  getAllRatingReviews(page: number, limit: number): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }>;
+  getAllRatingReviews(
+    page: number,
+    limit: number,
+    sortBy?: "latest" | "oldest" | "lowest" | "highest"
+  ): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }>;
 
 }

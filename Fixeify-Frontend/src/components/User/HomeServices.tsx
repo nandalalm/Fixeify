@@ -31,7 +31,7 @@ const HomeServices = () => {
   const services = [
     {
       title: "House Cleaning",
-      description: "Hire a top-rated pro to keep your home spotless.",
+      description: "Hire a top-rated professional to keep your home spotless.",
       image: "/home-service1.png?height=200&width=200",
     },
     {

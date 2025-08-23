@@ -26,12 +26,12 @@ export interface IUserService {
     data: { currentPassword: string; newPassword: string }
   ): Promise<UserResponse | null>;
   getNearbyPros(
-    categoryId: string, 
-    longitude: number, 
-    latitude: number, 
-    skip?: number, 
-    limit?: number, 
-    sortBy?: string, 
+    categoryId: string,
+    longitude: number,
+    latitude: number,
+    skip?: number,
+    limit?: number,
+    sortBy?: string,
     availabilityFilter?: string
   ): Promise<{ pros: ProResponse[]; total: number; hasMore: boolean }>;
   createBooking(

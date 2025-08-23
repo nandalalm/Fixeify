@@ -11,9 +11,9 @@ interface StepProps {
 const steps = [
   { number: 1, title: "Search and Find", description: "Find the service you need.", image: "/step1.jpeg" },
   { number: 2, title: "Get matched", description: "We match you with the best service providers.", image: "/step2.png" },
-  { number: 3, title: "Review and find", description: "Review the options and find your preferred pro.", image: "/step3.png" },
-  { number: 4, title: "Book your pro", description: "Select the date and time for the service.", image: "/step4.png" },
-  { number: 5, title: "Plans Change?", description: "Cancel anytime before the pro accepts.", image: "/step5.png" },
+  { number: 3, title: "Review and find", description: "Review the options and find your preferred professional.", image: "/step3.png" },
+  { number: 4, title: "Book your professional", description: "Select the date and time for the service.", image: "/step4.png" },
+  { number: 5, title: "Plans Change?", description: "Cancel anytime before the professional accepts.", image: "/step5.png" },
   { number: 6, title: "Payment", description: "Make a secure payment for the service.", image: "/step6.png" },
 ];
 

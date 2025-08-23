@@ -2,7 +2,6 @@ import jsPDF from 'jspdf';
 import { BookingCompleteResponse } from '../interfaces/bookingInterface';
 import { QuotaResponse } from '../interfaces/quotaInterface';
 
-// Helper function to format currency properly (always without decimals)
 const formatCurrency = (amount: number | undefined): string => {
   if (!amount) return '0';
   // Convert to number and round to remove any decimal places

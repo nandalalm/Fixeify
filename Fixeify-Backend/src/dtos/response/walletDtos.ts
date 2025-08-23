@@ -4,6 +4,7 @@ export interface WalletResponseDTO {
   balance: number;
   transactions: {
     _id: string;
+    transactionId?: string;
     amount: number;
     type: "credit" | "debit";
     date: Date;

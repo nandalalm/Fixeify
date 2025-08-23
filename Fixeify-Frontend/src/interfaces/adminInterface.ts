@@ -22,6 +22,7 @@ export interface User {
   address?: ILocation | null;
   isBanned: boolean;
   photo?: string | null;
+  createdAt?: string | Date;
 }
 
 export interface LocationData {

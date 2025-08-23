@@ -1,6 +1,5 @@
 import { WalletDocument } from "../models/walletModel";
 import { WalletResponseDTO } from "../dtos/response/walletDtos";
-import { UpdateQuery } from "mongoose";
 
 export interface IWalletRepository {
   createWallet(walletData: Partial<WalletDocument>): Promise<WalletResponseDTO>;

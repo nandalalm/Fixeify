@@ -488,7 +488,8 @@ const BookingForm = () => {
                     Use Saved Location
                   </button>
                 )}
-                <p className="text-gray-400 text-sm pl-3">Saved Location: {savedLocation?.address}</p>
+                {savedLocation?.address&&
+                <p className="text-gray-400 text-sm pl-3">Saved Location: {savedLocation?.address}</p>}
               </div>
 
               <div>
@@ -515,7 +516,8 @@ const BookingForm = () => {
                     Use Saved Phone Number
                   </button>
                 )}
-                <p className="text-gray-400 text-sm pl-3">Saved Phone No: {savedPhoneNumber}</p>
+                {savedPhoneNumber&&
+                <p className="text-gray-400 text-sm pl-3">Saved Phone No: {savedPhoneNumber}</p>}
               </div>
 
               <BookingFormSecond

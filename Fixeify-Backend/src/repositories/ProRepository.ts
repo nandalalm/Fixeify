@@ -30,8 +30,14 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     return ApprovedProModel.findOne({ email }).exec();
   }
 
-  async getPendingProsWithPagination(skip: number, limit: number): Promise<PendingProDocument[]> {
-    return this._model.find({ isRejected: false }).skip(skip).limit(limit).exec();
+  async getPendingProsWithPagination(skip: number, limit: number, sortBy?: "latest" | "oldest"): Promise<PendingProDocument[]> {
+    const sortOrder = sortBy === "oldest" ? 1 : -1;
+    return this._model
+      .find({ isRejected: false })
+      .sort({ createdAt: sortOrder })
+      .skip(skip)
+      .limit(limit)
+      .exec();
   }
 
 
@@ -77,8 +83,10 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
   }
 
 
-  async getApprovedProsWithPagination(skip: number, limit: number): Promise<ProResponse[]> {
+  async getApprovedProsWithPagination(skip: number, limit: number, sortBy?: "latest" | "oldest"): Promise<ProResponse[]> {
+    const sortOrder = sortBy === "oldest" ? 1 : -1;
     const pros = (await ApprovedProModel.find({}, { password: 0 })
+      .sort({ createdAt: sortOrder })
       .populate<{ categoryId: CategoryDocument }>("categoryId")
       .skip(skip)
       .limit(limit)
@@ -234,7 +242,6 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
         }
       }
 
-      // Add sorting
       let sortStage: any = {};
       switch (sortBy) {
         case 'highest_rated':
@@ -250,12 +257,10 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       }
       pipeline.push(sortStage);
 
-      // Get total count before pagination
       const countPipeline = [...pipeline, { $count: "total" }];
       const countResult = await ApprovedProModel.aggregate(countPipeline);
       const total = countResult.length > 0 ? countResult[0].total : 0;
 
-      // Add pagination
       pipeline.push({ $skip: skip });
       pipeline.push({ $limit: limit });
 

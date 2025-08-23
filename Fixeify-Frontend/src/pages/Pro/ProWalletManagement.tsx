@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
 import { type WalletResponse, type ITransaction } from "../../interfaces/walletInterface";
 import TransactionDetails from "@/components/Reuseable/TransactionDetails";
 import WithdrawalRequestDetails from "@/components/Reuseable/WithdrawalRequestDetails";
+import { SkeletonLine } from "@/components/Reuseable/Skeleton";
 
 const ProWalletManagement = () => {
   const user = useSelector((state: RootState) => state.auth.user) as User | null;
@@ -45,18 +46,25 @@ const ProWalletManagement = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [activeTab, setActiveTab] = useState<'transactions' | 'withdrawals'>('transactions');
   const [withdrawals, setWithdrawals] = useState<IWithdrawalRequest[]>([]);
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState<boolean>(false);
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<IWithdrawalRequest | null>(null);
   // inline details for withdrawals; no modal
   const [selectedTransaction, setSelectedTransaction] = useState<ITransaction | null>(null);
+  // flags to control UX while opening details
+  const [isViewingTransaction, setIsViewingTransaction] = useState<boolean>(false);
+  const [isViewingWithdrawal, setIsViewingWithdrawal] = useState<boolean>(false);
+  // show table-only skeletons during tab switch
+  const [tabSwitching, setTabSwitching] = useState<boolean>(false);
+  const [transactionsListLoading, setTransactionsListLoading] = useState<boolean>(false);
   const [withdrawalsPage, setWithdrawalsPage] = useState<number>(1);
   const [withdrawalsTotalPages, setWithdrawalsTotalPages] = useState<number>(1);
   const [withdrawalsSearch, setWithdrawalsSearch] = useState<string>("");
   const [withdrawalsSortBy, setWithdrawalsSortBy] = useState<string>("latest"); // latest, oldest, pending, approved, rejected
 
   // Helpers to refresh wallet transactions and withdrawals, returning fresh data
-  const refreshWallet = async (): Promise<WalletResponse | null> => {
+  const refreshWallet = async (opts?: { silent?: boolean }): Promise<WalletResponse | null> => {
     if (!user || !accessToken || user.role !== UserRole.PRO) return null;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
     try {
       const { wallet: walletData, total } = await getWalletWithPagination(user.id, currentPage, itemsPerPage);
       setWallet(walletData || { id: "", proId: user.id, balance: 0, transactions: [], createdAt: new Date(), updatedAt: new Date() });
@@ -74,20 +82,33 @@ const ProWalletManagement = () => {
       }
       return null;
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   };
 
-  const refreshProWithdrawals = async (): Promise<IWithdrawalRequest[]> => {
+  const refreshProWithdrawals = async (opts?: { silent?: boolean }): Promise<IWithdrawalRequest[]> => {
     if (!user || user.role !== UserRole.PRO) return [];
+    if (!opts?.silent) setWithdrawalsLoading(true);
     try {
-      const { withdrawals, total } = await fetchProWithdrawalRequests(user.id, withdrawalsPage, itemsPerPage);
+      const v = (withdrawalsSortBy || '').toLowerCase();
+      const sortByParam: "latest" | "oldest" | undefined = v === 'oldest' ? 'oldest' : v === 'latest' ? 'latest' : undefined;
+      const statusParam: "pending" | "approved" | "rejected" | undefined =
+        v === 'pending' || v === 'approved' || v === 'rejected' ? (v as any) : undefined;
+      const { withdrawals, total } = await fetchProWithdrawalRequests(
+        user.id,
+        withdrawalsPage,
+        itemsPerPage,
+        sortByParam,
+        statusParam
+      );
       setWithdrawals(withdrawals);
       setWithdrawalsTotalPages(Math.ceil(total / itemsPerPage));
       return withdrawals;
     } catch (e) {
       console.error("Failed to fetch withdrawal requests", e);
       return [];
+    } finally {
+      if (!opts?.silent) setWithdrawalsLoading(false);
     }
   };
 
@@ -119,27 +140,35 @@ const ProWalletManagement = () => {
     return () => window.removeEventListener("resize", handleResize); // Cleanup
   }, [user, accessToken, dispatch, navigate, currentPage, itemsPerPage]);
 
-  // Load pro withdrawal requests when the withdrawals tab becomes active or pagination changes
+  // Load pro withdrawal requests when the withdrawals tab becomes active or pagination/filter changes
   useEffect(() => {
     if (activeTab === 'withdrawals') {
       refreshProWithdrawals();
     }
-  }, [activeTab, user, withdrawalsPage, itemsPerPage]);
+  }, [activeTab, user, withdrawalsPage, itemsPerPage, withdrawalsSortBy]);
 
   // Refetch latest data when switching tabs and clear any selected details
   useEffect(() => {
     // Clear selected inline details on tab change
     setSelectedTransaction(null);
     setSelectedWithdrawal(null);
-    if (activeTab === 'transactions') {
-      refreshWallet();
-    } else if (activeTab === 'withdrawals') {
-      refreshProWithdrawals();
-    }
+    setTabSwitching(true);
+    (async () => {
+      if (activeTab === 'transactions') {
+        setTransactionsListLoading(true);
+        await refreshWallet({ silent: true });
+        setTransactionsListLoading(false);
+      } else if (activeTab === 'withdrawals') {
+        setWithdrawalsLoading(true);
+        await refreshProWithdrawals({ silent: true });
+        setWithdrawalsLoading(false);
+      }
+      setTabSwitching(false);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // Derived filtered/sorted withdrawals for current page data
+  // Derived withdrawals for current page data (only client-side search; sorting/filtering done in backend)
   const visibleWithdrawals = (() => {
     let list = [...withdrawals];
     const q = withdrawalsSearch.trim().toLowerCase();
@@ -150,29 +179,6 @@ const ProWalletManagement = () => {
         String(wr.amount).includes(q) ||
         new Date(wr.createdAt).toLocaleDateString().toLowerCase().includes(q)
       );
-    }
-    switch (withdrawalsSortBy) {
-      case 'oldest':
-        list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        break;
-      case 'pending': {
-        list = list.filter(w => (w.status || '').toLowerCase() === 'pending');
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-      }
-      case 'approved': {
-        list = list.filter(w => (w.status || '').toLowerCase() === 'approved');
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-      }
-      case 'rejected': {
-        list = list.filter(w => (w.status || '').toLowerCase() === 'rejected');
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        break;
-      }
-      default:
-        // latest
-        list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return list;
   })();
@@ -268,6 +274,8 @@ const ProWalletManagement = () => {
       console.log("Withdrawal successful, updated wallet:", walletData);
       // Reset to first page after update
       setCurrentPage(1);
+      // Refresh withdrawals table to include the newly created request
+      await refreshProWithdrawals({ silent: true });
     } catch (err: any) {
       console.error("Withdrawal request error:", err.response?.data);
       setError(err.response?.data?.message || "Failed to send withdrawal request");
@@ -306,13 +314,7 @@ const ProWalletManagement = () => {
     return null;
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="spinner border-t-4 border-blue-500 rounded-full w-12 h-12 animate-spin"></div>
-      </div>
-    );
-  }
+  // Note: Do not early-return full-screen skeleton. We'll render skeleton only in content area below.
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -329,7 +331,48 @@ const ProWalletManagement = () => {
           <div className="max-w-7xl mx-auto mb-[50px]">
             <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Wallet Management</h1>
             {successMessage && <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-md text-center">{successMessage}</div>}
-            {wallet ? (
+            {loading ? (
+              <div className="animate-pulse">
+                {/* Wallet card skeleton */}
+                <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-4">
+                  <SkeletonLine width="w-80" height="h-5" />
+                  <div className="mt-4 w-48">
+                    <SkeletonLine width="w-full" height="h-10" />
+                  </div>
+                </div>
+                {/* Tabs skeleton */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm mb-6">
+                  <div className="border-b border-gray-200 dark:border-gray-700 flex gap-4 p-4">
+                    <SkeletonLine width="w-32" height="h-8" />
+                    <SkeletonLine width="w-40" height="h-8" />
+                  </div>
+                </div>
+                {/* List skeleton */}
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={`row-skel-${i}`} className="p-4">
+                        <div className="flex items-center gap-4">
+                          <SkeletonLine width="w-12" height="h-4" />
+                          <SkeletonLine width="w-56" height="h-4" />
+                          <SkeletonLine width="w-24" height="h-4" />
+                          <SkeletonLine width="w-24" height="h-4" />
+                          <SkeletonLine width="w-20" height="h-6" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {/* Pagination skeleton */}
+                <div className="bg-white dark:bg-gray-800 px-4 py-3 mt-4 flex items-center justify-center border border-gray-200 dark:border-gray-700 rounded-md">
+                  <div className="flex items-center space-x-2">
+                    <SkeletonLine width="w-8" height="h-8" />
+                    <SkeletonLine width="w-32" height="h-4" />
+                    <SkeletonLine width="w-8" height="h-8" />
+                  </div>
+                </div>
+              </div>
+            ) : wallet ? (
               <div className="flex flex-col items-center">
                 <div className="w-full">
                   <div className="bg-white p-6 rounded-lg shadow-md mb-4">
@@ -367,92 +410,48 @@ const ProWalletManagement = () => {
                       {/* If a transaction is selected, show inline details instead of list/table */}
                       {selectedTransaction ? (
                         <div className="mt-2">
-                          <TransactionDetails
-                            transaction={selectedTransaction}
-                            onClose={async () => {
-                              await refreshWallet();
-                              setSelectedTransaction(null);
-                            }}
-                          />
-                        </div>
-                      ) : isMobile ? (
-                        <>
-                          <div className="flex flex-col gap-4">
-                            {wallet.transactions.map((transaction, index) => (
-                              <div key={transaction._id} className="bg-white p-4 rounded-md shadow border border-gray-200">
-                                <p className="text-sm text-gray-700"><strong>S.No:</strong> {index + 1 + (currentPage - 1) * itemsPerPage}</p>
-                                <p className="text-sm text-gray-700"><strong>Description:</strong> {transaction.description || "-"}</p>
-                                <p className="text-sm text-gray-700">
-                                  <strong>Type:</strong>{" "}
-                                  <span
-                                    className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${
-                                      transaction.type === "credit" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-                                    }`}
-                                  >
-                                    {transaction.type}
-                                  </span>
-                                </p>
-                                <p className="text-sm text-gray-700">
-                                  <strong>Amount:</strong> {transaction.type === "credit" ? "+" : "-"}₹{transaction.amount.toFixed(2)}
-                                </p>
-                                <p className="text-sm text-gray-700"><strong>Date:</strong> {new Date(transaction.date).toLocaleDateString()}</p>
-                                <div className="mt-2">
-                                  <button
-                                    onClick={async () => {
-                                      const fresh = await refreshWallet();
-                                      const latest = fresh?.transactions?.find(t => t._id === transaction._id) || transaction;
-                                      setSelectedTransaction(latest);
-                                    }}
-                                    className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors"
-                                  >
-                                    View
-                                  </button>
+                              {isViewingTransaction ? (
+                                <div className="p-6 flex justify-center">
+                                  <div className="w-8 h-8 rounded-full border-4 border-gray-200 border-t-[#032B44] animate-spin"></div>
                                 </div>
-                              </div>
-                            ))}
-                          </div>
-                          {totalPages >= 1 && (
-                            <div className="bg-white px-4 py-3 mt-2 flex items-center justify-center border border-gray-200 rounded-md">
-                              <nav className="flex items-center space-x-2" aria-label="Pagination">
-                                <button
-                                  onClick={() => handlePageChange(currentPage - 1)}
-                                  disabled={currentPage === 1}
-                                  className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
-                                >
-                                  <ChevronLeft className="h-5 w-5" />
-                                </button>
-                                <span className="text-sm text-gray-700">Page {currentPage} of {totalPages}</span>
-                                <button
-                                  onClick={() => handlePageChange(currentPage + 1)}
-                                  disabled={currentPage === totalPages}
-                                  className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
-                                >
-                                  <ChevronRight className="h-5 w-5" />
-                                </button>
-                              </nav>
+                              ) : (
+                                <TransactionDetails
+                                  transaction={selectedTransaction}
+                                  onClose={async () => {
+                                    setIsViewingTransaction(true);
+                                    await refreshWallet({ silent: true });
+                                    setSelectedTransaction(null);
+                                    setIsViewingTransaction(false);
+                                  }}
+                                />
+                              )}
                             </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="overflow-x-auto">
-                          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-100">
-                                <tr>
-                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
-                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Description</th>
-                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Type</th>
-                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Amount</th>
-                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
-                                  <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Action</th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
+                          ) : isMobile ? (
+                            <>
+                          {tabSwitching || transactionsListLoading ? (
+                            <div className="flex flex-col gap-4">
+                              {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={`txn-card-skel-${i}`} className="bg-white p-4 rounded-md shadow border border-gray-200 animate-pulse">
+                                  <SkeletonLine width="w-24" height="h-4" />
+                                  <div className="mt-2 space-y-2">
+                                    <SkeletonLine width="w-40" height="h-4" />
+                                    <SkeletonLine width="w-24" height="h-4" />
+                                    <SkeletonLine width="w-28" height="h-4" />
+                                    <SkeletonLine width="w-32" height="h-4" />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex flex-col gap-4">
                                 {wallet.transactions.map((transaction, index) => (
-                                  <tr key={transaction._id} className="hover:bg-gray-50">
-                                    <td className="py-3 px-4 text-sm text-gray-900 border-b">{index + 1 + (currentPage - 1) * itemsPerPage}</td>
-                                    <td className="py-3 px-4 text-sm text-gray-700 border-b">{transaction.description || "-"}</td>
-                                    <td className="py-3 px-4 text-sm text-gray-700 border-b">
+                                  <div key={transaction._id} className="bg-white p-4 rounded-md shadow border border-gray-200">
+                                    <p className="text-sm text-gray-700"><strong>S.No:</strong> {index + 1 + (currentPage - 1) * itemsPerPage}</p>
+                                    <p className="text-sm text-gray-700"><strong>Description:</strong> {transaction.description || "-"}</p>
+                                    <p className="text-xs text-gray-500 mt-0.5"><strong>Txn:</strong> {transaction.transactionId || transaction._id}</p>
+                                    <p className="text-sm text-gray-700">
+                                      <strong>Type:</strong>{" "}
                                       <span
                                         className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${
                                           transaction.type === "credit" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
@@ -460,51 +459,147 @@ const ProWalletManagement = () => {
                                       >
                                         {transaction.type}
                                       </span>
-                                    </td>
-                                    <td className="py-3 px-4 text-sm text-gray-700 border-b">
-                                      {transaction.type === "credit" ? "+" : "-"}₹{transaction.amount.toFixed(2)}
-                                    </td>
-                                    <td className="py-3 px-4 text-sm text-gray-700 border-b">
-                                      {new Date(transaction.date).toLocaleDateString()}
-                                    </td>
-                                    <td className="py-3 px-4 text-sm text-gray-700 border-b">
+                                    </p>
+                                    <p className="text-sm text-gray-700">
+                                      <strong>Amount:</strong> {transaction.type === "credit" ? "+" : "-"}₹{transaction.amount.toFixed(2)}
+                                    </p>
+                                    <p className="text-sm text-gray-700"><strong>Date:</strong> {new Date(transaction.date).toLocaleDateString()}</p>
+                                    <div className="mt-2">
                                       <button
                                         onClick={async () => {
-                                          const fresh = await refreshWallet();
+                                          setIsViewingTransaction(true);
+                                          setSelectedTransaction(transaction); // trigger details area
+                                          const fresh = await refreshWallet({ silent: true });
                                           const latest = fresh?.transactions?.find(t => t._id === transaction._id) || transaction;
                                           setSelectedTransaction(latest);
+                                          setIsViewingTransaction(false);
                                         }}
-                                        className="bg-[#032B44] text-white px-3 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors"
+                                        className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors"
                                       >
                                         View
                                       </button>
-                                    </td>
-                                  </tr>
+                                    </div>
+                                  </div>
                                 ))}
-                              </tbody>
-                            </table>
-                            {totalPages >= 1 && (
-                              <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200">
-                                <nav className="flex items-center space-x-2" aria-label="Pagination">
-                                  <button
-                                    onClick={() => handlePageChange(currentPage - 1)}
-                                    disabled={currentPage === 1}
-                                    className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
-                                  >
-                                    <ChevronLeft className="h-5 w-5" />
-                                  </button>
-                                  <span className="text-sm text-gray-700">Page {currentPage} of {totalPages}</span>
-                                  <button
-                                    onClick={() => handlePageChange(currentPage + 1)}
-                                    disabled={currentPage === totalPages}
-                                    className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
-                                  >
-                                    <ChevronRight className="h-5 w-5" />
-                                  </button>
-                                </nav>
                               </div>
+                              {totalPages >= 1 && (
+                                <div className="bg-white px-4 py-3 mt-2 flex items-center justify-center border border-gray-200 rounded-md">
+                                  <nav className="flex items-center space-x-2" aria-label="Pagination">
+                                    <button
+                                      onClick={() => handlePageChange(currentPage - 1)}
+                                      disabled={currentPage === 1}
+                                      className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                                    >
+                                      <ChevronLeft className="h-5 w-5" />
+                                    </button>
+                                    <span className="text-sm text-gray-700">Page {currentPage} of {totalPages}</span>
+                                    <button
+                                      onClick={() => handlePageChange(currentPage + 1)}
+                                      disabled={currentPage === totalPages}
+                                      className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                                    >
+                                      <ChevronRight className="h-5 w-5" />
+                                    </button>
+                                  </nav>
+                                </div>
+                              )}
+                            </>
+                          )}
+                            </>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                            {tabSwitching || transactionsListLoading ? (
+                              <div className="divide-y divide-gray-200 animate-pulse">
+                                {Array.from({ length: 6 }).map((_, i) => (
+                                  <div key={`txn-row-skel-${i}`} className="p-4">
+                                    <div className="flex items-center gap-4">
+                                      <SkeletonLine width="w-12" height="h-4" />
+                                      <SkeletonLine width="w-56" height="h-4" />
+                                      <SkeletonLine width="w-24" height="h-4" />
+                                      <SkeletonLine width="w-24" height="h-4" />
+                                      <SkeletonLine width="w-16" height="h-6" />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <>
+                                <table className="min-w-full divide-y divide-gray-200">
+                                  <thead className="bg-gray-100">
+                                    <tr>
+                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
+                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Description</th>
+                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Transaction ID</th>
+                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">Type</th>
+                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">Amount</th>
+                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
+                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {wallet.transactions.map((transaction, index) => (
+                                      <tr key={transaction._id} className="hover:bg-gray-50">
+                                        <td className="py-3 px-4 text-sm text-gray-900 border-b">{index + 1 + (currentPage - 1) * itemsPerPage}</td>
+                                        <td className="py-3 px-4 text-sm text-gray-700 border-b">{transaction.description || "-"}</td>
+                                        <td className="py-3 px-4 text-sm text-gray-700 border-b font-mono">{transaction.transactionId || transaction._id}</td>
+                                        <td className="py-3 px-4 text-sm text-gray-700 border-b">
+                                          <span
+                                            className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${
+                                              transaction.type === "credit" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                                            }`}
+                                          >
+                                            {transaction.type}
+                                          </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-sm text-gray-700 border-b">
+                                          {transaction.type === "credit" ? "+" : "-"}₹{transaction.amount.toFixed(2)}
+                                        </td>
+                                        <td className="py-3 px-4 text-sm text-gray-700 border-b">
+                                          {new Date(transaction.date).toLocaleDateString()}
+                                        </td>
+                                        <td className="py-3 px-4 text-sm text-gray-700 border-b">
+                                          <button
+                                            onClick={async () => {
+                                              setIsViewingTransaction(true);
+                                              setSelectedTransaction(transaction);
+                                              const fresh = await refreshWallet({ silent: true });
+                                              const latest = fresh?.transactions?.find(t => t._id === transaction._id) || transaction;
+                                              setSelectedTransaction(latest);
+                                              setIsViewingTransaction(false);
+                                            }}
+                                            className="bg-[#032B44] text-white px-3 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors"
+                                          >
+                                            View
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                                {totalPages >= 1 && (
+                                  <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200">
+                                    <nav className="flex items-center space-x-2" aria-label="Pagination">
+                                      <button
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                        className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                                      >
+                                        <ChevronLeft className="h-5 w-5" />
+                                      </button>
+                                      <span className="text-sm text-gray-700">Page {currentPage} of {totalPages}</span>
+                                      <button
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                        className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50"
+                                      >
+                                        <ChevronRight className="h-5 w-5" />
+                                      </button>
+                                    </nav>
+                                  </div>
+                                )}
+                              </>
                             )}
-
                           </div>
                         </div>
                       )}
@@ -514,19 +609,83 @@ const ProWalletManagement = () => {
                   ) : (
                     <div className="overflow-x-auto">
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-                        {selectedWithdrawal ? (
-                          <div className="p-4">
-                            <WithdrawalRequestDetails
-                              withdrawal={selectedWithdrawal}
-                              onBack={async () => {
-                                await refreshProWithdrawals();
-                                setSelectedWithdrawal(null);
-                              }}
-                              showProDetails={false}
-                            />
+                        {withdrawalsLoading && !selectedWithdrawal ? (
+                          <div className="animate-pulse">
+                            {/* Search/Sort skeleton */}
+                            <div className="mb-4 px-4 pt-4 flex flex-col sm:flex-row gap-4 justify-between">
+                              <SkeletonLine width="w-full" height="h-10" className="sm:w-5/6" />
+                              <SkeletonLine width="w-40" height="h-10" className="sm:w-1/6" />
+                            </div>
+                            {/* Header skeleton (desktop) */}
+                            <div className="hidden sm:block bg-gray-100">
+                              <div className="grid grid-cols-6 gap-4 px-4 py-3">
+                                <SkeletonLine width="w-12" height="h-5" />
+                                <SkeletonLine width="w-24" height="h-5" />
+                                <SkeletonLine width="w-24" height="h-5" />
+                                <SkeletonLine width="w-24" height="h-5" />
+                                <SkeletonLine width="w-24" height="h-5" />
+                                <SkeletonLine width="w-16" height="h-5" />
+                              </div>
+                            </div>
+                            {/* Rows skeleton */}
+                            <div className="divide-y divide-gray-200">
+                              {Array.from({ length: 6 }).map((_, i) => (
+                                <div key={`wr-skel-${i}`} className="p-4">
+                                  <div className="flex items-center gap-4">
+                                    <SkeletonLine width="w-12" height="h-4" />
+                                    <SkeletonLine width="w-32" height="h-4" />
+                                    <SkeletonLine width="w-24" height="h-4" />
+                                    <SkeletonLine width="w-24" height="h-4" />
+                                    <SkeletonLine width="w-20" height="h-6" />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            {/* Pagination skeleton */}
+                            <div className="px-4 py-3 flex items-center justify-center border-t border-gray-200">
+                              <div className="flex items-center space-x-2">
+                                <SkeletonLine width="w-8" height="h-8" />
+                                <SkeletonLine width="w-32" height="h-4" />
+                                <SkeletonLine width="w-8" height="h-8" />
+                              </div>
+                            </div>
                           </div>
+                        ) : selectedWithdrawal ? (
+                          isViewingWithdrawal ? (
+                            <div className="p-6 flex justify-center">
+                              <div className="w-8 h-8 rounded-full border-4 border-gray-200 border-t-[#032B44] animate-spin"></div>
+                            </div>
+                          ) : (
+                            <div className="p-4">
+                              <WithdrawalRequestDetails
+                                withdrawal={selectedWithdrawal}
+                                onBack={async () => {
+                                  // Show list skeleton instead of spinner: clear details first
+                                  setSelectedWithdrawal(null);
+                                  await refreshProWithdrawals();
+                                }}
+                                showProDetails={false}
+                              />
+                            </div>
+                          )
                         ) : withdrawals.length === 0 ? (
-                          <div className="px-6 py-6 text-gray-500">No withdrawal requests yet.</div>
+                          (() => {
+                            const hasActiveFilter = withdrawalsSearch.trim() !== "" || withdrawalsSortBy !== "latest";
+                            return hasActiveFilter ? (
+                              <div className="px-6 py-10 text-center text-gray-600">
+                                <div className="mb-2 font-medium">No results found for the current search/sort criteria.</div>
+                                <button
+                                  onClick={clearWithdrawalsFilters}
+                                  className="inline-flex items-center gap-2 text-[#032B44] hover:text-[#054869] font-medium"
+                                >
+                                  <RotateCcw className="w-4 h-4" />
+                                  Clear filters
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="px-6 py-6 text-gray-500">No withdrawal requests yet.</div>
+                            );
+                          })()
                         ) : (
                           <>
                             {/* Search and Sort */}
@@ -580,44 +739,72 @@ const ProWalletManagement = () => {
                                     <p className="text-sm text-gray-700"><strong>Date:</strong> {new Date(wr.createdAt).toLocaleDateString()}</p>
                                     <p className="text-sm text-gray-700"><strong>Status:</strong> {renderStatusBadge(wr.status)}</p>
                                     <div className="mt-2">
-                                      <button onClick={() => { setSelectedWithdrawal(wr); }} className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors">View</button>
+                                      <button onClick={async () => {
+                                        setIsViewingWithdrawal(true);
+                                        setSelectedWithdrawal(wr);
+                                        const list = await refreshProWithdrawals({ silent: true });
+                                        const latest = list.find(x => x.id === wr.id) || wr;
+                                        setSelectedWithdrawal(latest);
+                                        setIsViewingWithdrawal(false);
+                                      }} className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors">View</button>
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             ) : (
-                              <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-100">
-                                  <tr>
-                                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
-                                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Payment Mode</th>
-                                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Amount</th>
-                                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
-                                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Status</th>
-                                    <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">Action</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                  {visibleWithdrawals.map((wr, index) => (
-                                    <tr key={wr.id} className="hover:bg-gray-50">
-                                      <td className="py-3 px-4 text-sm text-gray-900 border-b">{index + 1 + (withdrawalsPage - 1) * itemsPerPage}</td>
-                                      <td className="py-3 px-4 text-sm text-gray-700 border-b">{wr.paymentMode === 'bank' ? 'Bank' : 'UPI'}</td>
-                                      <td className="py-3 px-4 text-sm text-gray-700 border-b">₹{wr.amount.toFixed(2)}</td>
-                                      <td className="py-3 px-4 text-sm text-gray-700 border-b">{new Date(wr.createdAt).toLocaleDateString()}</td>
-                                      <td className="py-3 px-4 text-sm text-gray-700 border-b">{renderStatusBadge(wr.status)}</td>
-                                      <td className="py-3 px-4 text-sm text-gray-700 border-b">
-                                        <button onClick={async () => {
-                                          const list = await refreshProWithdrawals();
-                                          const latest = list.find(x => x.id === wr.id) || wr;
-                                          setSelectedWithdrawal(latest);
-                                        }} className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors">View</button>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                              <>
+                                {tabSwitching ? (
+                                  <div className="divide-y divide-gray-200 animate-pulse">
+                                    {Array.from({ length: 6 }).map((_, i) => (
+                                      <div key={`wr-row-skel-${i}`} className="p-4">
+                                        <div className="flex items-center gap-4">
+                                          <SkeletonLine width="w-12" height="h-4" />
+                                          <SkeletonLine width="w-32" height="h-4" />
+                                          <SkeletonLine width="w-24" height="h-4" />
+                                          <SkeletonLine width="w-24" height="h-4" />
+                                          <SkeletonLine width="w-20" height="h-6" />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-100">
+                                      <tr>
+                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
+                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Payment Mode</th>
+                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Amount</th>
+                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
+                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Status</th>
+                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">Action</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                      {visibleWithdrawals.map((wr, index) => (
+                                        <tr key={wr.id} className="hover:bg-gray-50">
+                                          <td className="py-3 px-4 text-sm text-gray-900 border-b">{index + 1 + (withdrawalsPage - 1) * itemsPerPage}</td>
+                                          <td className="py-3 px-4 text-sm text-gray-700 border-b">{wr.paymentMode === 'bank' ? 'Bank' : 'UPI'}</td>
+                                          <td className="py-3 px-4 text-sm text-gray-700 border-b">₹{wr.amount.toFixed(2)}</td>
+                                          <td className="py-3 px-4 text-sm text-gray-700 border-b">{new Date(wr.createdAt).toLocaleDateString()}</td>
+                                          <td className="py-3 px-4 text-sm text-gray-700 border-b">{renderStatusBadge(wr.status)}</td>
+                                              <td className="py-3 px-4 text-sm text-gray-700 border-b">
+                                            <button onClick={async () => {
+                                              setIsViewingWithdrawal(true);
+                                              setSelectedWithdrawal(wr);
+                                              const list = await refreshProWithdrawals({ silent: true });
+                                              const latest = list.find(x => x.id === wr.id) || wr;
+                                              setSelectedWithdrawal(latest);
+                                              setIsViewingWithdrawal(false);
+                                            }} className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors">View</button>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </>
                             )}
-                            {visibleWithdrawals.length > 0 && withdrawalsTotalPages >= 1 && (
+                            {!tabSwitching && visibleWithdrawals.length > 0 && withdrawalsTotalPages >= 1 && (
                               <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200">
                                 <nav className="flex items-center space-x-2" aria-label="Pagination">
                                   <button onClick={() => handleWithdrawalsPageChange(withdrawalsPage - 1)} disabled={withdrawalsPage === 1} className="p-2 rounded-md text-gray-400 hover:text-gray-500 disabled:opacity-50">

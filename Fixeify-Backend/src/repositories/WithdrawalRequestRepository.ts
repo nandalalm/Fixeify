@@ -29,10 +29,19 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
     return withdrawalRequests.map(this.mapToWithdrawalRequestResponse);
   }
 
-  async findWithdrawalRequestsByProIdPaginated(proId: string, skip: number, limit: number): Promise<WithdrawalRequestResponse[]> {
+  async findWithdrawalRequestsByProIdPaginated(
+    proId: string,
+    skip: number,
+    limit: number,
+    sortBy: "latest" | "oldest" = "latest",
+    status?: "pending" | "approved" | "rejected"
+  ): Promise<WithdrawalRequestResponse[]> {
+    const query: any = { proId: new Types.ObjectId(proId) };
+    if (status) query.status = status;
+    const sortOrder = sortBy === "oldest" ? 1 : -1;
     const withdrawalRequests = await this._model
-      .find({ proId: new Types.ObjectId(proId) })
-      .sort({ createdAt: -1 })
+      .find(query)
+      .sort({ createdAt: sortOrder })
       .skip(skip)
       .limit(limit)
       .exec();
@@ -46,18 +55,28 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
     return withdrawalRequest ? this.mapToWithdrawalRequestResponse(withdrawalRequest) : null;
   }
 
-  async getAllWithdrawalRequests(skip: number, limit: number): Promise<WithdrawalRequestResponse[]> {
+  async getAllWithdrawalRequests(
+    skip: number,
+    limit: number,
+    sortBy: "latest" | "oldest" = "latest",
+    status?: "pending" | "approved" | "rejected"
+  ): Promise<WithdrawalRequestResponse[]> {
+    const query: any = {};
+    if (status) query.status = status;
+    const sortOrder = sortBy === "oldest" ? 1 : -1;
     const withdrawalRequests = await this._model
-      .find({})
-      .sort({ createdAt: -1 })
+      .find(query)
+      .sort({ createdAt: sortOrder })
       .skip(skip)
       .limit(limit)
       .exec();
     return withdrawalRequests.map(this.mapToWithdrawalRequestResponse);
   }
 
-  async getTotalWithdrawalRequestsCount(): Promise<number> {
-    return this._model.countDocuments({}).exec();
+  async getTotalWithdrawalRequestsCount(status?: "pending" | "approved" | "rejected"): Promise<number> {
+    const query: any = {};
+    if (status) query.status = status;
+    return this._model.countDocuments(query).exec();
   }
 
   async getTotalWithdrawalRequestsCountByProId(proId: string): Promise<number> {

@@ -1,8 +1,8 @@
-
 import { ILocation, ITimeSlot } from "../../models/bookingModel";
 
 export class BookingResponse {
   id: string;
+  bookingId: string;
   user: {
     id: string;
     name: string;
@@ -38,6 +38,7 @@ export class BookingResponse {
 
   constructor(data: {
     id: string;
+    bookingId: string;
     user: { id: string; name: string; email: string; photo?: string };
     pro: { id: string; firstName: string; lastName: string; profilePhoto?: string };
     category: { id: string; name: string; image?: string };
@@ -58,6 +59,7 @@ export class BookingResponse {
     updatedAt: Date;
   }) {
     this.id = data.id;
+    this.bookingId = data.bookingId;
     this.user = data.user;
     this.pro = data.pro;
     this.category = data.category;
@@ -81,6 +83,7 @@ export class BookingResponse {
 
 export class BookingCompleteResponse {
   id: string;
+  bookingId: string;
   user: {
     id: string;
     name: string;
@@ -118,6 +121,7 @@ export class BookingCompleteResponse {
 
   constructor(data: {
     id: string;
+    bookingId: string;
     user: { id: string; name: string; email: string; photo?: string };
     pro: { id: string; firstName: string; lastName: string; profilePhoto?: string; email?: string; phoneNumber?: string };
     category: { id: string; name: string; image?: string };
@@ -138,6 +142,7 @@ export class BookingCompleteResponse {
     updatedAt: Date;
   }) {
     this.id = data.id;
+    this.bookingId = data.bookingId;
     this.user = data.user;
     this.pro = data.pro;
     this.category = data.category;

@@ -13,7 +13,7 @@ const Hero = () => {
 
       <div className="flex flex-col justify-center text-center absolute inset-0 items-center px-4 z-10">
         <h1 className="text-3xl text-white font-bold lg:text-5xl mb-8 md:text-4xl dark:!text-white">
-          Find Your Proffesional Near You!
+          Find Your Professional Near You!
         </h1>
         <div className="flex bg-white rounded-md w-full items-center max-w-md mx-2 overflow-hidden sm:mx-0 dark:bg-gray-800">
           <div className="flex flex-1 items-center px-3 py-2">

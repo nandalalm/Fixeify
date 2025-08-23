@@ -1,31 +1,14 @@
 import { injectable, inject } from "inversify";
-import { IChatService } from "./IChatService";
+import { IChatService,PopulatedUser,PopulatedPro,PopulatedChat } from "./IChatService";
 import { IChatRepository } from "../repositories/IChatRepository";
 import { INotificationService } from "./INotificationService";
 import { ChatResponse, MessageResponse, CreateChatRequest, SendMessageRequest } from "../dtos/response/chatDtos";
 import { TYPES } from "../types";
 import mongoose from "mongoose";
-import { IChat } from "../models/chatModel";
 import { IMessage } from "../models/messageModel";
-
-interface PopulatedUser {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-}
-
-interface PopulatedPro {
-  _id: mongoose.Types.ObjectId;
-  firstName: string;
-  lastName: string;
-}
-
-type PopulatedChat = Omit<IChat, "participants" | "lastMessage"> & {
-  participants: {
-    userId: PopulatedUser;
-    proId: PopulatedPro;
-  };
-  lastMessage?: IMessage;
-};
+import { HttpError } from "../middleware/errorMiddleware";
+import { HttpStatus } from "../enums/httpStatus";
+import { MESSAGES } from "../constants/messages";
 
 @injectable()
 export class ChatService implements IChatService {
@@ -35,9 +18,9 @@ export class ChatService implements IChatService {
   ) {}
 
   async getExistingChat(userId: string, proId: string, participantModel: "User" | "ApprovedPro"): Promise<ChatResponse | null> {
-    if (!userId || !proId) throw new Error("userId and proId are required");
+    if (!userId || !proId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.USERID_AND_PROID_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(proId)) {
-      throw new Error("Invalid userId or proId");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     }
     const chat = await this._chatRepository.findChatByParticipants(userId, proId);
     if (!chat) {
@@ -46,7 +29,7 @@ export class ChatService implements IChatService {
     const user = await mongoose.model("User").findById(chat.participants.userId._id, "name photo").exec();
     const pro = await mongoose.model("ApprovedPro").findById(chat.participants.proId._id, "firstName lastName profilePhoto").exec();
     if (!user || !pro) {
-      throw new Error("User or Professional not found");
+      throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.NOT_FOUND);
     }
     const response = this.mapToChatResponse(chat, participantModel === "User" ? userId : proId, participantModel, {
       userName: user.name,
@@ -58,15 +41,15 @@ export class ChatService implements IChatService {
   }
 
   async createChat(data: CreateChatRequest): Promise<ChatResponse> {
-    if (!data.userId) throw new Error("userId is required");
-    if (!data.proId) throw new Error("proId is required");
+    if (!data.userId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.USERID_REQUIRED);
+    if (!data.proId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.PROID_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(data.userId) || !mongoose.Types.ObjectId.isValid(data.proId)) {
-      throw new Error("Invalid userId or proId");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     }
     const user = await mongoose.model("User").findById(data.userId, "name photo").exec();
     const pro = await mongoose.model("ApprovedPro").findById(data.proId, "firstName lastName profilePhoto").exec();
-    if (!user) throw new Error("User not found");
-    if (!pro) throw new Error("Professional not found");
+    if (!user) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
+    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     let chat: PopulatedChat | null = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
     if (chat) {
@@ -82,7 +65,7 @@ export class ChatService implements IChatService {
       const newChat = await this._chatRepository.createChat(data.userId, data.proId);
       chat = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
       if (!chat) {
-        throw new Error("Failed to fetch created chat");
+        throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_TO_FETCH_CHAT);
       }
 
       return this.mapToChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro", {
@@ -108,8 +91,8 @@ export class ChatService implements IChatService {
   }
 
   async getChats(participantId: string, participantModel: "User" | "ApprovedPro"): Promise<ChatResponse[]> {
-    if (!participantId) throw new Error("participantId is required");
-    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new Error("Invalid participantId");
+    if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
+    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     const chats = await (participantModel === "User"
       ? this._chatRepository.findChatsByUser(participantId)
       : this._chatRepository.findChatsByPro(participantId));
@@ -128,24 +111,23 @@ export class ChatService implements IChatService {
   }
 
   async sendMessage(data: SendMessageRequest): Promise<MessageResponse> {
-    if (!data.chatId) throw new Error("chatId is required");
-    if (!data.senderId) throw new Error("senderId is required");
+    if (!data.chatId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CHATID_REQUIRED);
+    if (!data.senderId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(data.chatId) || !mongoose.Types.ObjectId.isValid(data.senderId)) {
-      throw new Error("Invalid chatId or senderId");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     }
     if (!data.body && (!data.attachments || data.attachments.length === 0)) {
-      throw new Error("Message body or attachments required");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.MESSAGE_BODY_OR_ATTACHMENTS_REQUIRED);
     }
 
     const chat = await this._chatRepository.findById(data.chatId);
-    if (!chat) throw new Error("Chat not found");
+    if (!chat) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CHAT_NOT_FOUND);
 
-    // Access the _id from populated participants
     const userId = chat.participants.userId._id.toString();
     const proId = chat.participants.proId._id.toString();
     
     if (![userId, proId].includes(data.senderId)) {
-      throw new Error(`Sender is not a participant in this chat (chatId: ${data.chatId}, senderId: ${data.senderId})`);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.SENDER_NOT_AUTHORIZED_IN_CHAT);
     }
 
     if (data.senderModel === "ApprovedPro") {
@@ -154,7 +136,7 @@ export class ChatService implements IChatService {
         senderModel: "User",
       }).exec();
       if (!userMessages) {
-        throw new Error("Professionals can only send messages after a user initiates the conversation");
+        throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.SENDER_NOT_AUTHORIZED_IN_CHAT);
       }
     }
 
@@ -181,19 +163,18 @@ export class ChatService implements IChatService {
     const receiver = await (receiverModel === "User"
       ? mongoose.model("User").findById(receiverId, "name").exec()
       : mongoose.model("ApprovedPro").findById(receiverId, "firstName lastName").exec());
-    if (!receiver) throw new Error("Receiver not found");
+    if (!receiver) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.NOT_FOUND);
 
     const sender = await (data.senderModel === "User"
       ? mongoose.model("User").findById(data.senderId, "name").exec()
       : mongoose.model("ApprovedPro").findById(data.senderId, "firstName lastName").exec());
-    if (!sender) throw new Error("Sender not found");
+    if (!sender) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.NOT_FOUND);
 
     const senderName =
       data.senderModel === "User"
         ? (sender as PopulatedUser).name
         : `${(sender as PopulatedPro).firstName} ${(sender as PopulatedPro).lastName || ""}`.trim();
 
-    // Create appropriate description based on message type
     let description: string;
     if (data.body && data.body.trim()) {
       description = data.body.slice(0, 100);
@@ -228,18 +209,18 @@ export class ChatService implements IChatService {
     page: number,
     limit: number
   ): Promise<{ messages: MessageResponse[]; total: number }> {
-    if (!chatId || !participantId) throw new Error("chatId and participantId are required");
+    if (!chatId || !participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
-      throw new Error("Invalid chatId or participantId");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     }
 
     const chat = await this._chatRepository.findById(chatId);
-    if (!chat) throw new Error("Chat not found");
+    if (!chat) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CHAT_NOT_FOUND);
 
     const userId = chat.participants.userId._id.toString();
     const proId = chat.participants.proId._id.toString();
     if (![userId, proId].includes(participantId)) {
-      throw new Error(`Participant not authorized to view this chat (chatId: ${chatId}, participantId: ${participantId})`);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.UNAUTHORIZED_OWN_CHATS);
     }
 
     const result = await this._chatRepository.findMessagesByChatId(chatId, page, limit);
@@ -247,36 +228,36 @@ export class ChatService implements IChatService {
   }
 
   async markMessagesAsRead(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
-    if (!chatId || !participantId) throw new Error("chatId and participantId are required");
+    if (!chatId || !participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
-      throw new Error("Invalid chatId or participantId");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     }
 
     const chat = await this._chatRepository.findById(chatId);
-    if (!chat) throw new Error("Chat not found");
+    if (!chat) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CHAT_NOT_FOUND);
 
     const userId = chat.participants.userId._id.toString();
     const proId = chat.participants.proId._id.toString();
     if (![userId, proId].includes(participantId)) {
-      throw new Error(`Participant not authorized to mark messages as read (chatId: ${chatId}, participantId: ${participantId})`);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.USER_NOT_AUTHORIZED_MARK_MESSAGES);
     }
 
     await this._chatRepository.markMessagesAsRead(chatId, participantId, participantModel);
   }
 
   async markMessagesAsDelivered(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
-    if (!chatId || !participantId) throw new Error("chatId and participantId are required");
+    if (!chatId || !participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
-      throw new Error("Invalid chatId or participantId");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     }
 
     const chat = await this._chatRepository.findById(chatId);
-    if (!chat) throw new Error("Chat not found");
+    if (!chat) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CHAT_NOT_FOUND);
 
     const userId = chat.participants.userId._id.toString();
     const proId = chat.participants.proId._id.toString();
     if (![userId, proId].includes(participantId)) {
-      throw new Error(`Participant not authorized to mark messages as delivered (chatId: ${chatId}, participantId: ${participantId})`);
+      throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.USER_NOT_AUTHORIZED_MARK_MESSAGES);
     }
 
     await this._chatRepository.markMessagesAsDelivered(chatId, participantId, participantModel);
@@ -284,7 +265,7 @@ export class ChatService implements IChatService {
 
   async findById(chatId: string): Promise<ChatResponse | null> {
     if (!mongoose.Types.ObjectId.isValid(chatId)) {
-      throw new Error("Invalid chatId");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     }
     const chat = await this._chatRepository.findById(chatId);
     if (!chat) {

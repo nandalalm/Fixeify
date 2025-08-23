@@ -35,7 +35,7 @@ export interface IProService {
   getAvailability(proId: string): Promise<{ availability: IAvailability; isUnavailable: boolean }>;
   updateAvailability(proId: string, data: { availability: IAvailability; isUnavailable: boolean }): Promise<{ availability: IAvailability; isUnavailable: boolean }>;
   getAllCategories(): Promise<CategoryResponse[]>;
-  fetchProBookings(proId: string, page?: number, limit?: number, status?: string): Promise<{ bookings: BookingResponse[]; total: number }>;
+  fetchProBookings(proId: string, page?: number, limit?: number, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }>;
   getBookingById(id: string): Promise<BookingResponse>;
   acceptBooking(bookingId: string): Promise<{ message: string }>;
   rejectBooking(bookingId: string, rejectedReason: string): Promise<{ message: string }>;
@@ -53,11 +53,17 @@ export interface IProService {
       ifscCode?: string;
       branchName?: string;
       upiCode?: string;
-      bookingId?: string; // optional link to a specific booking
+      bookingId?: string;
     }
   ): Promise<WithdrawalRequestResponse>;
   getWithdrawalRequestsByProId(proId: string): Promise<WithdrawalRequestResponse[]>;
-  getWithdrawalRequestsByProIdPaginated(proId: string, page: number, limit: number): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number }>;
+  getWithdrawalRequestsByProIdPaginated(
+    proId: string,
+    page: number,
+    limit: number,
+    sortBy?: "latest" | "oldest",
+    status?: "pending" | "approved" | "rejected"
+  ): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number }>;
   getPendingProById(pendingProId: string): Promise<PendingProResponse>;
   getDashboardMetrics(proId: string): Promise<{
     totalRevenue: number;

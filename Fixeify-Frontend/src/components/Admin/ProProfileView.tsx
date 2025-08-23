@@ -80,6 +80,7 @@ const ProProfileView: FC = () => {
   const [pro, setPro] = useState<PendingPro | IApprovedPro | null>(null);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [activeTab, setActiveTab] = useState<
     "service" | "identity" | "availability" | "contact" | "bankDetails" | "action"
   >("service");
@@ -130,21 +131,17 @@ const ProProfileView: FC = () => {
     fetchPro();
   }, [id, user?.id, navigate, location.state]);
 
-  if (loading) return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex justify-center items-center z-50">
-      <div className="spinner"></div>
-    </div>
-  );
-  if (!pro) return <div className="flex justify-center p-6">Pro not found.</div>;
+  useEffect(() => {
+    const handleResize = () => setIsLargeScreen(window.innerWidth >= 1024);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
-  const defaultAbout = !("createdAt" in pro) && pro.about
-    ? pro.about
-    : !("createdAt" in pro) && !pro.about
-    ? `Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.category.name} works, and if you have any questions, feel free to message me.`
-    : "";
+  // Show not-found only after loading finishes
+  if (!loading && !pro) return <div className="flex justify-center p-6">Pro not found.</div>;
 
   const handleApprove = () => {
-    if ("createdAt" in pro) {
+    if (pro && "createdAt" in pro) {
       setAction("approve");
       setShowConfirmModal(true);
       setError(null);
@@ -152,7 +149,7 @@ const ProProfileView: FC = () => {
   };
 
   const handleReject = () => {
-    if ("createdAt" in pro) {
+    if (pro && "createdAt" in pro) {
       setAction("reject");
       setShowConfirmModal(true);
       setError(null);
@@ -160,7 +157,7 @@ const ProProfileView: FC = () => {
   };
 
   const handleBan = () => {
-    if (!("createdAt" in pro)) {
+    if (pro && !("createdAt" in pro)) {
       setAction(pro.isBanned ? "unban" : "ban");
       setShowConfirmModal(true);
       setError(null);
@@ -175,21 +172,21 @@ const ProProfileView: FC = () => {
 
     setIsProcessing(true);
     try {
-      if (action === "approve" && "createdAt" in pro) {
+      if (action === "approve" && pro && "createdAt" in pro) {
         console.log("Calling approvePro for ID:", pro._id);
         await approvePro(pro._id, { about: null });
         console.log("approvePro completed, closing modal");
         setShowConfirmModal(false);
         setAction(null);
         navigate("/admin/pro-management", { state: { tab: "approved", fromNavigation: true } });
-      } else if (action === "reject" && "createdAt" in pro && reason) {
+      } else if (action === "reject" && pro && "createdAt" in pro && reason) {
         console.log("Calling rejectPro for ID:", pro._id, "with reason:", reason);
         await rejectPro(pro._id, { reason });
         console.log("rejectPro completed, closing modal");
         setShowConfirmModal(false);
         setAction(null);
         navigate("/admin/pro-management", { state: { tab: "pending", fromNavigation: true } });
-      } else if ((action === "ban" || action === "unban") && !("createdAt" in pro)) {
+      } else if ((action === "ban" || action === "unban") && pro && !("createdAt" in pro)) {
         console.log("Calling toggleBanPro for ID:", pro._id, "ban:", action === "ban");
         await toggleBanPro(pro._id, action === "ban");
         setPro((prev) => (prev ? { ...prev, isBanned: action === "ban" } : null));
@@ -240,7 +237,7 @@ const ProProfileView: FC = () => {
         `}
       </style>
       <div className="flex flex-col h-screen bg-gray-50">
-        <AdminTopNavbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} userName={user.name} />
+        <AdminTopNavbar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} userName={user.name} isLargeScreen={isLargeScreen} />
 
         <div className="flex flex-1 overflow-visible">
           <AdminNavbar isOpen={sidebarOpen} />
@@ -248,6 +245,12 @@ const ProProfileView: FC = () => {
             className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
           >
             <div className="max-w-7xl mx-auto mb-10">
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="spinner"></div>
+                </div>
+              ) : (
+              pro && (
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="pb-5">
                   <button
@@ -284,7 +287,11 @@ const ProProfileView: FC = () => {
                 </div>
                 <div className="mt-12 md:mt-0 mb-5 md:ml-3 place-items-start">
                   <h1 className="text-2xl font-semibold text-gray-800">{`${pro.firstName} ${pro.lastName}`}</h1>
-                  {!("createdAt" in pro) && <p className="text-md text-gray-600 mt-2">{defaultAbout}</p>}
+                  {pro && !("createdAt" in pro) && (
+                    <p className="text-md text-gray-600 mt-2">
+                      {pro.about ?? `Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.category.name} works, and if you have any questions, feel free to message me.`}
+                    </p>
+                  )}
                 </div>
 
                 <div className="mb-6">
@@ -329,7 +336,7 @@ const ProProfileView: FC = () => {
                     >
                       Bank Details
                     </button>
-                    {!("createdAt" in pro) && (
+                    {pro && !("createdAt" in pro) && (
                       <button
                         className={`px-4 py-2 font-medium text-sm flex-shrink-0 ${
                           activeTab === "action" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
@@ -378,9 +385,9 @@ const ProProfileView: FC = () => {
                     </div>
                   )}
                   {activeTab === "availability" && (
-                    <div className={!('createdAt' in pro) && pro.isUnavailable ? "opacity-50" : ""}>
+                    <div className={pro && !("createdAt" in pro) && pro.isUnavailable ? "opacity-50" : ""}>
                       <h3 className="text-md font-medium text-gray-600 mb-4">Available Days</h3>
-                      {!('createdAt' in pro) && pro.isUnavailable && (
+                      {pro && !("createdAt" in pro) && pro.isUnavailable && (
                         <p className="text-red-500 mb-4">Status: Currently Unavailable</p>
                       )}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -425,7 +432,7 @@ const ProProfileView: FC = () => {
                     </div>
                   )}
 
-                  {activeTab === "action" && !("createdAt" in pro) && (
+                  {activeTab === "action" && pro && !("createdAt" in pro) && (
                     <div>
                       <h3 className="text-md font-medium text-gray-600 mb-4">Actions</h3>
                       <button
@@ -439,7 +446,7 @@ const ProProfileView: FC = () => {
                   )}
                 </div>
 
-                {"createdAt" in pro && (
+                {pro && "createdAt" in pro && (
                   <div className="flex flex-col sm:flex-row gap-4 mt-6">
                     <button
                       onClick={handleApprove}
@@ -458,6 +465,8 @@ const ProProfileView: FC = () => {
                   </div>
                 )}
               </div>
+              )
+              )}
             </div>
           </main>
           <ConfirmationModal

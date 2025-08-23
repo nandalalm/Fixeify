@@ -2,21 +2,19 @@ import { injectable, inject } from "inversify";
 import { Request, Response } from "express";
 import { INotificationService } from "../services/INotificationService";
 import { TYPES } from "../types";
-import { AuthRequest } from "../middleware/authMiddleware";
 import { UserRole } from "../enums/roleEnum";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class NotificationController {
-  constructor(@inject(TYPES.INotificationService) private _notificationService: INotificationService) {}
+  constructor(@inject(TYPES.INotificationService) private _notificationService: INotificationService) { }
 
   private isUserRole(role: unknown): role is UserRole {
     return typeof role === "string" && Object.values(UserRole).includes(role as UserRole);
   }
 
   async getNotifications(req: Request, res: Response): Promise<void> {
-    const authReq = req as AuthRequest;
     const { role, participantId } = req.params;
     const { page = 1, limit = 10, filter = 'all' } = req.query;
 
@@ -57,7 +55,6 @@ export class NotificationController {
   }
 
   async markAllNotificationsAsRead(req: Request, res: Response): Promise<void> {
-    const authReq = req as AuthRequest;
     const { role, participantId } = req.params;
 
     try {

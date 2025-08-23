@@ -1,9 +1,10 @@
 import { ITicketRepository } from "../repositories/ITicketRepository";
 import { MESSAGES } from "../constants/messages";
+import { HttpError } from "../middleware/errorMiddleware";
+import { HttpStatus } from "../enums/httpStatus";
 import { ITicketService } from "./ITicketService";
 import { TicketResponse, TicketListResponse } from "../dtos/response/ticketDto";
 import { CreateTicketRequest, UpdateTicketStatusRequest } from "../dtos/request/ticketDtos";
-import { TicketDocument } from "../models/ticketModel";
 import mongoose from "mongoose";
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
@@ -18,20 +19,18 @@ export class TicketService implements ITicketService {
     @inject(TYPES.ITicketRepository) private _ticketRepository: ITicketRepository,
     @inject(TYPES.INotificationService) private _notificationService: INotificationService,
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
-  ) {}
+  ) { }
 
   async createTicket(ticketData: CreateTicketRequest): Promise<TicketResponse> {
-    // Enforce one complaint per booking per complainant (user or pro)
     const existing = await Ticket.findOne({
       complainantId: new mongoose.Types.ObjectId(ticketData.complainantId),
       bookingId: new mongoose.Types.ObjectId(ticketData.bookingId),
     });
     if (existing) {
-      throw new Error("A complaint has already been raised for this booking by this account.");
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.COMPLAINT_ALREADY_RAISED);
     }
 
     const ticket = await this._ticketRepository.create(ticketData);
-    // Set booking flag based on who raised the complaint
     const flagUpdate: any = {};
     if (ticketData.complainantType === "user") {
       flagUpdate.hasComplaintRaisedByUser = true;
@@ -41,8 +40,7 @@ export class TicketService implements ITicketService {
     if (Object.keys(flagUpdate).length) {
       await Booking.findByIdAndUpdate(ticketData.bookingId, flagUpdate).exec();
     }
-    
-    // Notify the complainant (raised by) that the complaint was created
+
     try {
       await this._notificationService.createNotification({
         type: "general",
@@ -56,7 +54,6 @@ export class TicketService implements ITicketService {
       console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
     }
 
-    // Notify Admin about new complaint
     try {
       const admin = await this._adminRepository.find();
       if (admin) {
@@ -89,50 +86,31 @@ export class TicketService implements ITicketService {
     const { tickets, total } = await this._ticketRepository.findByComplainant(complainantId, page, limit);
     const hasMore = page * limit < total;
 
-    return {
-      tickets,
-      total,
-      page,
-      limit,
-      hasMore
-    };
+    return {tickets,total,page,limit,hasMore};
   }
 
   async getTicketsByAgainst(againstId: string, page: number = 1, limit: number = 10): Promise<TicketListResponse> {
     const { tickets, total } = await this._ticketRepository.findByAgainst(againstId, page, limit);
     const hasMore = page * limit < total;
 
-    return {
-      tickets,
-      total,
-      page,
-      limit,
-      hasMore
-    };
+    return {tickets,total,page,limit,hasMore};
   }
 
   async getAllTickets(page: number = 1, limit: number = 10, status?: string): Promise<TicketListResponse> {
     const { tickets, total } = await this._ticketRepository.findAll(page, limit, status);
     const hasMore = page * limit < total;
 
-    return {
-      tickets,
-      total,
-      page,
-      limit,
-      hasMore
-    };
+    return {tickets,total,page,limit,hasMore};
   }
 
   async updateTicketStatus(id: string, updateData: UpdateTicketStatusRequest): Promise<TicketResponse | null> {
     const ticket = await this._ticketRepository.updateStatus(id, updateData);
-    
+
     if (ticket) {
       const complainantIdStr = (ticket as any)?.complainantId?._id?.toString?.() ?? (ticket as any)?.complainantId?.toString?.();
       const bookingIdStr = (ticket as any)?.bookingId?._id?.toString?.() ?? (ticket as any)?.bookingId?.toString?.();
 
       if (updateData.status === 'under_review') {
-        // Notify the complainant that their complaint is under review
         try {
           await this._notificationService.createNotification({
             type: "general",
@@ -143,13 +121,11 @@ export class TicketService implements ITicketService {
             bookingId: bookingIdStr
           });
         } catch (err) {
-          console.error("Failed to send 'under review' notification:", err);
-          // Do not fail the endpoint just because notification failed
+          console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", err);
         }
       }
 
       if (updateData.status === 'resolved') {
-        // Send notification to complainant about resolution
         try {
           await this._notificationService.createNotification({
             type: "general",
@@ -160,8 +136,7 @@ export class TicketService implements ITicketService {
             bookingId: bookingIdStr
           });
         } catch (err) {
-          console.error("Failed to send 'resolved' notification:", err);
-          // Do not fail the endpoint just because notification failed
+          console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", err);
         }
       }
     }
@@ -169,11 +144,14 @@ export class TicketService implements ITicketService {
     return ticket ? this.formatTicketResponse(ticket) : null;
   }
 
+  async updateTicketBanStatus(ticketId: string, isUserBanned?: boolean, isProBanned?: boolean): Promise<TicketResponse | null> {
+    const ticket = await this._ticketRepository.updateBanStatus(ticketId, isUserBanned, isProBanned);
+    return ticket ? this.formatTicketResponse(ticket) : null;
+  }
+
   async getTicketStats(): Promise<{ pending: number; underReview: number; resolved: number; total: number }> {
     return await this._ticketRepository.getTicketStats();
   }
-
-  // Note: notifications are now handled via NotificationService
 
   private formatTicketResponse(ticket: any): TicketResponse {
     return {
@@ -193,6 +171,8 @@ export class TicketService implements ITicketService {
       adminComment: ticket.adminComment,
       resolvedBy: ticket.resolvedBy?._id?.toString(),
       resolvedAt: ticket.resolvedAt,
+      isUserBanned: ticket.isUserBanned,
+      isProBanned: ticket.isProBanned,
       createdAt: ticket.createdAt,
       updatedAt: ticket.updatedAt
     };

@@ -28,6 +28,7 @@ const BookingTable: React.FC<BookingTableProps> = ({ bookings, onViewDetails, to
         {bookings.map((booking, index) => (
           <div key={booking.id} className="bg-white dark:bg-gray-800 p-4 rounded-md shadow border border-gray-200 dark:border-gray-700">
             <p className="text-sm text-gray-700 dark:text-gray-300"><strong>S.No:</strong> {index + 1 + (currentPage - 1) * 5}</p>
+            <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Booking ID:</strong> {booking.bookingId}</p>
             <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Issue:</strong> {booking.issueDescription}</p>
             <p className="text-sm text-gray-700 dark:text-gray-300"><strong>Date:</strong> {formatDate(new Date(booking.preferredDate))}</p>
             <p className="text-sm text-gray-700 dark:text-gray-300">
@@ -87,7 +88,8 @@ const BookingTable: React.FC<BookingTableProps> = ({ bookings, onViewDetails, to
           <thead className="bg-gray-100 dark:bg-gray-700">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">S.No</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/6">Issue</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Booking ID</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/6">Issue</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Date</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Booking Status</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Actions</th>
@@ -97,6 +99,7 @@ const BookingTable: React.FC<BookingTableProps> = ({ bookings, onViewDetails, to
             {bookings.map((booking, index) => (
               <tr key={booking.id} className="hover:bg-gray-50 dark:hover:bg-gray-600">
                 <td className="py-3 px-4 text-sm text-gray-900 dark:text-gray-100 border-b">{index + 1 + (currentPage - 1) * 5}</td>
+                <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300 border-b font-mono">{booking.bookingId}</td>
                 <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300 border-b">{booking.issueDescription}</td>
                 <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300 border-b">{formatDate(new Date(booking.preferredDate))}</td>
                 <td className="py-3 px-4 text-sm text-gray-700 dark:text-gray-300 border-b">

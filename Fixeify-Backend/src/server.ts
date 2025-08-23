@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { Server } from "http";
 import DatabaseConnector from "./config/databaseConnector";
+import RedisConnector from "./config/redisConnector";
 import createAuthRoutes from "./routes/authRoutes";
 import createAdminRoutes from "./routes/adminRoutes";
 import createProRoutes from "./routes/proRoute";
@@ -65,9 +66,9 @@ import { MongoTransactionRepository } from "./repositories/TransactionRepository
 import { MongoTicketRepository } from "./repositories/ticketRepository";
 import { ChatGateway } from "./chatGateway";
 import { errorMiddleware } from "./middleware/errorMiddleware";
-import "./models/notificationModel"; 
-import "./models/chatModel"; 
-import "./models/messageModel"; 
+import "./models/notificationModel";
+import "./models/chatModel";
+import "./models/messageModel";
 
 dotenv.config();
 
@@ -78,6 +79,7 @@ if (!fs.existsSync(logDir)) {
 
 const container = new Container();
 container.bind<DatabaseConnector>(TYPES.DatabaseConnector).to(DatabaseConnector).inSingletonScope();
+container.bind<RedisConnector>(TYPES.RedisConnector).to(RedisConnector).inSingletonScope();
 container.bind<IUserRepository>(TYPES.IUserRepository).to(MongoUserRepository).inSingletonScope();
 container.bind<IAdminRepository>(TYPES.IAdminRepository).to(MongoAdminRepository).inSingletonScope();
 container.bind<IProRepository>(TYPES.IProRepository).to(MongoProRepository).inSingletonScope();
@@ -146,15 +148,20 @@ chatGateway.init(server);
 
 const PORT = process.env.PORT || 5000;
 const dbConnector = container.get<DatabaseConnector>(TYPES.DatabaseConnector);
+const redisConnector = container.get<RedisConnector>(TYPES.RedisConnector);
 
-dbConnector
-  .connect()
-  .then(() => {
+const connectServices = async (): Promise<void> => {
+  try {
+    await dbConnector.connect();
+    await redisConnector.connect();
+    
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
-  })
-  .catch((err) => {
-    console.error("Failed to connect to database:", err);
+  } catch (err) {
+    console.error("Failed to connect to services:", err);
     process.exit(1);
-  });
+  }
+};
+
+connectServices();

@@ -1,7 +1,7 @@
 import { injectable, inject } from "inversify";
 import { Request, Response } from "express";
 import { IChatService } from "../services/IChatService";
-import { CreateChatRequest, SendMessageRequest, ChatResponse, MessageResponse } from "../dtos/response/chatDtos";
+import { CreateChatRequest, SendMessageRequest } from "../dtos/response/chatDtos";
 import { TYPES } from "../types";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { UserRole } from "../enums/roleEnum";
@@ -10,7 +10,7 @@ import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class ChatController {
-  constructor(@inject(TYPES.IChatService) private _chatService: IChatService) {}
+  constructor(@inject(TYPES.IChatService) private _chatService: IChatService) { }
 
   private isUserRole(role: unknown): role is UserRole {
     return typeof role === "string" && ["user", "pro"].includes(role as UserRole);

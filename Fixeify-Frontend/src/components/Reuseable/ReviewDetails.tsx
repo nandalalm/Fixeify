@@ -1,5 +1,5 @@
 import { FC, useEffect, useMemo, useState } from "react";
-import { Star, Eye, X, Phone } from "lucide-react";
+import { Star, Eye, X, Phone, User as UserIcon } from "lucide-react";
 import { RatingReviewResponse } from "@/api/ratingReviewApi";
 import { BookingResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
@@ -10,7 +10,6 @@ export interface ReviewDetailsProps {
   onBack: () => void;
 }
 
-// Shared UI atoms to mirror BookingDetails.tsx styling
 const LabelValue: React.FC<{ label: React.ReactNode; value?: React.ReactNode }>=({ label, value }) => (
   <div className="flex flex-col sm:flex-row sm:items-center gap-1 py-1">
     <span className="w-44 text-sm font-medium text-gray-600 dark:text-gray-300">{label}</span>
@@ -27,6 +26,65 @@ const Section: React.FC<{ title: string; rightSlot?: React.ReactNode; children: 
     <div className="divide-y divide-gray-100 dark:divide-gray-700">{children}</div>
   </div>
 );
+
+// Avatar component: show placeholder icon until real image is confirmed loaded
+const Avatar: React.FC<{
+  src: string;
+  placeholder: string;
+  alt: string;
+  className?: string;
+  onSrcChange?: (displayedSrc: string) => void;
+}> = ({ src, placeholder, alt, className, onSrcChange }) => {
+  const [displayedSrc, setDisplayedSrc] = useState<string>(placeholder);
+
+  useEffect(() => {
+    if (!src || src === placeholder) {
+      setDisplayedSrc(placeholder);
+      onSrcChange && onSrcChange(placeholder);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) {
+        setDisplayedSrc(src);
+        onSrcChange && onSrcChange(src);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) {
+        setDisplayedSrc(placeholder);
+        onSrcChange && onSrcChange(placeholder);
+      }
+    };
+    img.src = src;
+    return () => { cancelled = true; };
+  }, [src, placeholder, onSrcChange]);
+
+  const isTrulyPlaceholder = !src || src === placeholder;
+  if (displayedSrc === placeholder && isTrulyPlaceholder) {
+    return (
+      <div
+        aria-label={alt}
+        className={(className || "") + " bg-gray-200 dark:bg-gray-700 border flex items-center justify-center text-gray-500 dark:text-gray-300"}
+      >
+        <UserIcon className="w-5 h-5" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={displayedSrc}
+      alt={alt}
+      className={className}
+      onError={() => {
+        setDisplayedSrc(placeholder);
+        onSrcChange && onSrcChange(placeholder);
+      }}
+    />
+  );
+};
 
 const StatusBadge: React.FC<{ kind: "booking" | "payment"; value: string }>=({ kind, value }) => {
   const v = (value || "").toLowerCase();
@@ -65,6 +123,12 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [userDisplaySrc, setUserDisplaySrc] = useState<string>("/placeholder-user.jpg");
+
+  const userImageSrc = useMemo(() => {
+    const src = review.user?.photo?.trim();
+    return src ? src : "/placeholder-user.jpg";
+  }, [review.user?.photo]);
 
   const bookingId: string | null = useMemo(() => {
     if (!review?.bookingId) return null;
@@ -129,13 +193,18 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
                   type="button"
                   className="relative group shrink-0"
                   aria-label="View user image"
-                  onClick={() => setImagePreview(review.user?.photo || "/images/avatar-user.png")}
+                  onClick={() => {
+                    if (userDisplaySrc !== "/placeholder-user.jpg") {
+                      setImagePreview(userDisplaySrc);
+                    }
+                  }}
                 >
-                  <img
-                    src={review.user?.photo || "/images/avatar-user.png"}
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/avatar-user.png"; }}
+                  <Avatar
+                    src={userImageSrc}
+                    placeholder="/placeholder-user.jpg"
                     alt="User"
                     className="w-10 h-10 rounded-full object-cover border transition filter group-hover:blur-[1px]"
+                    onSrcChange={setUserDisplaySrc}
                   />
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                     <Eye className="w-4 h-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" />
@@ -151,7 +220,7 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
                 <span>{booking?.phoneNumber || "-"}</span>
               </div>
             </Section>
-            <Section title="Pro Details" rightSlot={(
+            <Section title="Professional Details" rightSlot={(
               <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border border-blue-500 text-blue-700 whitespace-nowrap">
                 {review.category?.name || "Service"}
               </span>
@@ -203,6 +272,7 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
           <Section title="Booking Details">
             {booking ? (
               <>
+                <LabelValue label="Booking ID" value={booking?.bookingId || bookingId || "-"} />
                 <LabelValue label="Issue Description" value={booking.issueDescription} />
                 <LabelValue label="Preferred Date" value={new Date(booking.preferredDate).toLocaleDateString()} />
                 <LabelValue
@@ -252,7 +322,6 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
             )}
           </Section>
 
-          {/* No separate location section; included in Booking Details */}
           {/* Image Lightbox */}
           {imagePreview && (
             <div className="fixed inset-0 bg-black/70 backdrop-blur-[2px] flex items-center justify-center z-50" onClick={() => setImagePreview(null)}>

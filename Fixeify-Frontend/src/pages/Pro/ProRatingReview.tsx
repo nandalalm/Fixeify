@@ -109,17 +109,62 @@ const ProRatingReview: FC = () => {
         <ProNavbar isOpen={sidebarOpen} />
         <main className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}>
           <div className="max-w-7xl mx-auto mb-[50px]">
+            <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">
+              Ratings & Reviews
+            </h1>
+
             {selectedReview ? (
               <ReviewDetails review={selectedReview} onBack={handleBackFromDetails} />
             ) : (
               <>
-                <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">
-                  Ratings & Reviews
-                </h1>
-
                 {loading ? (
-                  <div className="flex justify-center items-center h-40">
-                    <div className="spinner border-t-4 border-blue-500 rounded-full w-10 h-10 animate-spin" />
+                  <div className="animate-pulse">
+                    {/* Search & Sort skeleton */}
+                    <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                      <div className="w-full sm:w-5/6">
+                        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                      <div className="w-full sm:w-1/6">
+                        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    </div>
+
+                    {/* Mobile card skeletons */}
+                    <div className="md:hidden flex flex-col gap-4">
+                      {Array.from({ length: 3 }).map((_, i) => (
+                        <div key={i} className="bg-white dark:bg-gray-800 p-4 rounded-md shadow border border-gray-200 dark:border-gray-700">
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24 mb-3"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-40 mb-3"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/5 mb-3"></div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Desktop table skeleton */}
+                    <div className="hidden md:block overflow-x-auto bg-white dark:bg-gray-800 shadow rounded-lg">
+                      <div className="min-w-full">
+                        {/* table header skeleton */}
+                        <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-100 dark:bg-gray-700 rounded-t-lg">
+                          <div className="h-4 bg-gray-300/70 dark:bg-gray-600 rounded col-span-1"></div>
+                          <div className="h-4 bg-gray-300/70 dark:bg-gray-600 rounded col-span-2"></div>
+                          <div className="h-4 bg-gray-300/70 dark:bg-gray-600 rounded col-span-3"></div>
+                          <div className="h-4 bg-gray-300/70 dark:bg-gray-600 rounded col-span-2"></div>
+                          <div className="h-4 bg-gray-300/70 dark:bg-gray-600 rounded col-span-2"></div>
+                        </div>
+                        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className="grid grid-cols-12 gap-4 px-4 py-3">
+                              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded col-span-1"></div>
+                              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded col-span-2"></div>
+                              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded col-span-3"></div>
+                              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded col-span-2"></div>
+                              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded col-span-2"></div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ) : reviews.length === 0 ? (
                   <p className="text-center text-gray-600 dark:text-gray-300">No ratings/reviews yet.</p>

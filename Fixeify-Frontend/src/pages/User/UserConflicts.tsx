@@ -8,6 +8,7 @@ import { TicketResponse } from "@/interfaces/ticketInterface";
 import TicketTable from "@/components/Reuseable/TicketTable";
 import TicketDetails from "@/components/Reuseable/TicketDetails";
 import { RotateCcw } from "lucide-react";
+import { SkeletonLine, SkeletonBlock } from "@/components/Reuseable/Skeleton";
 
 const UserConflicts: React.FC = () => {
   const user = useSelector((s: RootState) => s.auth.user);
@@ -21,6 +22,7 @@ const UserConflicts: React.FC = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<TicketResponse | null>(null);
+  const [viewing, setViewing] = useState<boolean>(false);
   const [anyTicketsExist, setAnyTicketsExist] = useState<boolean>(true);
 
   const userNameCache = React.useRef<Record<string, string>>({});
@@ -104,6 +106,25 @@ const UserConflicts: React.FC = () => {
     setPage(1);
   };
 
+  if (loading) {
+    return (
+      <div className="p-6 mb-[350px] mt-8">
+        <div className="mb-6">
+          <SkeletonLine width="w-1/3" height="h-8" className="mb-4" />
+          <div className="flex flex-col sm:flex-row gap-4">
+            <SkeletonLine width="w-full sm:w-5/6" height="h-10" />
+            <SkeletonLine width="w-full sm:w-1/6" height="h-10" />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <SkeletonBlock height="h-20" />
+          <SkeletonBlock height="h-20" />
+          <SkeletonBlock height="h-20" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 mb-[350px] mt-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
@@ -112,7 +133,7 @@ const UserConflicts: React.FC = () => {
 
       {anyTicketsExist ? (
         <>
-          {!selected && (
+          {!selected && !viewing && (
             <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
               <input
                 type="text"
@@ -134,7 +155,7 @@ const UserConflicts: React.FC = () => {
             </div>
           )}
 
-          {!selected && (search && filteredTickets.length === 0) ? (
+          {!selected && !viewing && (search && filteredTickets.length === 0) ? (
             <div className="flex flex-col items-center justify-center py-8">
               <p className="text-gray-500 dark:text-gray-400 mb-2">
                 No results found with the search or sort criteria.
@@ -143,24 +164,31 @@ const UserConflicts: React.FC = () => {
                 <RotateCcw className="w-4 h-4 mr-1" /> Clear Filter
               </button>
             </div>
-          ) : !selected ? (
+          ) : !selected && !viewing ? (
             <TicketTable
               tickets={filteredTickets}
               loading={loading}
               onView={async (t) => {
+                setViewing(true);
                 try {
                   const fresh = await getTicketById(t._id);
                   setSelected(fresh);
                 } catch {
                   setSelected(t);
+                } finally {
+                  setViewing(false);
                 }
               }}
               pagination={{ page, limit, total, onPageChange: setPage }}
               showRaisedBy={false}
               showTypeBadges={false}
             />
+          ) : !selected && viewing ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#032b44]"></div>
+            </div>
           ) : (
-            <TicketDetails ticket={selected} onBack={() => { setSelected(null); load(); }} />
+            <TicketDetails ticket={selected as TicketResponse} onBack={() => { setSelected(null); load(); }} />
           )}
         </>
       ) : (

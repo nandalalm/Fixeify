@@ -21,6 +21,7 @@ import BookingDetails from "../../components/Reuseable/BookingDetails";
 import RaiseComplaintModal from "../../components/Modals/RaiseComplaintModal";
 import { createTicket } from "../../store/ticketSlice";
 import { TicketPriority } from "../../interfaces/ticketInterface";
+import { SkeletonLine, SkeletonBlock } from "../../components/Reuseable/Skeleton";
 
 const formatDate = (date: Date): string => {
   return date.toLocaleDateString("en-GB", {
@@ -40,6 +41,7 @@ const JobManagementPage = () => {
 
   const [bookings, setBookings] = useState<BookingResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [tabSwitching, setTabSwitching] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
@@ -95,11 +97,18 @@ const JobManagementPage = () => {
         case "scheduled":
           status = "accepted";
           break;
-        case "history":
-          status = ["completed", "rejected", "cancelled"].join(",");
+        case "history": {
+          const historyStatuses = ["completed", "rejected", "cancelled"] as const;
+          if (historyStatuses.includes(sortOption as any)) {
+            status = sortOption as string; // narrow to specific history status
+          } else {
+            status = historyStatuses.join(",");
+          }
           break;
+        }
       }
-      const { bookings, total } = await fetchProBookings(user.id, currentPage[tab], limit, status);
+      const sortByParam = sortOption === "oldest" ? "oldest" : "latest";
+      const { bookings, total } = await fetchProBookings(user.id, currentPage[tab], limit, status, sortByParam);
       setBookings(bookings);
       setTotalPages((prev) => ({ ...prev, [tab]: Math.ceil(total / limit) }));
     } catch (err: any) {
@@ -114,9 +123,48 @@ const JobManagementPage = () => {
     }
   };
 
+  // Silent fetch to use during tab switching (no full-page loader)
+  const fetchBookingsSilent = async (tab: "requests" | "scheduled" | "history", pageOverride?: number) => {
+    if (!user || !accessToken || user.role !== UserRole.PRO) return;
+    setError(null);
+    try {
+      let status: string | undefined;
+      switch (tab) {
+        case "requests":
+          status = "pending";
+          break;
+        case "scheduled":
+          status = "accepted";
+          break;
+        case "history": {
+          const historyStatuses = ["completed", "rejected", "cancelled"] as const;
+          if (historyStatuses.includes(sortOption as any)) {
+            status = sortOption as string;
+          } else {
+            status = historyStatuses.join(",");
+          }
+          break;
+        }
+      }
+      const page = typeof pageOverride === 'number' ? pageOverride : currentPage[tab];
+      const sortByParam = sortOption === "oldest" ? "oldest" : "latest";
+      const { bookings, total } = await fetchProBookings(user.id, page, limit, status, sortByParam);
+      setBookings(bookings);
+      setTotalPages((prev) => ({ ...prev, [tab]: Math.ceil(total / limit) }));
+    } catch (err: any) {
+      console.error(`Silent fetch pro bookings error for ${tab}:`, err);
+      setError(err.response?.data?.message || "Failed to load bookings");
+      if (err.response?.status === 401) {
+        dispatch(logoutUserSync());
+        navigate("/login");
+      }
+    }
+  };
+
   useEffect(() => {
+    if (tabSwitching) return; // avoid page loader during tab switch; handled by silent fetch
     fetchBookings(activeTab);
-  }, [user, accessToken, dispatch, navigate, activeTab, currentPage[activeTab]]);
+  }, [user, accessToken, dispatch, navigate, activeTab, currentPage[activeTab], sortOption]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -134,12 +182,15 @@ const JobManagementPage = () => {
   }, [isLargeScreen]);
 
 
-  const handleTabChange = (tab: "requests" | "scheduled" | "history") => {
+  const handleTabChange = async (tab: "requests" | "scheduled" | "history") => {
+    setTabSwitching(true);
+    setSelectedBooking(null);
     setActiveTab(tab);
     setSearchTerm("");
     setSortOption("latest");
     setCurrentPage((prev) => ({ ...prev, [tab]: 1 }));
-    fetchBookings(tab);
+    await fetchBookingsSilent(tab, 1);
+    setTabSwitching(false);
   };
 
   const handleViewBooking = async (booking: BookingResponse) => {
@@ -271,29 +322,13 @@ const JobManagementPage = () => {
   };
 
   const filteredAndSortedBookings = useMemo(() => {
-    return bookings
-      .filter((booking) => {
-        if (activeTab === "requests") return booking.status === "pending";
-        if (activeTab === "scheduled") return booking.status === "accepted";
-        if (activeTab === "history") {
-          if (sortOption === "completed") return booking.status === "completed";
-          if (sortOption === "rejected") return booking.status === "rejected";
-          if (sortOption === "cancelled") return booking.status === "cancelled";
-          return ["completed", "rejected", "cancelled"].includes(booking.status);
-        }
-        return true;
-      })
-      .filter(
-        (booking) =>
-          booking.issueDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          booking.location.address.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .sort((a, b) => {
-        if (sortOption === "latest") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        if (sortOption === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        return 0;
-      });
-  }, [bookings, activeTab, searchTerm, sortOption]);
+    // Backend now handles status filtering and createdAt sorting. Only apply search filter here.
+    return bookings.filter(
+      (booking) =>
+        booking.issueDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        booking.location.address.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [bookings, searchTerm]);
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -347,8 +382,29 @@ const JobManagementPage = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="spinner border-t-4 border-blue-500 rounded-full w-12 h-12 animate-spin"></div>
+      <div className="flex flex-col h-screen bg-gray-50">
+        <ProTopNavbar 
+          toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+          isLargeScreen={isLargeScreen}
+          sidebarOpen={sidebarOpen}
+        />
+        <div className="flex flex-1">
+          <ProNavbar isOpen={sidebarOpen} />
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-7xl mx-auto mb-[50px]">
+              <SkeletonLine width="w-1/3" height="h-8" className="mb-6" />
+              <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                <SkeletonLine width="w-full sm:w-5/6" height="h-10" />
+                <SkeletonLine width="w-full sm:w-1/6" height="h-10" />
+              </div>
+              <div className="space-y-3">
+                <SkeletonBlock height="h-20" />
+                <SkeletonBlock height="h-20" />
+                <SkeletonBlock height="h-20" />
+              </div>
+            </div>
+          </main>
+        </div>
       </div>
     );
   }
@@ -463,6 +519,52 @@ const JobManagementPage = () => {
                   onGenerateQuota={() => setIsQuotaModalOpen(true)}
                 />
               </div>
+            ) : tabSwitching ? (
+              // Table-only skeletons during tab switching (always take precedence over empty state)
+              <>
+                <div>
+                  {/* Mobile cards skeleton */}
+                  <div className="md:hidden flex flex-col gap-4 animate-pulse">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={`job-card-skel-${i}`} className="bg-white p-4 rounded-md shadow border border-gray-200">
+                        <SkeletonLine width="w-20" height="h-4" />
+                        <div className="mt-2 space-y-2">
+                          <SkeletonLine width="w-40" height="h-4" />
+                          <SkeletonLine width="w-24" height="h-4" />
+                          <SkeletonLine width="w-28" height="h-4" />
+                        </div>
+                        <div className="mt-3">
+                          <SkeletonLine width="w-16" height="h-8" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Desktop rows skeleton (no headers/pagination) */}
+                  <div className="hidden md:block overflow-x-auto animate-pulse">
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                      <div className="divide-y divide-gray-200">
+                        {Array.from({ length: 6 }).map((_, i) => (
+                          <div key={`job-row-skel-${i}`} className="grid grid-cols-12 gap-4 px-4 py-3">
+                            <SkeletonLine width="w-10" height="h-4" />
+                            <div className="col-span-6 flex items-center gap-2">
+                              <SkeletonLine width="w-48" height="h-4" />
+                            </div>
+                            <div className="col-span-2">
+                              <SkeletonLine width="w-24" height="h-4" />
+                            </div>
+                            <div className="col-span-2">
+                              <SkeletonLine width="w-24" height="h-4" />
+                            </div>
+                            <div className="col-span-1">
+                              <SkeletonLine width="w-16" height="h-8" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
             ) : filteredAndSortedBookings.length === 0 ? (
               <div className="text-center text-gray-600">
                 <p>No results found for your search or sort criteria.</p>
@@ -478,13 +580,15 @@ const JobManagementPage = () => {
                 </a>
               </div>
             ) : (
-              <BookingTable
-                bookings={filteredAndSortedBookings}
-                onViewDetails={handleViewBooking}
-                totalPages={totalPages[activeTab]}
-                currentPage={currentPage[activeTab]}
-                onPageChange={handlePageChange}
-              />
+              <>
+                  <BookingTable
+                    bookings={filteredAndSortedBookings}
+                    onViewDetails={handleViewBooking}
+                    totalPages={totalPages[activeTab]}
+                    currentPage={currentPage[activeTab]}
+                    onPageChange={handlePageChange}
+                  />
+              </>
             )}
           </div>
         </main>

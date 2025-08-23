@@ -7,6 +7,9 @@ import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
 import { UserProfile } from "@/interfaces/userInterface";
 import { ProProfile } from "@/interfaces/proInterface";
+import { toggleBanUser, toggleBanPro } from "@/api/adminApi";
+import { updateTicketBanStatus } from "@/api/ticketApi";
+import { ConfirmationModal } from "@/components/Reuseable/ConfirmationModal";
 
 interface AdminTicketDetailsProps {
   ticket: TicketResponse;
@@ -35,6 +38,11 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [complainant, setComplainant] = useState<UserProfile | ProProfile | null>(null);
   const [against, setAgainst] = useState<UserProfile | ProProfile | null>(null);
+  const [banLoading, setBanLoading] = useState(false);
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [showBanModal, setShowBanModal] = useState(false);
+  const [banAction, setBanAction] = useState<'ban' | 'unban'>('ban');
+  const [updatedTicket, setUpdatedTicket] = useState<TicketResponse>(ticket);
 
   const complainantDisplay = useMemo(() => ticket.complainantName?.trim() || ticket.complainantId, [ticket]);
   const againstDisplay = useMemo(() => ticket.againstName?.trim() || ticket.againstId, [ticket]);
@@ -75,7 +83,6 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
     }
   };
 
-  const canClose = ticket.status === "under_review" || ticket.status === "pending"; // pending will be moved to under_review first by parent
 
   useEffect(() => {
     let mounted = true;
@@ -127,6 +134,61 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
     onClose(c);
   };
 
+  const isCurrentlyBanned = ticket.againstType === 'user' ? updatedTicket.isUserBanned : updatedTicket.isProBanned;
+  const canShowBanButton = updatedTicket.status !== 'resolved';
+
+  const handleBanAgainst = () => {
+    setSuccessBanner(null);
+    const isCurrentlyBanned = ticket.againstType === 'user' ? updatedTicket.isUserBanned : updatedTicket.isProBanned;
+    setBanAction(isCurrentlyBanned ? 'unban' : 'ban');
+    setShowBanModal(true);
+  };
+
+  const confirmBan = async () => {
+    const targetType = ticket.againstType;
+    const targetId = ticket.againstId;
+    const shouldBan = banAction === 'ban';
+    
+    try {
+      setBanLoading(true);
+      
+      // Update user/pro ban status
+      if (targetType === "user") {
+        await toggleBanUser(targetId, shouldBan);
+      } else {
+        await toggleBanPro(targetId, shouldBan);
+      }
+      
+      // Update ticket ban status
+      const updatedTicketData = await updateTicketBanStatus(
+        ticket._id, 
+        targetType === 'user' ? shouldBan : undefined,
+        targetType === 'pro' ? shouldBan : undefined
+      );
+      
+      if (updatedTicketData) {
+        setUpdatedTicket(updatedTicketData);
+      }
+      
+      setSuccessBanner(`${targetType.toUpperCase()} has been ${shouldBan ? 'banned' : 'unbanned'} successfully.`);
+      
+      // Auto-hide banner after 1 second
+      setTimeout(() => {
+        setSuccessBanner(null);
+      }, 1000);
+    } catch (e) {
+      setSuccessBanner(`Failed to ${banAction}. Please try again.`);
+      
+      // Auto-hide banner after 1 second
+      setTimeout(() => {
+        setSuccessBanner(null);
+      }, 1000);
+    } finally {
+      setBanLoading(false);
+      setShowBanModal(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -138,6 +200,13 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
         </button>
         <div className="text-sm text-gray-600">Ticket ID: {ticket.ticketId}</div>
       </div>
+
+      {/* Success Banner */}
+      {successBanner && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4">
+          <span className="block sm:inline">{successBanner}</span>
+        </div>
+      )}
 
       {/* Ticket Details (paragraph style) */}
       <Section title="Ticket Details">
@@ -209,7 +278,7 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
           {ticket.againstType === "user" && (
             <>
               <LabelValue label="Email" value={(against as UserProfile | null)?.email} />
-              <LabelValue label="Phone" value={(against as UserProfile | null)?.phoneNo || "-"} />
+              <LabelValue label="Phone" value={(against as UserProfile | null)?.phoneNo ||booking?.phoneNumber || "-"} />
             </>
           )}
           {ticket.againstType === "pro" && (
@@ -219,6 +288,33 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
               <LabelValue label="Service Type" value={booking?.category?.name || "-"} />
             </>
           )}
+          <LabelValue 
+            label="Action Taken" 
+            value={isCurrentlyBanned 
+              ? `${ticket.againstType === 'user' ? 'User' : 'Pro'} Banned` 
+              : 'No Action Taken'
+            } 
+          />
+          {canShowBanButton && (
+            <div className="pt-2 flex items-center justify-end gap-3">
+              <button
+                onClick={handleBanAgainst}
+                disabled={banLoading}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md border disabled:opacity-60 disabled:bg-transparent ${
+                  isCurrentlyBanned 
+                    ? 'border-gray-600 text-gray-600 hover:bg-gray-50' 
+                    : 'border-red-600 text-red-600 hover:bg-red-50'
+                }`}
+              >
+                {banLoading 
+                  ? (isCurrentlyBanned ? 'Unbanning...' : 'Banning...') 
+                  : (isCurrentlyBanned 
+                      ? `Unban ${ticket.againstType === 'user' ? 'User' : 'Pro'}` 
+                      : `Ban ${ticket.againstType === 'user' ? 'User' : 'Pro'}`)
+                }
+              </button>
+            </div>
+          )}
         </Section>
       </div>
 
@@ -226,6 +322,7 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title="Booking Details">
+          <LabelValue label="Booking ID" value={booking?.bookingId || ticket.bookingId} />
           <LabelValue label="Issue" value={booking?.issueDescription} />
           <LabelValue label="Booking Status" value={booking?.status} />
           <LabelValue label="Preferred Date" value={booking ? new Date(booking.preferredDate).toLocaleDateString() : "-"} />
@@ -273,8 +370,16 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
             <div className="flex justify-end">
               <button
                 onClick={handleCloseClick}
-                disabled={!canClose}
-                className="px-4 py-2 bg-green-600 text-white rounded-md disabled:opacity-60 hover:bg-green-700"
+                className="px-4 py-2 text-white rounded-md transition-colors duration-200"
+                style={{ 
+                  backgroundColor: '#032B44'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1E3A5F';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#032B44';
+                }}
               >
                 Close Ticket
               </button>
@@ -282,6 +387,15 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
           </div>
         </Section>
       )}
+
+      <ConfirmationModal
+        isOpen={showBanModal}
+        onCancel={() => setShowBanModal(false)}
+        onConfirm={confirmBan}
+        action={banAction}
+        entityType={ticket.againstType as "user" | "pro"}
+        isProcessing={banLoading}
+      />
     </div>
   );
 };

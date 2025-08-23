@@ -1,13 +1,13 @@
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
 import { IUserRepository } from "../repositories/IUserRepository";
+import { IAdminRepository } from "../repositories/IAdminRepository";
 import { IProRepository } from "../repositories/IProRepository";
 import { ICategoryRepository } from "../repositories/ICategoryRepository";
 import { IBookingRepository } from "../repositories/IBookingRepository";
 import { IQuotaRepository } from "../repositories/IQuotaRepository";
 import { IWalletRepository } from "../repositories/IWalletRepository";
 import { IWithdrawalRequestRepository } from "../repositories/IWithdrawalRequestRepository";
-import { IAdminRepository } from "../repositories/IAdminRepository";
 import { ITransactionRepository } from "../repositories/ITransactionRepository";
 import { UserResponse } from "../dtos/response/userDtos";
 import { IAdminService } from "./IAdminService";
@@ -21,51 +21,50 @@ import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import { getApprovalEmailTemplate, getRejectionEmailTemplate } from "../utils/emailTemplates";
-import { createClient } from "redis";
+import RedisConnector from "../config/redisConnector";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "../middleware/errorMiddleware";
+import { HttpStatus } from "../enums/httpStatus";
 import { INotificationService } from "./INotificationService";
 
 @injectable()
 export class AdminService implements IAdminService {
-  private _redisClient = createClient({
-    url: process.env.REDIS_URL || "redis://localhost:6379",
-    socket: {
-      keepAlive: 10000,
-      reconnectStrategy: (retries) => Math.min(retries * 50, 1000),
-    },
-  });
+  private _redisConnector: RedisConnector;
+  private _quotaRepository: IQuotaRepository;
 
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
+    @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository,
     @inject(TYPES.IProRepository) private _proRepository: IProRepository,
     @inject(TYPES.ICategoryRepository) private _categoryRepository: ICategoryRepository,
     @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository,
-    @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
+    @inject(TYPES.IQuotaRepository) quotaRepository: IQuotaRepository,
     @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
     @inject(TYPES.IWithdrawalRequestRepository) private _withdrawalRequestRepository: IWithdrawalRequestRepository,
     @inject(TYPES.ITransactionRepository) private _transactionRepository: ITransactionRepository,
     @inject(TYPES.INotificationService) private _notificationService: INotificationService,
-    @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository
+    @inject(TYPES.RedisConnector) redisConnector: RedisConnector
   ) {
-    this._redisClient.connect().catch((err) => console.error(MESSAGES.REDIS_CONNECT_FAILED + ":", err));
-    this._redisClient.on("error", (err) => console.error(MESSAGES.REDIS_ERROR + ":", err));
+    this._redisConnector = redisConnector;
+    this._quotaRepository = quotaRepository;
   }
 
-  async getAdminTransactions(adminId: string, page: number, limit: number): Promise<{ transactions: Array<{
-    id: string;
-    proId: string;
-    walletId?: string;
-    amount: number;
-    type: "credit" | "debit";
-    date: Date;
-    description?: string;
-    bookingId?: string;
-    quotaId?: string;
-    adminId?: string;
-    createdAt: Date;
-    updatedAt: Date;
-  }>; total: number }> {
+  async getAdminTransactions(adminId: string, page: number, limit: number): Promise<{
+    transactions: Array<{
+      id: string;
+      proId: string;
+      walletId?: string;
+      amount: number;
+      type: "credit" | "debit";
+      date: Date;
+      description?: string;
+      bookingId?: string;
+      quotaId?: string;
+      adminId?: string;
+      createdAt: Date;
+      updatedAt: Date;
+    }>; total: number
+  }> {
     return this._transactionRepository.findByAdminIdPaginated(adminId, page, limit);
   }
 
@@ -80,10 +79,10 @@ export class AdminService implements IAdminService {
     return quota;
   }
 
-  async getUsers(page: number, limit: number): Promise<{ users: UserResponse[]; total: number }> {
+  async getUsers(page: number, limit: number, sortBy?: "latest" | "oldest"): Promise<{ users: UserResponse[]; total: number }> {
     const skip = (page - 1) * limit;
     const [users, total] = await Promise.all([
-      this._userRepository.getUsersWithPagination(skip, limit),
+      this._userRepository.getUsersWithPagination(skip, limit, sortBy),
       this._userRepository.getTotalUsersCount(),
     ]);
     return {
@@ -97,6 +96,7 @@ export class AdminService implements IAdminService {
           phoneNo: user.phoneNo ?? null,
           address: user.address ?? null,
           photo: user.photo ?? null,
+          createdAt: user.createdAt,
         })
       ),
       total,
@@ -108,7 +108,7 @@ export class AdminService implements IAdminService {
     if (!updatedUser) return null;
 
     if (isBanned) {
-      await this._redisClient.del(`refresh:${userId}`);
+      await this._redisConnector.getClient().del(`refresh:${userId}`);
     }
 
     return new UserResponse({
@@ -128,11 +128,11 @@ export class AdminService implements IAdminService {
     if (!updatedPro) return null;
 
     if (isBanned) {
-      await this._redisClient.del(`refresh:${proId}`);
+      await this._redisConnector.getClient().del(`refresh:${proId}`);
     }
 
     const category = await this._categoryRepository.findCategoryById(updatedPro.categoryId.toString());
-    if (!category) throw new HttpError(404, MESSAGES.CATEGORY_NOT_FOUND);
+    if (!category) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
 
     return new ProResponse({
       _id: updatedPro._id.toString(),
@@ -173,15 +173,15 @@ export class AdminService implements IAdminService {
     });
   }
 
-  async getPendingPros(page: number, limit: number): Promise<{ pros: PendingProResponse[]; total: number }> {
+  async getPendingPros(page: number, limit: number, sortBy?: "latest" | "oldest"): Promise<{ pros: PendingProResponse[]; total: number }> {
     const skip = (page - 1) * limit;
-    const pros = await this._proRepository.getPendingProsWithPagination(skip, limit);
+    const pros = await this._proRepository.getPendingProsWithPagination(skip, limit, sortBy);
     const total = await this._proRepository.getTotalPendingProsCount();
     return {
       pros: await Promise.all(
         pros.map(async (doc: PendingProDocument) => {
           const category = await this._categoryRepository.findCategoryById(doc.categoryId.toString());
-          if (!category) throw new HttpError(404, MESSAGES.CATEGORY_NOT_FOUND);
+          if (!category) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
           return {
             _id: doc._id.toString(),
             firstName: doc.firstName,
@@ -213,10 +213,10 @@ export class AdminService implements IAdminService {
   async getPendingProById(id: string): Promise<PendingProResponse> {
     const proDoc = await this._proRepository.findById(id);
     if (!proDoc) {
-      throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+      throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
     }
     const category = await this._categoryRepository.findCategoryById(proDoc.categoryId.toString());
-    if (!category) throw new HttpError(404, MESSAGES.CATEGORY_NOT_FOUND);
+    if (!category) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
     return {
       _id: proDoc._id.toString(),
       firstName: proDoc.firstName,
@@ -245,8 +245,7 @@ export class AdminService implements IAdminService {
     const { plainPassword, hashedPassword } = await this.generatePassword();
     const { email, firstName, lastName, approvedProId } = await this._proRepository.approvePro(id, hashedPassword, about || "");
     await this.sendApprovalEmail(email, `${firstName} ${lastName}`, plainPassword);
-    
-    // Send welcome notification to newly approved pro
+
     try {
       await this._notificationService.createNotification({
         type: "general",
@@ -259,10 +258,10 @@ export class AdminService implements IAdminService {
     }
   }
 
-  async getApprovedPros(page: number, limit: number): Promise<{ pros: ProResponse[]; total: number }> {
+  async getApprovedPros(page: number, limit: number, sortBy?: "latest" | "oldest"): Promise<{ pros: ProResponse[]; total: number }> {
     const skip = (page - 1) * limit;
     const [pros, total] = await Promise.all([
-      this._proRepository.getApprovedProsWithPagination(skip, limit),
+      this._proRepository.getApprovedProsWithPagination(skip, limit, sortBy),
       this._proRepository.getTotalApprovedProsCount(),
     ]);
     return { pros, total };
@@ -271,7 +270,7 @@ export class AdminService implements IAdminService {
   async getApprovedProById(id: string): Promise<ProResponse> {
     const proDoc = await this._proRepository.findApprovedProByIdAsResponse(id);
     if (!proDoc) {
-      throw new HttpError(404, MESSAGES.PRO_NOT_FOUND);
+      throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
     }
     return proDoc;
   }
@@ -279,7 +278,7 @@ export class AdminService implements IAdminService {
   async createCategory(name: string, image: string): Promise<CategoryResponse> {
     const existingCategory = await this._categoryRepository.findCategoryByName(name);
     if (existingCategory) {
-      throw new HttpError(400, MESSAGES.CATEGORY_NAME_EXISTS);
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CATEGORY_NAME_EXISTS);
     }
     const categoryData = { name, image };
     return this._categoryRepository.createCategory(categoryData);
@@ -298,17 +297,22 @@ export class AdminService implements IAdminService {
     if (data.name) {
       const existingCategory = await this._categoryRepository.findCategoryByName(data.name);
       if (existingCategory && existingCategory.id !== categoryId) {
-        throw new HttpError(400, MESSAGES.CATEGORY_NAME_EXISTS);
+        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CATEGORY_NAME_EXISTS);
       }
     }
     return this._categoryRepository.updateCategory(categoryId, data);
   }
 
-  async getWithdrawalRequests(page: number, limit: number): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number; pros: ProResponse[] }> {
+  async getWithdrawalRequests(
+    page: number,
+    limit: number,
+    sortBy: "latest" | "oldest" = "latest",
+    status?: "pending" | "approved" | "rejected"
+  ): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number; pros: ProResponse[] }> {
     const skip = (page - 1) * limit;
     const [withdrawals, total] = await Promise.all([
-      this._withdrawalRequestRepository.getAllWithdrawalRequests(skip, limit),
-      this._withdrawalRequestRepository.getTotalWithdrawalRequestsCount(),
+      this._withdrawalRequestRepository.getAllWithdrawalRequests(skip, limit, sortBy, status),
+      this._withdrawalRequestRepository.getTotalWithdrawalRequestsCount(status),
     ]);
     const proIds = [...new Set(withdrawals.map((w) => w.proId))];
     const pros = await Promise.all(proIds.map((id) => this._proRepository.findApprovedProByIdAsResponse(id)));
@@ -317,17 +321,31 @@ export class AdminService implements IAdminService {
 
   async acceptWithdrawalRequest(withdrawalId: string): Promise<void> {
     const withdrawal = await this._withdrawalRequestRepository.findWithdrawalRequestById(withdrawalId);
-    if (!withdrawal) throw new HttpError(404, MESSAGES.WITHDRAWAL_NOT_FOUND);
-    if (withdrawal.status !== "pending") throw new HttpError(400, MESSAGES.WITHDRAWAL_NOT_PENDING);
+    if (!withdrawal) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WITHDRAWAL_NOT_FOUND);
+    if (withdrawal.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.WITHDRAWAL_NOT_PENDING);
 
     const wallet = await this._walletRepository.findWalletByProId(withdrawal.proId, false);
-    if (!wallet) throw new HttpError(404, MESSAGES.WALLET_NOT_FOUND);
-    if (wallet.balance < withdrawal.amount) throw new HttpError(400, MESSAGES.INSUFFICIENT_BALANCE);
+    if (!wallet) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WALLET_NOT_FOUND);
+    if (wallet.balance < withdrawal.amount) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INSUFFICIENT_BALANCE);
 
     await this._walletRepository.decreaseWalletBalance(wallet.id, withdrawal.amount);
     await this._withdrawalRequestRepository.updateWithdrawalRequest(withdrawalId, { status: "approved" });
 
-    // Notify pro on approval
+    // Record a debit transaction in the pro's wallet for this withdrawal approval
+    try {
+      const mongoose = await import("mongoose");
+      await this._transactionRepository.createTransaction({
+        proId: new mongoose.Types.ObjectId(withdrawal.proId),
+        walletId: new mongoose.Types.ObjectId(wallet.id),
+        amount: withdrawal.amount,
+        type: "debit",
+        date: new Date(),
+        description: `Withdrawal approved (Request #${withdrawalId.slice(-6)})`,
+      } as any);
+    } catch (e) {
+      console.error("Failed to record withdrawal debit transaction:", e);
+    }
+
     try {
       await this._notificationService.createNotification({
         type: "wallet",
@@ -342,15 +360,14 @@ export class AdminService implements IAdminService {
 
   async rejectWithdrawalRequest(withdrawalId: string, reason: string): Promise<void> {
     const withdrawal = await this._withdrawalRequestRepository.findWithdrawalRequestById(withdrawalId);
-    if (!withdrawal) throw new HttpError(404, MESSAGES.WITHDRAWAL_NOT_FOUND);
-    if (withdrawal.status !== "pending") throw new HttpError(400, MESSAGES.WITHDRAWAL_NOT_PENDING);
+    if (!withdrawal) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WITHDRAWAL_NOT_FOUND);
+    if (withdrawal.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.WITHDRAWAL_NOT_PENDING);
 
     await this._withdrawalRequestRepository.updateWithdrawalRequest(withdrawalId, {
       status: "rejected",
       rejectionReason: reason,
     });
 
-    // Notify pro on rejection
     try {
       await this._notificationService.createNotification({
         type: "wallet",
@@ -409,10 +426,10 @@ export class AdminService implements IAdminService {
 
     try {
       await transporter.sendMail(mailOptions);
-      console.log(`Approval email sent to ${email}`);
+      console.log(MESSAGES.PRO_APPROVED_SUCCESSFULLY);
     } catch (error) {
-      console.error(`Failed to send approval email to ${email}:`, error);
-      throw new HttpError(500, MESSAGES.FAILED_SEND_APPROVAL_EMAIL);
+      console.error(MESSAGES.FAILED_SEND_APPROVAL_EMAIL + ":", error);
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_APPROVAL_EMAIL);
     }
   }
 
@@ -472,7 +489,6 @@ export class AdminService implements IAdminService {
     return this._bookingRepository.getPlatformProMonthlyRevenueSeries(lastNMonths);
   }
 
-
   async rejectPro(id: string, reason: string): Promise<void> {
     const pendingPro = await this.getPendingProById(id);
     await this._proRepository.rejectPro(id);
@@ -492,15 +508,15 @@ export class AdminService implements IAdminService {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Fixeify - Request Rejected",
-      html: getRejectionEmailTemplate(reason, pendingProId), // Pass pendingProId
+      html: getRejectionEmailTemplate(reason, pendingProId),
     };
 
     try {
       await transporter.sendMail(mailOptions);
-      console.log(`Rejection email sent to ${email}`);
+      console.log(MESSAGES.PRO_REJECTED_SUCCESSFULLY);
     } catch (error) {
-      console.error(`Failed to send rejection email to ${email}:`, error);
-      throw new HttpError(500, MESSAGES.FAILED_SEND_REJECTION_EMAIL);
+      console.error(MESSAGES.FAILED_SEND_REJECTION_EMAIL + ":", error);
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_REJECTION_EMAIL);
     }
   }
 }

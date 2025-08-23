@@ -55,6 +55,7 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
 
   private map = (doc: TransactionDocument): TransactionResponseDTO => ({
     id: doc._id.toString(),
+    transactionId: (doc as any).transactionId,
     proId: doc.proId.toString(),
     walletId: doc.walletId ? doc.walletId.toString() : undefined,
     amount: doc.amount,
@@ -68,3 +69,4 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
     updatedAt: doc.updatedAt,
   });
 }
+

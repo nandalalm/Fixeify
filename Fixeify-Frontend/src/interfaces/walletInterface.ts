@@ -1,5 +1,6 @@
 export interface ITransaction {
-  _id: string; // Unique identifier for each transaction, mapped from MongoDB ObjectId
+  _id: string;
+  transactionId?: string;
   amount: number;
   type: "credit" | "debit";
   date: Date;

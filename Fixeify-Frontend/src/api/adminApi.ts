@@ -33,9 +33,13 @@ export const updateCategory = async (
   return response.data;
 };
 
-export const fetchUsers = async (page: number = 1, limit: number = 5): Promise<{ users: User[]; total: number }> => {
+export const fetchUsers = async (
+  page: number = 1,
+  limit: number = 5,
+  sortBy?: "latest" | "oldest"
+): Promise<{ users: User[]; total: number }> => {
   const response = await api.get(`${AdminBase}/fetchUsers`, {
-    params: { page, limit },
+    params: { page, limit, sortBy },
     withCredentials: true,
   });
   return response.data;
@@ -51,9 +55,13 @@ export const toggleBanPro = async (proId: string, isBanned: boolean): Promise<IA
   return response.data;
 };
 
-export const fetchPendingPros = async (page: number = 1, limit: number = 5): Promise<{ pros: PendingPro[]; total: number }> => {
+export const fetchPendingPros = async (
+  page: number = 1,
+  limit: number = 5,
+  sortBy?: "latest" | "oldest"
+): Promise<{ pros: PendingPro[]; total: number }> => {
   const response = await api.get(`${AdminBase}/fetchPending-pros`, {
-    params: { page, limit },
+    params: { page, limit, sortBy },
     withCredentials: true,
   });
   return response.data;
@@ -76,9 +84,13 @@ export const rejectPro = async (id: string, data: { reason: string }): Promise<v
   return response.data;
 };
 
-export const fetchApprovedPros = async (page: number = 1, limit: number = 5): Promise<{ pros: IApprovedPro[]; total: number }> => {
+export const fetchApprovedPros = async (
+  page: number = 1,
+  limit: number = 5,
+  sortBy?: "latest" | "oldest"
+): Promise<{ pros: IApprovedPro[]; total: number }> => {
   const response = await api.get(`${AdminBase}/fetchApproved-pros`, {
-    params: { page, limit },
+    params: { page, limit, sortBy },
     withCredentials: true,
   });
   return response.data;
@@ -121,10 +133,12 @@ export const fetchQuotaByBookingId = async (bookingId: string): Promise<QuotaRes
 
 export const fetchWithdrawalRequests = async (
   page: number = 1,
-  limit: number = 5
+  limit: number = 5,
+  sortBy?: "latest" | "oldest",
+  status?: "pending" | "approved" | "rejected"
 ): Promise<{ withdrawals: IWithdrawalRequest[]; total: number; pros: IApprovedPro[] }> => {
   const response = await api.get(`${AdminBase}/fetchWithdrawalRequests`, {
-    params: { page, limit },
+    params: { page, limit, sortBy, status },
     withCredentials: true,
   });
   return response.data;
@@ -172,6 +186,7 @@ export const fetchDashboardMetrics = async (adminId: string): Promise<{
 
 export interface AdminTransactionDTO {
   id: string;
+  transactionId?: string;
   proId: string;
   walletId?: string;
   amount: number;

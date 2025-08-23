@@ -19,7 +19,7 @@ const AdminConflictManagement: React.FC = () => {
   const [tickets, setTickets] = useState<TicketResponse[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [limit] = useState(10);
+  const [limit] = useState(5);
   // Single sort control that also implies status when relevant
   type SortKey =
     | "default_all"
@@ -264,7 +264,7 @@ const AdminConflictManagement: React.FC = () => {
     }
   };
 
-  const handleView = async (t: TicketResponse) => {
+  const handleView = async (t: TicketResponse): Promise<void> => {
     // enforce single under_review only when attempting to open a pending ticket
     const hasAnotherUR = tickets.some((x) => x.status === "under_review" && x._id !== t._id);
     if (hasAnotherUR && t.status === "pending") {

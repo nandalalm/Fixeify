@@ -6,8 +6,6 @@ import { getProProfile, fetchBookingById as fetchProBookingById } from "@/api/pr
 import { BookingResponse } from "@/interfaces/bookingInterface";
 import { fetchApprovedProById } from "@/api/adminApi";
 
-// (booking/quota UI removed; no time formatting needed)
-
 const LabelValue: React.FC<{ label: React.ReactNode; value?: React.ReactNode }> = ({ label, value }) => (
   <div className="flex flex-col sm:flex-row sm:items-center gap-1 py-1">
     <span className="w-44 text-sm font-medium text-gray-600 dark:text-gray-300">{label}</span>
@@ -25,8 +23,6 @@ const Section: React.FC<{ title: string; rightSlot?: React.ReactNode; children: 
   </div>
 );
 
-// Badges (only withdrawal status needed here)
-
 const WithdrawalStatusBadge: React.FC<{ value: string }> = ({ value }) => {
   const v = (value || "").toLowerCase();
   let classes = "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border whitespace-nowrap shrink-0 ";
@@ -40,7 +36,7 @@ const WithdrawalStatusBadge: React.FC<{ value: string }> = ({ value }) => {
 interface WithdrawalRequestDetailsProps {
   withdrawal: IWithdrawalRequest;
   onBack: () => void;
-  showProDetails?: boolean; // optional: allow hiding Pro Details in Pro wallet context
+  showProDetails?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
   isProcessing?: boolean;
@@ -53,7 +49,7 @@ const WithdrawalRequestDetails: React.FC<WithdrawalRequestDetailsProps> = ({ wit
   const [categoryName, setCategoryName] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!showProDetails) return; // skip fetching pro/category info when hidden
+    if (!showProDetails) return; 
     const load = async () => {
       setLoading(true);
       setError(null);
@@ -62,7 +58,6 @@ const WithdrawalRequestDetails: React.FC<WithdrawalRequestDetailsProps> = ({ wit
           const p = await getProProfile(withdrawal.proId);
           setPro(p);
         }
-        // Fetch category/service name from booking if available
         if (withdrawal.bookingId) {
           try {
             const b: BookingResponse = await fetchProBookingById(withdrawal.bookingId);
@@ -71,7 +66,6 @@ const WithdrawalRequestDetails: React.FC<WithdrawalRequestDetailsProps> = ({ wit
             setCategoryName(null);
           }
         }
-        // Fallback: if still no category, try admin API (works in admin context)
         if (!categoryName) {
           try {
             const ap = await fetchApprovedProById(withdrawal.proId);
@@ -98,10 +92,10 @@ const WithdrawalRequestDetails: React.FC<WithdrawalRequestDetailsProps> = ({ wit
         </button>
       </div>
 
-      {/* Pro Details (optional) */}
+      {/* Pro Details */}
       {showProDetails && (
         <Section
-          title="Pro Details"
+          title="Professional Details"
           rightSlot={
             (categoryName || pro?.categoryName) ? (
               <span
@@ -124,7 +118,7 @@ const WithdrawalRequestDetails: React.FC<WithdrawalRequestDetailsProps> = ({ wit
                   type="button"
                   className="relative group shrink-0"
                   aria-label="View pro image"
-                  onClick={() => { /* no preview modal here; keep minimal */ }}
+                  onClick={() => {}}
                 >
                   <img
                     src={pro.profilePhoto || "/images/avatar-pro.png"}

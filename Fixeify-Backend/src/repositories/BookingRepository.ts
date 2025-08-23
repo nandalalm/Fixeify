@@ -1,71 +1,10 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { IBookingRepository } from "./IBookingRepository";
-import Booking, { BookingDocument, ITimeSlot, ILocation } from "../models/bookingModel";
+import { IBookingRepository,PopulatedUser,PopulatedPro,PopulatedCategory,PopulatedBookingDocument,PopulatedLeanBooking } from "./IBookingRepository";
+import Booking, { BookingDocument, ITimeSlot } from "../models/bookingModel";
 import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
-import mongoose, { Types } from "mongoose";
+import mongoose from "mongoose";
 
-interface PopulatedUser {
-  _id: Types.ObjectId;
-  name: string;
-  email: string;
-  photo?: string;
-}
-
-interface PopulatedPro {
-  _id: Types.ObjectId;
-  firstName: string;
-  lastName: string;
-  profilePhoto?: string;
-}
-
-interface PopulatedCategory {
-  _id: Types.ObjectId;
-  name: string;
-  image?: string;
-}
-
-interface PopulatedBookingDocument {
-  _id: Types.ObjectId;
-  userId: PopulatedUser;
-  proId: PopulatedPro;
-  categoryId: PopulatedCategory;
-  issueDescription: string;
-  location: ILocation;
-  phoneNumber: string;
-  preferredDate: Date;
-  preferredTime: ITimeSlot[];
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
-  rejectedReason?: string;
-  cancelReason?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isRated?: boolean;
-  hasComplaintRaisedByPro?: boolean;
-  hasComplaintRaisedByUser?: boolean;
-  adminRevenue?: number;
-  proRevenue?: number;
-}
-
-interface PopulatedLeanBooking {
-  _id: Types.ObjectId;
-  userId: PopulatedUser;
-  proId: PopulatedPro;
-  categoryId: PopulatedCategory;
-  issueDescription: string;
-  location: ILocation;
-  phoneNumber: string;
-  preferredDate: Date;
-  preferredTime: ITimeSlot[];
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
-  rejectedReason?: string;
-  cancelReason?:string;
-  createdAt: Date;
-  updatedAt: Date;
-  isRated?:boolean;
-  hasComplaintRaisedByPro?: boolean;
-  hasComplaintRaisedByUser?: boolean;
-}
 
 @injectable()
 export class MongoBookingRepository extends BaseRepository<BookingDocument> implements IBookingRepository {
@@ -129,7 +68,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     };
   }
 
-  async fetchProBookings(proId: string, page: number = 1, limit: number = 5, status?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
+  async fetchProBookings(proId: string, page: number = 1, limit: number = 5, status?: string, sortBy: "latest" | "oldest" = "latest"): Promise<{ bookings: BookingResponse[]; total: number }> {
   const skip = (page - 1) * limit;
   const query: any = { proId: new mongoose.Types.ObjectId(proId) };
   if (status) {
@@ -140,6 +79,8 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       query.status = statusArray[0]; 
     }
   }
+  const sort: any = {};
+  sort.createdAt = sortBy === "oldest" ? 1 : -1;
   const bookings = await this._model
     .find(query)
     .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
@@ -147,7 +88,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       { path: "proId", select: "firstName lastName profilePhoto" },
       { path: "categoryId", select: "name image" },
     ])
-    .sort({ createdAt: -1 })
+    .sort(sort)
     .skip(skip)
     .limit(limit)
     .lean()
@@ -227,8 +168,10 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
   }
 
   async findBookingByIdComplete(bookingId: string): Promise<BookingCompleteResponse | null> {
+    const isObjectId = mongoose.Types.ObjectId.isValid(bookingId);
+    const query = isObjectId ? { _id: new mongoose.Types.ObjectId(bookingId) } : { bookingId } as any;
     const booking = await this._model
-      .findById(bookingId)
+      .findOne(query)
       .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
         { path: "userId", select: "name email photo" },
         { path: "proId", select: "firstName lastName profilePhoto email phoneNumber" },
@@ -243,6 +186,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
   private mapToBookingCompleteResponse(booking: PopulatedBookingDocument): BookingCompleteResponse {
     return new BookingCompleteResponse({
       id: booking._id.toString(),
+      bookingId: booking.bookingId,
       user: {
         id: booking.userId._id.toString(),
         name: booking.userId.name,
@@ -405,6 +349,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
   private mapToBookingResponse(booking: PopulatedBookingDocument): BookingResponse {
     return new BookingResponse({
       id: booking._id.toString(),
+      bookingId: booking.bookingId,
       user: {
         id: booking.userId._id.toString(),
         name: booking.userId.name,
@@ -450,7 +395,6 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
     dailyDeltaPercent: number | null;
   }> {
     const now = new Date();
-    // Period starts
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -613,7 +557,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
     
       mongoose.model("RatingReview").aggregate([
         { $group: { _id: "$proId", averageRating: { $avg: "$rating" }, count: { $sum: 1 } } },
-        { $match: { count: { $gte: 1 } } },
+        { $match: { count: { $gte: 2 } } },
         { $sort: { averageRating: 1 } },
         { $limit: 1 },
         { $lookup: { from: "approvedpros", localField: "_id", foreignField: "_id", as: "pro" } },
@@ -642,10 +586,17 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
       ])
     ]);
 
+    const most = mostRated[0] || null;
+    let least = leastRated[0] || null;
+    // Ensure the same pro isn't returned for both mostRated and leastRated
+    if (most && least && String(most.proId) === String(least.proId)) {
+      least = null;
+    }
+
     return {
-      mostRated: mostRated[0] || null,
+      mostRated: most,
       highestEarning: highestEarning[0] || null,
-      leastRated: leastRated[0] || null,
+      leastRated: least,
       lowestEarning: lowestEarning[0] || null
     };
   }

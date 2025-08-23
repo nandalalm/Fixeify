@@ -25,16 +25,16 @@ interface AuthenticatedSocket extends Socket {
 
 @injectable()
 export class ChatGateway {
-  private io!: Server;
-  private connectedUsers: Map<string, { socketId: string; userId: string; userRole: string }> = new Map();
+  private _io!: Server;
+  private _connectedUsers: Map<string, { socketId: string; userId: string; userRole: string }> = new Map();
 
   constructor(
     @inject(TYPES.IChatService) private chatService: IChatService,
     @inject(TYPES.INotificationService) private notificationService: INotificationService
-  ) {}
+  ) { }
 
   public init(server: any): void {
-    this.io = new Server(server, {
+    this._io = new Server(server, {
       cors: {
         origin: process.env.FRONTEND_URL || "http://localhost:5173",
         methods: ["GET", "POST"],
@@ -42,10 +42,10 @@ export class ChatGateway {
       },
     });
 
-    (global as any).io = this.io;
-    (global as any).connectedUsers = this.connectedUsers;
+    (global as any).io = this._io;
+    (global as any).connectedUsers = this._connectedUsers;
 
-    this.io.use(async (socket: AuthenticatedSocket, next) => {
+    this._io.use(async (socket: AuthenticatedSocket, next) => {
       try {
         const token = socket.handshake.auth.token;
         if (!token) {
@@ -78,13 +78,13 @@ export class ChatGateway {
           throw new Error("User not found");
         }
 
-        this.connectedUsers.set(decoded.userId, {
+        this._connectedUsers.set(decoded.userId, {
           socketId: socket.id,
           userId: decoded.userId,
           userRole: socket.userRole,
         });
 
-        (global as any).connectedUsers = this.connectedUsers;
+        (global as any).connectedUsers = this._connectedUsers;
 
         next();
       } catch (error) {
@@ -92,23 +92,23 @@ export class ChatGateway {
       }
     });
 
-    this.io.on("connection", (socket: AuthenticatedSocket) => {
-      
+    this._io.on("connection", (socket: AuthenticatedSocket) => {
+
       if (socket.userId && socket.userRole) {
-        this.connectedUsers.set(socket.userId, {
+        this._connectedUsers.set(socket.userId, {
           socketId: socket.id,
           userId: socket.userId,
           userRole: socket.userRole
         });
-        (global as any).connectedUsers = this.connectedUsers;
-        
-   
-        const onlineUserIds = Array.from(this.connectedUsers.keys());
+        (global as any).connectedUsers = this._connectedUsers;
+
+
+        const onlineUserIds = Array.from(this._connectedUsers.keys());
         for (const userId of onlineUserIds) {
           socket.emit("onlineStatus", { userId, isOnline: true });
         }
-        
-      
+
+
         socket.broadcast.emit("onlineStatus", { userId: socket.userId, isOnline: true });
       }
 
@@ -133,20 +133,20 @@ export class ChatGateway {
           }
 
           socket.join(chatId);
-          
-        
+
+
           await this.chatService.markMessagesAsDelivered(chatId, participantId, participantModel);
-          
-      
-          this.io.to(chatId).emit("messagesDelivered", { 
-            chatId, 
+
+
+          this._io.to(chatId).emit("messagesDelivered", {
+            chatId,
             participantId,
             participantModel
           });
-          
-          this.io.to(chatId).emit("userJoined", { 
-            chatId, 
-            participantId, 
+
+          this._io.to(chatId).emit("userJoined", {
+            chatId,
+            participantId,
             participantModel,
             timestamp: new Date().toISOString()
           });
@@ -158,24 +158,24 @@ export class ChatGateway {
 
       socket.on("leaveChat", ({ chatId }: { chatId: string }) => {
         socket.leave(chatId);
-        this.io.to(chatId).emit("userLeft", { 
-          chatId, 
+        this._io.to(chatId).emit("userLeft", {
+          chatId,
           participantId: socket.userId,
           timestamp: new Date().toISOString()
         });
       });
 
       socket.on("typing", ({ chatId }: { chatId: string }) => {
-        socket.to(chatId).emit("typing", { 
-          chatId, 
+        socket.to(chatId).emit("typing", {
+          chatId,
           userId: socket.userId,
           timestamp: new Date().toISOString()
         });
       });
 
       socket.on("stopTyping", ({ chatId }: { chatId: string }) => {
-        socket.to(chatId).emit("stopTyping", { 
-          chatId, 
+        socket.to(chatId).emit("stopTyping", {
+          chatId,
           userId: socket.userId,
           timestamp: new Date().toISOString()
         });
@@ -190,26 +190,26 @@ export class ChatGateway {
           if (!data.chatId || !data.senderId || !mongoose.Types.ObjectId.isValid(data.chatId) || !mongoose.Types.ObjectId.isValid(data.senderId)) {
             throw new Error("Invalid chatId or senderId");
           }
-          
+
           if (!data.role || !["user", "pro"].includes(data.role)) {
             throw new Error("Valid role is required");
           }
-          
+
           const senderModel = data.role === "pro" ? "ApprovedPro" : "User";
           if ((senderModel === "User" && data.role !== "user") || (senderModel === "ApprovedPro" && data.role !== "pro")) {
             throw new Error("Role does not match expected participant model");
           }
 
           const message: MessageResponse = await this.chatService.sendMessage({ ...data, senderModel });
-          
-          this.io.to(data.chatId).emit("newMessage", message);
+
+          this._io.to(data.chatId).emit("newMessage", message);
 
         } catch (error) {
           socket.emit("error", { message: "Failed to send message", error: (error as Error).message });
         }
       });
 
-    
+
       socket.on("markMessageRead", async ({ chatId, messageId }: { chatId: string; messageId?: string }) => {
         try {
           if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
@@ -218,19 +218,19 @@ export class ChatGateway {
 
           const participantModel = socket.userRole === "pro" ? "ApprovedPro" : "User";
           await this.chatService.markMessagesAsRead(chatId, socket.userId!, participantModel);
-          
-       
-          this.io.to(chatId).emit("messagesRead", { 
-            chatId, 
+
+
+          this._io.to(chatId).emit("messagesRead", {
+            chatId,
             participantId: socket.userId,
             participantModel,
-            messageId 
+            messageId
           });
 
-    
+
           const chat = await this.chatService.findById(chatId);
           if (chat) {
-            this.io.to(chatId).emit("conversationUpdated", chat);
+            this._io.to(chatId).emit("conversationUpdated", chat);
           }
 
         } catch (error) {
@@ -241,22 +241,22 @@ export class ChatGateway {
       socket.on("disconnect", () => {
 
         if (socket.userId) {
-          this.io.emit("onlineStatus", { userId: socket.userId, isOnline: false });
-          this.connectedUsers.delete(socket.userId);
-          (global as any).connectedUsers = this.connectedUsers;
+          this._io.emit("onlineStatus", { userId: socket.userId, isOnline: false });
+          this._connectedUsers.delete(socket.userId);
+          (global as any).connectedUsers = this._connectedUsers;
         }
       });
     });
   }
 
   public getConnectedUsers(): Map<string, { socketId: string; userId: string; userRole: string }> {
-    return this.connectedUsers;
+    return this._connectedUsers;
   }
 
   public emitToUser(userId: string, event: string, data: any): void {
-    const user = this.connectedUsers.get(userId);
+    const user = this._connectedUsers.get(userId);
     if (user) {
-      this.io.to(user.socketId).emit(event, data);
+      this._io.to(user.socketId).emit(event, data);
     }
   }
 }
