@@ -1,4 +1,4 @@
-import { IAdmin } from "../models/adminModel";
+import { IAdmin } from "../models/tempAdminModel";
 
 export interface CreateAdminData {
   name: string;

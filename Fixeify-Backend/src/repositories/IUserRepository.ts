@@ -1,4 +1,4 @@
-import { IUser } from "../models/userModel";
+import { IUser } from "../models/tempUserModel";
 import { UserResponse } from "../dtos/response/userDtos";
 
 export interface ILocation {
