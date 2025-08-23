@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { Container } from "inversify";
 import { TYPES } from "../types";
-import { AuthController } from "../controllers/tempAuthController";
+import { AuthController } from "../controllers/authController";
 import { authenticateToken } from "../middleware/authMiddleware";
 import cookieParser from "cookie-parser";
 

@@ -10,7 +10,7 @@ import { UserResponse } from "../dtos/response/userDtos";
 import { ProResponse } from "../dtos/response/proDtos";
 import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
 import { UserRole } from "../enums/roleEnum";
-import { IUser } from "../models/tempUserModel";
+import { IUser } from "../models/userModel";
 import { IApprovedPro, ITimeSlot } from "../models/approvedProModel";
 import { IBooking } from "../models/bookingModel";
 import { WalletDocument } from "../models/walletModel";

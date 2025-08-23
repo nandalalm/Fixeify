@@ -1,4 +1,4 @@
-import User, { IUser } from "../models/tempUserModel";
+import User, { IUser } from "../models/userModel";
 import { IUserRepository, CreateUserData } from "./IUserRepository";
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";

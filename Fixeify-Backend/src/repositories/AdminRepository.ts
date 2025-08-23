@@ -1,4 +1,4 @@
-import Admin, { IAdmin } from "../models/tempAdminModel";
+import Admin, { IAdmin } from "../models/adminModel";
 import { IAdminRepository, CreateAdminData } from "./IAdminRepository";
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
