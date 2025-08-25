@@ -150,6 +150,11 @@ const Profile = () => {
                           setIsChangingPassword(false);
                         }
                       }
+                      // Auto-close sidebar on mobile view after selection
+                      if (isExtraSmallScreen) {
+                        setIsSidebarVisible(false);
+                        setIsToggleActive(false);
+                      }
                     }}
                     title={isSidebarShrunk ? tab.name : ""}
                     className={`flex items-center w-full p-3 rounded-md transition-colors ${

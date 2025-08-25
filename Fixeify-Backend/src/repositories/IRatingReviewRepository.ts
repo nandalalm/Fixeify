@@ -6,7 +6,9 @@ export interface IRatingReviewRepository {
   findByProId(
     proId: string,
     page: number,
-    limit: number
+    limit: number,
+    sortBy?: "latest" | "oldest" | "lowest" | "highest",
+    search?: string
   ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }>;
   findByUserId(
     userId: string,
@@ -17,7 +19,8 @@ export interface IRatingReviewRepository {
   findAll(
     page: number,
     limit: number,
-    sortBy?: "latest" | "oldest" | "lowest" | "highest"
+    sortBy?: "latest" | "oldest" | "lowest" | "highest",
+    search?: string
   ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }>;
 
   

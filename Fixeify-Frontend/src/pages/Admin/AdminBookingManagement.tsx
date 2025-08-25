@@ -66,13 +66,18 @@ const AdminBookingManagement: FC = () => {
         ? (sortOption as "pending" | "accepted" | "completed" | "rejected" | "cancelled")
         : undefined;
       const sortByParam = sortOption === "latest" || sortOption === "oldest" ? sortOption : "latest";
+      // Heuristic: if search input looks like a Booking ID (no spaces, length >= 6), also pass as bookingId
+      const trimmedSearch = (searchTerm || "").trim();
+      const isPotentialBookingId = trimmedSearch.length >= 6 && !/\s/.test(trimmedSearch);
+      const bookingIdParam = isPotentialBookingId ? trimmedSearch : undefined;
 
       const { bookings, total } = await fetchAdminBookings(
         currentPage,
         limit,
         searchTerm || undefined,
         statusFilter,
-        sortByParam
+        sortByParam,
+        bookingIdParam
       );
       setBookings(bookings);
       setTotalPages(Math.ceil(total / limit));
@@ -146,7 +151,7 @@ const AdminBookingManagement: FC = () => {
                 <div className="relative w-full sm:w-5/6">
                   <input
                     type="text"
-                    placeholder="Search by issue or location..."
+                    placeholder="Search by issue, location, or booking ID..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

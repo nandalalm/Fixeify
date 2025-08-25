@@ -108,7 +108,15 @@ const JobManagementPage = () => {
         }
       }
       const sortByParam = sortOption === "oldest" ? "oldest" : "latest";
-      const { bookings, total } = await fetchProBookings(user.id, currentPage[tab], limit, status, sortByParam);
+      const { bookings, total } = await fetchProBookings(
+        user.id,
+        currentPage[tab],
+        limit,
+        status,
+        sortByParam,
+        searchTerm || undefined,
+        searchTerm || undefined
+      );
       setBookings(bookings);
       setTotalPages((prev) => ({ ...prev, [tab]: Math.ceil(total / limit) }));
     } catch (err: any) {
@@ -148,7 +156,15 @@ const JobManagementPage = () => {
       }
       const page = typeof pageOverride === 'number' ? pageOverride : currentPage[tab];
       const sortByParam = sortOption === "oldest" ? "oldest" : "latest";
-      const { bookings, total } = await fetchProBookings(user.id, page, limit, status, sortByParam);
+      const { bookings, total } = await fetchProBookings(
+        user.id,
+        page,
+        limit,
+        status,
+        sortByParam,
+        searchTerm || undefined,
+        searchTerm || undefined
+      );
       setBookings(bookings);
       setTotalPages((prev) => ({ ...prev, [tab]: Math.ceil(total / limit) }));
     } catch (err: any) {
@@ -165,6 +181,19 @@ const JobManagementPage = () => {
     if (tabSwitching) return; // avoid page loader during tab switch; handled by silent fetch
     fetchBookings(activeTab);
   }, [user, accessToken, dispatch, navigate, activeTab, currentPage[activeTab], sortOption]);
+
+  // Debounced search: avoid full-page loader to preserve input focus
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      if (!tabSwitching) {
+        // reset to page 1 on new search and fetch silently
+        setCurrentPage((prev) => ({ ...prev, [activeTab]: 1 }));
+        fetchBookingsSilent(activeTab, 1);
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+    // include only searchTerm and activeTab to debounce typing changes
+  }, [searchTerm, activeTab]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -323,11 +352,15 @@ const JobManagementPage = () => {
 
   const filteredAndSortedBookings = useMemo(() => {
     // Backend now handles status filtering and createdAt sorting. Only apply search filter here.
-    return bookings.filter(
-      (booking) =>
-        booking.issueDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.location.address.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const term = searchTerm.toLowerCase();
+    return bookings.filter((booking) => {
+      const matchesIssue = booking.issueDescription.toLowerCase().includes(term);
+      const matchesLocation = booking.location.address.toLowerCase().includes(term);
+      const matchesBookingId = (booking as any).bookingId
+        ? String((booking as any).bookingId).toLowerCase().includes(term)
+        : false;
+      return matchesIssue || matchesLocation || matchesBookingId;
+    });
   }, [bookings, searchTerm]);
 
   const clearFilters = () => {
@@ -423,7 +456,7 @@ const JobManagementPage = () => {
           className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
         >
           <div className="max-w-7xl mx-auto mb-[50px]">
-            <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Job Management</h1>
+          <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Job Management</h1>
 
             {successMessage && (
               <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-md text-center">
@@ -441,7 +474,7 @@ const JobManagementPage = () => {
               <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
                 <input
                   type="text"
-                  placeholder="Search by issue or location..."
+                  placeholder="Search by issue, location, or booking ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

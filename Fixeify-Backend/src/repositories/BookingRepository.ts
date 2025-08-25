@@ -26,82 +26,182 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     return this.mapToBookingResponse(booking.toObject() as PopulatedBookingDocument);
   }
 
-  async fetchBookingDetails(userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> {
+  async fetchBookingDetails(
+    userId: string,
+    page: number = 1,
+    limit: number = 5,
+    search?: string,
+    status?: string,
+    sortBy: "latest" | "oldest" = "latest",
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }> {
     const skip = (page - 1) * limit;
-    const bookings = await this._model
-      .find({ userId, status: { $in: ["pending", "accepted"] } })
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
-        { path: "userId", select: "name email photo" },
-        { path: "proId", select: "firstName lastName profilePhoto" },
-        { path: "categoryId", select: "name image" },
-      ])
-      .skip(skip)
-      .limit(limit)
-      .lean()
-      .exec() as PopulatedLeanBooking[];
 
-    const total = await this._model.countDocuments({ userId, status: { $in: ["pending", "accepted"] } }).exec();
-    return { 
-      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)), 
-      total 
-    };
-  }
+    const query: any = { userId: new mongoose.Types.ObjectId(userId) };
 
-  async fetchBookingHistoryDetails(userId: string, page: number, limit: number): Promise<{ bookings: BookingResponse[]; total: number }> {
-    const skip = (page - 1) * limit;
-    const bookings = await this._model
-      .find({ userId, status: { $in: ["completed", "rejected", "cancelled"] } })
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
-        { path: "userId", select: "name email photo" },
-        { path: "proId", select: "firstName lastName profilePhoto" },
-        { path: "categoryId", select: "name image" },
-      ])
-      .skip(skip)
-      .limit(limit)
-      .lean()
-      .exec() as PopulatedLeanBooking[];
-
-    const total = await this._model.countDocuments({ userId, status: { $in: ["completed", "rejected", "cancelled"] } }).exec();
-    return { 
-      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)), 
-      total 
-    };
-  }
-
-  async fetchProBookings(proId: string, page: number = 1, limit: number = 5, status?: string, sortBy: "latest" | "oldest" = "latest"): Promise<{ bookings: BookingResponse[]; total: number }> {
-  const skip = (page - 1) * limit;
-  const query: any = { proId: new mongoose.Types.ObjectId(proId) };
-  if (status) {
-    const statusArray = status.split(",").map(s => s.trim());
-    if (statusArray.length > 1) {
-      query.status = { $in: statusArray };
+    if (status && status.trim().length > 0) {
+      const statusArray = status.split(",").map((s) => s.trim());
+      query.status = statusArray.length > 1 ? { $in: statusArray } : statusArray[0];
     } else {
-      query.status = statusArray[0]; 
+      query.status = { $in: ["pending", "accepted"] };
     }
+
+    const orClauses: any[] = [];
+    if (search && search.trim().length > 0) {
+      orClauses.push(
+        { issueDescription: { $regex: search, $options: "i" } },
+        { "location.address": { $regex: search, $options: "i" } },
+        { bookingId: { $regex: search, $options: "i" } }
+      );
+    }
+    if (bookingId && bookingId.trim().length > 0) {
+      const escaped = bookingId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      orClauses.push({ bookingId: { $regex: `${escaped}`, $options: "i" } });
+    }
+    if (orClauses.length > 0) {
+      query.$or = orClauses;
+    }
+
+    const sort: any = { createdAt: sortBy === "oldest" ? 1 : -1, _id: sortBy === "oldest" ? 1 : -1 };
+
+    const bookings = await this._model
+      .find(query)
+      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+        { path: "userId", select: "name email photo" },
+        { path: "proId", select: "firstName lastName profilePhoto" },
+        { path: "categoryId", select: "name image" },
+      ])
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .exec() as PopulatedLeanBooking[];
+
+    const total = await this._model.countDocuments(query).exec();
+    return {
+      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)),
+      total,
+    };
   }
-  const sort: any = {};
-  sort.createdAt = sortBy === "oldest" ? 1 : -1;
-  const bookings = await this._model
-    .find(query)
-    .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
-      { path: "userId", select: "name email photo" },
-      { path: "proId", select: "firstName lastName profilePhoto" },
-      { path: "categoryId", select: "name image" },
-    ])
-    .sort(sort)
-    .skip(skip)
-    .limit(limit)
-    .lean()
-    .exec() as PopulatedLeanBooking[];
 
-  const total = await this._model.countDocuments(query).exec();
-  return { 
-    bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)), 
-    total 
-  };
-}
+  async fetchBookingHistoryDetails(
+    userId: string,
+    page: number = 1,
+    limit: number = 5,
+    search?: string,
+    status?: string,
+    sortBy: "latest" | "oldest" = "latest",
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const skip = (page - 1) * limit;
+    const query: any = { userId: new mongoose.Types.ObjectId(userId) };
 
-async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, status?: string, sortBy: "latest" | "oldest" = "latest"): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const historyStatuses = ["completed", "rejected", "cancelled"];
+    if (status && status.trim().length > 0) {
+      const statusArray = status.split(",").map((s) => s.trim());
+      query.status = statusArray.length > 1 ? { $in: statusArray } : statusArray[0];
+    } else {
+      query.status = { $in: historyStatuses };
+    }
+
+    const orClauses: any[] = [];
+    if (search && search.trim().length > 0) {
+      orClauses.push(
+        { issueDescription: { $regex: search, $options: "i" } },
+        { "location.address": { $regex: search, $options: "i" } },
+        { bookingId: { $regex: search, $options: "i" } }
+      );
+    }
+    if (bookingId && bookingId.trim().length > 0) {
+      const escaped = bookingId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      orClauses.push({ bookingId: { $regex: `${escaped}`, $options: "i" } });
+    }
+    if (orClauses.length > 0) {
+      query.$or = orClauses;
+    }
+
+    const sort: any = { createdAt: sortBy === "oldest" ? 1 : -1, _id: sortBy === "oldest" ? 1 : -1 };
+
+    const bookings = await this._model
+      .find(query)
+      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+        { path: "userId", select: "name email photo" },
+        { path: "proId", select: "firstName lastName profilePhoto" },
+        { path: "categoryId", select: "name image" },
+      ])
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .exec() as PopulatedLeanBooking[];
+
+    const total = await this._model.countDocuments(query).exec();
+    return {
+      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)),
+      total,
+    };
+  }
+
+  async fetchProBookings(
+    proId: string,
+    page: number = 1,
+    limit: number = 5,
+    status?: string,
+    sortBy: "latest" | "oldest" = "latest",
+    search?: string,
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const skip = (page - 1) * limit;
+    const query: any = { proId: new mongoose.Types.ObjectId(proId) };
+    if (status) {
+      const statusArray = status.split(",").map(s => s.trim());
+      if (statusArray.length > 1) {
+        query.status = { $in: statusArray };
+      } else {
+        query.status = statusArray[0];
+      }
+    }
+
+    const orClauses: any[] = [];
+    if (search) {
+      orClauses.push(
+        { issueDescription: { $regex: search, $options: "i" } },
+        { "location.address": { $regex: search, $options: "i" } },
+        { bookingId: { $regex: search, $options: "i" } }
+      );
+    }
+    if (bookingId) {
+      const escaped = bookingId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      orClauses.push({ bookingId: { $regex: `${escaped}`, $options: "i" } });
+    }
+    if (orClauses.length > 0) {
+      query.$or = orClauses;
+    }
+
+    const sort: any = {};
+    sort.createdAt = sortBy === "oldest" ? 1 : -1;
+    (sort as any)._id = sortBy === "oldest" ? 1 : -1;
+    const bookings = await this._model
+      .find(query)
+      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+        { path: "userId", select: "name email photo" },
+        { path: "proId", select: "firstName lastName profilePhoto" },
+        { path: "categoryId", select: "name image" },
+      ])
+      .sort(sort)
+      .skip(skip)
+      .limit(limit)
+      .lean()
+      .exec() as PopulatedLeanBooking[];
+
+    const total = await this._model.countDocuments(query).exec();
+    return {
+      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)),
+      total
+    };
+  }
+
+async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, status?: string, sortBy: "latest" | "oldest" = "latest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
     const skip = (page - 1) * limit;
     
   
@@ -111,18 +211,29 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
       query.status = status;
     }
     
+    const orClauses: any[] = [];
     if (search) {
-      query.$or = [
+      orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
-        { "location.address": { $regex: search, $options: "i" } }
-      ];
+        { "location.address": { $regex: search, $options: "i" } },
+        { bookingId: { $regex: search, $options: "i" } }
+      );
+    }
+    if (bookingId) {
+      const escaped = bookingId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      orClauses.push({ bookingId: { $regex: `${escaped}`, $options: "i" } });
+    }
+    if (orClauses.length > 0) {
+      query.$or = orClauses;
     }
     
     const sort: any = {};
     if (sortBy === "latest") {
-      sort.createdAt = -1; 
+      sort.createdAt = -1;
+      (sort as any)._id = -1;
     } else if (sortBy === "oldest") {
-      sort.createdAt = 1; 
+      sort.createdAt = 1;
+      (sort as any)._id = 1; 
     }
     
     const bookings = await this._model
@@ -344,6 +455,37 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
       .exec();
 
     return result.length > 0 ? result[0] : null;
+  }
+
+  async getTopCategoriesByCompleted(limit: number): Promise<Array<{ categoryId: string; name: string; image?: string; bookingCount: number }>> {
+    const lim = Math.max(1, Math.min(limit || 2, 10));
+    const result = await this._model
+      .aggregate([
+        { $match: { status: "completed" } },
+        { $group: { _id: "$categoryId", bookingCount: { $sum: 1 } } },
+        { $sort: { bookingCount: -1 } },
+        { $limit: lim },
+        {
+          $lookup: {
+            from: "categories",
+            localField: "_id",
+            foreignField: "_id",
+            as: "category",
+          },
+        },
+        { $unwind: "$category" },
+        {
+          $project: {
+            categoryId: "$_id",
+            name: "$category.name",
+            image: "$category.image",
+            bookingCount: 1,
+            _id: 0,
+          },
+        },
+      ])
+      .exec();
+    return (result as Array<{ categoryId: string; name: string; image?: string; bookingCount: number }>);
   }
 
   private mapToBookingResponse(booking: PopulatedBookingDocument): BookingResponse {

@@ -22,7 +22,6 @@ const onRefreshed = (token: string) => {
 
 api.interceptors.request.use((config) => {
   const token = store.getState().auth.accessToken;
-  console.log("Request interceptor: Current token:", token);
   const hasAuthHeader = Boolean((config.headers as any)?.Authorization);
   if (token && config.url !== "/auth/refresh-token" && !hasAuthHeader) {
     config.headers = {
@@ -35,27 +34,24 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => {
-    console.log("Response interceptor: Successful response", response.status, response.config.url);
     return response;
   },
   async (error) => {
     const originalRequest = error.config || {};
-    console.log("Response interceptor: Error caught", {
-      status: error.response?.status,
-      data: error.response?.data,
-      url: originalRequest.url,
-    });
 
     const status: number | undefined = error.response?.status;
     const message: string | undefined = error.response?.data?.message || error.response?.data?.error;
     const isRefreshEndpoint = originalRequest.url === "/auth/refresh-token";
     const alreadyRetried = (originalRequest as any)._retry;
-    const isAccessTokenIssue = (status === 401 || status === 403) && !isRefreshEndpoint && !alreadyRetried;
     const looksLikeExpiredToken = message?.toLowerCase()?.includes("expired") || message?.toLowerCase()?.includes("invalid token");
+
+    const currentToken: string | undefined = store.getState().auth.accessToken as any;
+    const hadAuthHeader = Boolean((originalRequest.headers || {}).Authorization);
+    const isAuthRoute = typeof originalRequest.url === 'string' && originalRequest.url.startsWith('/auth/');
+    const isAccessTokenIssue = (status === 401 || status === 403) && !isRefreshEndpoint && !alreadyRetried && (hadAuthHeader || !!currentToken) && !isAuthRoute;
 
     if (isAccessTokenIssue && (status === 401 || looksLikeExpiredToken || status === 403)) {
       (originalRequest as any)._retry = true;
-      console.log(`${status} detected, attempting token refresh for:`, originalRequest.url);
 
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
@@ -77,7 +73,6 @@ api.interceptors.response.use(
       try {
         const result = await store.dispatch(refreshToken()).unwrap();
         const { accessToken } = result;
-        console.log("Token refresh successful, new token:", accessToken);
         store.dispatch(setAccessToken(accessToken));
         onRefreshed(accessToken);
         originalRequest.headers = {

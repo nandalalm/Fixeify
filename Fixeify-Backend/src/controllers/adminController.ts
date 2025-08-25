@@ -20,7 +20,8 @@ export class AdminController {
       const search = req.query.search as string;
       const status = req.query.status as string;
       const sortBy = (req.query.sortBy as "latest" | "oldest") || "latest";
-      const { bookings, total } = await this._adminService.getBookings(page, limit, search, status, sortBy);
+      const bookingId = req.query.bookingId as string | undefined;
+      const { bookings, total } = await this._adminService.getBookings(page, limit, search, status, sortBy, bookingId);
       res.status(HttpStatus.OK).json({ bookings, total });
     } catch (error) {
       next(error);

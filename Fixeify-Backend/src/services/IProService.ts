@@ -35,14 +35,28 @@ export interface IProService {
   getAvailability(proId: string): Promise<{ availability: IAvailability; isUnavailable: boolean }>;
   updateAvailability(proId: string, data: { availability: IAvailability; isUnavailable: boolean }): Promise<{ availability: IAvailability; isUnavailable: boolean }>;
   getAllCategories(): Promise<CategoryResponse[]>;
-  fetchProBookings(proId: string, page?: number, limit?: number, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }>;
+  fetchProBookings(
+    proId: string,
+    page?: number,
+    limit?: number,
+    status?: string,
+    sortBy?: "latest" | "oldest",
+    search?: string,
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }>;
   getBookingById(id: string): Promise<BookingResponse>;
   acceptBooking(bookingId: string): Promise<{ message: string }>;
   rejectBooking(bookingId: string, rejectedReason: string): Promise<{ message: string }>;
   generateQuota(bookingId: string, data: QuotaRequest): Promise<QuotaResponse>;
   fetchQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null>;
   getWallet(proId: string): Promise<WalletResponseDTO | null>;
-  getWalletWithPagination(proId: string, page: number, limit: number): Promise<{ wallet: WalletResponseDTO | null; total: number }>;
+  getWalletWithPagination(
+    proId: string,
+    page: number,
+    limit: number,
+    sortBy?: "latest" | "oldest" | "credit" | "debit",
+    search?: string
+  ): Promise<{ wallet: WalletResponseDTO | null; total: number }>;
   requestWithdrawal(
     proId: string,
     data: {
@@ -77,4 +91,5 @@ export interface IProService {
     totalWithdrawn: number;
   }>;
   getMonthlyRevenueSeries(proId: string, lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>>;
+  getPopularCategories(limit?: number): Promise<Array<{ id: string; name: string; image?: string; bookingCount: number }>>;
 }

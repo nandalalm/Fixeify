@@ -64,10 +64,12 @@ export const fetchProBookings = async (
   page: number = 1,
   limit: number = 5,
   status?: string,
-  sortBy?: "latest" | "oldest"
+  sortBy?: "latest" | "oldest",
+  search?: string,
+  bookingId?: string
 ): Promise<{ bookings: BookingResponse[]; total: number }> => {
   const response = await api.get(`${ProBase}/bookings/${proId}`, {
-    params: { page, limit, status, sortBy },
+    params: { page, limit, status, sortBy, search, bookingId },
     withCredentials: true,
   });
   return response.data;
@@ -98,9 +100,15 @@ export const findWalletByProId = async (proId: string): Promise<WalletResponse> 
   return response.data;
 };
 
-export const getWalletWithPagination = async (proId: string, page: number, limit: number): Promise<{ wallet: WalletResponse | null; total: number }> => {
+export const getWalletWithPagination = async (
+  proId: string,
+  page: number,
+  limit: number,
+  sortBy?: "latest" | "oldest" | "credit" | "debit",
+  search?: string
+): Promise<{ wallet: WalletResponse | null; total: number }> => {
   const response = await api.get(`${ProBase}/walletWithPagenation/${proId}`, {
-    params: { page, limit },
+    params: { page, limit, sortBy, search },
     withCredentials: true,
   });
   return response.data;
@@ -171,6 +179,15 @@ export const fetchProMonthlyRevenueSeries = async (
   const response = await api.get(`${ProBase}/monthly-revenue-series/${proId}`, {
     params: { lastNMonths },
     withCredentials: true,
+  });
+  return response.data;
+};
+
+export const fetchPopularCategories = async (
+  limit: number = 2
+): Promise<Array<{ id: string; name: string; image?: string; bookingCount: number }>> => {
+  const response = await api.get(`${ProBase}/popularCategories`, {
+    params: { limit },
   });
   return response.data;
 };

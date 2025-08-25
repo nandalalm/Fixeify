@@ -53,18 +53,20 @@ export class RatingReviewService implements IRatingReviewService {
   async getRatingReviewsByPro(
     proId: string,
     page: number = 1,
-    limit: number = 5
+    limit: number = 5,
+    sortBy?: "latest" | "oldest" | "lowest" | "highest",
+    search?: string
   ): Promise<{
     items: RatingReviewResponse[];
     total: number;
     page: number;
     limit: number;
   }> {
-    const { items, total } = await this._ratingReviewRepository.findByProId(proId,page,limit);
+    const { items, total } = await this._ratingReviewRepository.findByProId(proId, page, limit, sortBy, search);
 
     return {
       items: items.map((doc) => new RatingReviewResponse(doc as any)),
-      total,page,limit,
+      total, page, limit,
     };
   }
 
@@ -88,9 +90,10 @@ export class RatingReviewService implements IRatingReviewService {
   async getAllRatingReviews(
     page: number = 1,
     limit: number = 5,
-    sortBy?: "latest" | "oldest" | "lowest" | "highest"
+    sortBy?: "latest" | "oldest" | "lowest" | "highest",
+    search?: string
   ): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }> {
-    const { items, total } = await this._ratingReviewRepository.findAll(page, limit, sortBy);
+    const { items, total } = await this._ratingReviewRepository.findAll(page, limit, sortBy, search);
     return {
       items: items.map((doc) => new RatingReviewResponse(doc as any)),
       total,page,limit,

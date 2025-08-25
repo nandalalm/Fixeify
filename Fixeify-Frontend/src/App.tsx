@@ -13,18 +13,14 @@ function App() {
 
   useEffect(() => {
     const manuallySet = localStorage.getItem("isAuthenticatedManuallySet");
-    console.log("App mounted, manuallySet:", manuallySet, "Local storage:", localStorage);
 
     if (!manuallySet) {
-      console.log("No manual auth, clearing state...");
       dispatch(logoutUserSync());
       setIsLoading(false);
     } else {
-      console.log("Attempting refresh due to manual set...");
       dispatch(refreshToken())
         .unwrap()
         .then((result) => {
-          console.log("Refresh succeeded, setting isLoading to false");
           if (result.accessToken) {
             initializeSocket(result.accessToken);
           }

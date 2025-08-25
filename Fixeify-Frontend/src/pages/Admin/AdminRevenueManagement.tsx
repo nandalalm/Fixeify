@@ -42,7 +42,7 @@ const AdminRevenueManagement: FC = () => {
   const [withdrawals, setWithdrawals] = useState<IWithdrawalRequest[]>([]);
   const [pros, setPros] = useState<{ [key: string]: IApprovedPro }>({});
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<string>("latest");
+  const [sortBy, setSortBy] = useState<string>("oldest");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [selectedWithdrawal, setSelectedWithdrawal] = useState<IWithdrawalRequest | null>(null);
@@ -253,7 +253,7 @@ const AdminRevenueManagement: FC = () => {
 
   const handleResetFilters = () => {
     setSearchQuery("");
-    setSortBy("latest");
+    setSortBy("oldest");
     setCurrentPage(1);
   };
 
@@ -500,10 +500,10 @@ const AdminRevenueManagement: FC = () => {
                             <thead className="bg-gray-100">
                               <tr>
                                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Serial No.</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-3/12">Professional</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Payment Mode</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Status</th>
-                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Action</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-2/12">Professional</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-3/12">Payment Mode</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-3/12">Status</th>
+                                <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase w-1/12">Action</th>
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -786,13 +786,13 @@ const AdminRevenueManagement: FC = () => {
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-100">
                             <tr>
-                              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
-                              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Description</th>
-                              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Transaction ID</th>
-                              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Type</th>
-                              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Amount</th>
-                              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
-                              <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Action</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">S.No</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Description</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Transaction ID</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Type</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Amount</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Date</th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Action</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">

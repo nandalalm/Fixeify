@@ -72,12 +72,12 @@ const ProMessages = () => {
         isLargeScreen={isLargeScreen}
         sidebarOpen={sidebarOpen}
       />
-      <div className="flex flex-1 overflow-visible">
+      <div className="flex flex-1 overflow-hidden">
         <ProNavbar isOpen={sidebarOpen} />
         <main
-          className={`flex-1 overflow-y-auto p-6 transition-all duration-300`}
+          className={`flex-1 w-full overflow-y-auto p-2 sm:p-4 lg:p-6 transition-all duration-300`}
         >
-          <div className="max-w-7xl mx-auto h-full">
+          <div className="max-w-full lg:max-w-7xl mx-auto h-full">
             <MessagingApp role="pro" />
           </div>
         </main>

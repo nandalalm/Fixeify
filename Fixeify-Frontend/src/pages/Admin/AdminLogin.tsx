@@ -26,7 +26,6 @@ const AdminLogin = () => {
   const location = useLocation();
 
   useEffect(() => {
-    console.log("Current location:", location.pathname);
     dispatch({ type: "auth/clearError" });
     dispatch({ type: "auth/logoutUserSync" });
   }, [location, dispatch]);
@@ -45,17 +44,14 @@ const AdminLogin = () => {
 
     try {
       adminLoginSchema.parse(formData);
-      console.log("Attempting admin login with:", formData);
       const { accessToken, user } = await loginUser(formData.email, formData.password, "admin");
       const mappedUser = {
         ...user,
         role: user.role === "admin" ? UserRole.ADMIN : user.role === "user" ? UserRole.USER : UserRole.PRO,
       };
       dispatch(setAuth({ user: mappedUser, accessToken }));
-      console.log("Admin login successful, navigating to: /admin-dashboard");
       navigate("/admin-dashboard", { replace: true });
     } catch (error) {
-      console.log("Admin login error:", error);
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
         error.errors.forEach((err) => {
@@ -67,7 +63,6 @@ const AdminLogin = () => {
         if (err.response?.status || err.status) {
           const status = err.response?.status || err.status;
           const message = err.response?.data?.message || err.message || "Login failed";
-          console.log(`API Error - Status: ${status}, Message: ${message}`);
 
           switch (status) {
             case 400:
@@ -100,7 +95,6 @@ const AdminLogin = () => {
           setServerError("Unable to connect to the server. Please try again later.");
           dispatch({ type: "auth/logoutUserSync" });
         }
-        console.log("Error state set, serverError:", serverError);
       }
     }
   };

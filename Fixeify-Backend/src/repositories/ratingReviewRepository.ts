@@ -36,29 +36,86 @@ export class MongoRatingReviewRepository
   async findByProId(
     proId: string,
     page: number = 1,
-    limit: number = 5
+    limit: number = 5,
+    sortBy?: "latest" | "oldest" | "lowest" | "highest",
+    search?: string
   ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }> {
     const skip = (page - 1) * limit;
 
-    const [items, total] = await Promise.all([
-      RatingReview.find({ proId: new mongoose.Types.ObjectId(proId) })
-        .populate({ path: "userId", select: "name email phoneNo photo" })
-        .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
-        .populate({ path: "categoryId", select: "name image" })
-        .populate({ path: "bookingId", select: "issueDescription" })
-        
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      RatingReview.countDocuments({ proId: new mongoose.Types.ObjectId(proId) }),
+    let sort: Record<string, 1 | -1> = { createdAt: -1 };
+    if (sortBy === "oldest") sort = { createdAt: 1 };
+    else if (sortBy === "lowest") sort = { rating: 1, createdAt: -1 };
+    else if (sortBy === "highest") sort = { rating: -1, createdAt: -1 };
+
+    const matchStage: any = { proId: new mongoose.Types.ObjectId(proId) };
+
+    const pipeline: any[] = [
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "userId",
+        },
+      },
+      { $unwind: { path: "$userId", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "approvedpros",
+          localField: "proId",
+          foreignField: "_id",
+          as: "proId",
+        },
+      },
+      { $unwind: { path: "$proId", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "categoryId",
+        },
+      },
+      { $unwind: { path: "$categoryId", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "bookings",
+          localField: "bookingId",
+          foreignField: "_id",
+          as: "bookingId",
+        },
+      },
+      { $unwind: { path: "$bookingId", preserveNullAndEmptyArrays: true } },
+    ];
+
+    if (search && search.trim().length > 0) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(escaped, "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            { "userId.name": { $regex: regex } },
+            { "bookingId.issueDescription": { $regex: regex } },
+            { "categoryId.name": { $regex: regex } },
+          ],
+        },
+      });
+    }
+
+    // Total count with same match
+    const countPipeline = [...pipeline, { $count: "total" }];
+
+    pipeline.push({ $sort: sort }, { $skip: skip }, { $limit: limit });
+
+    const [itemsAgg, totalAgg] = await Promise.all([
+      RatingReview.aggregate(pipeline),
+      RatingReview.aggregate(countPipeline),
     ]);
 
-    return {
-      items,
-      total,
-      page,
-      limit,
-    };
+    const total = totalAgg[0]?.total || 0;
+
+    return { items: itemsAgg as unknown as IRatingReview[], total, page, limit };
   }
 
   async findByUserId(
@@ -85,7 +142,8 @@ export class MongoRatingReviewRepository
   async findAll(
     page: number = 1,
     limit: number = 5,
-    sortBy?: "latest" | "oldest" | "lowest" | "highest"
+    sortBy?: "latest" | "oldest" | "lowest" | "highest",
+    search?: string
   ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }> {
     const skip = (page - 1) * limit;
 
@@ -95,19 +153,72 @@ export class MongoRatingReviewRepository
     else if (sortBy === "lowest") sort = { rating: 1, createdAt: -1 };
     else if (sortBy === "highest") sort = { rating: -1, createdAt: -1 };
 
-    const [items, total] = await Promise.all([
-      RatingReview.find()
-        .populate({ path: "userId", select: "name email phoneNo photo" })
-        .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
-        .populate({ path: "categoryId", select: "name image" })
-        .populate({ path: "bookingId", select: "issueDescription" })
-        .sort(sort)
-        .skip(skip)
-        .limit(limit),
-      RatingReview.countDocuments(),
+    // Build aggregation with lookups to enable search on related fields
+    const pipeline: any[] = [
+      {
+        $lookup: {
+          from: "users",
+          localField: "userId",
+          foreignField: "_id",
+          as: "userId",
+        },
+      },
+      { $unwind: { path: "$userId", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "approvedpros",
+          localField: "proId",
+          foreignField: "_id",
+          as: "proId",
+        },
+      },
+      { $unwind: { path: "$proId", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "categories",
+          localField: "categoryId",
+          foreignField: "_id",
+          as: "categoryId",
+        },
+      },
+      { $unwind: { path: "$categoryId", preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: "bookings",
+          localField: "bookingId",
+          foreignField: "_id",
+          as: "bookingId",
+        },
+      },
+      { $unwind: { path: "$bookingId", preserveNullAndEmptyArrays: true } },
+    ];
+
+    if (search && search.trim().length > 0) {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(escaped, "i");
+      pipeline.push({
+        $match: {
+          $or: [
+            { "userId.name": { $regex: regex } },
+            { "proId.firstName": { $regex: regex } },
+            { "proId.lastName": { $regex: regex } },
+            { "categoryId.name": { $regex: regex } },
+          ],
+        },
+      });
+    }
+
+    const countPipeline = [...pipeline, { $count: "total" }];
+
+    pipeline.push({ $sort: sort }, { $skip: skip }, { $limit: limit });
+
+    const [itemsAgg, totalAgg] = await Promise.all([
+      RatingReview.aggregate(pipeline),
+      RatingReview.aggregate(countPipeline),
     ]);
 
-    return { items, total, page, limit };
+    const total = totalAgg[0]?.total || 0;
+    return { items: itemsAgg as unknown as IRatingReview[], total, page, limit };
   }
 
   async hasUserReviewedBookingOrQuota(

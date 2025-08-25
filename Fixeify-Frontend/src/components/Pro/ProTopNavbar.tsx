@@ -91,8 +91,11 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
   }, [user, accessToken, filter, dispatch, isNotificationPanelOpen]);
 
   const handleLogout = () => {
-    dispatch(logoutUser("pro")).then(() => {
-      navigate("/home");
+    // Navigate away from protected pro routes first to avoid ProPrivateRoute redirect to /login
+    navigate("/home", { replace: true });
+    // Then perform logout
+    dispatch(logoutUser("pro")).finally(() => {
+      // no-op; already navigated
     });
   };
 
@@ -119,7 +122,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
 
   return (
     <header className="sticky top-0 z-50 w-full bg-white dark:bg-gray-900 shadow-md transition-colors duration-300">
-      <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+      <div className="w-full px-3 md:px-4 lg:px-6 py-3 flex justify-between items-center">
         <div className="flex items-center gap-4">
           {!isLargeScreen && (
             <button
@@ -133,10 +136,18 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
               )}
             </button>
           )}
+          {/* Mobile logo */}
+          <img
+            src="/logo2.png"
+            alt="Fixeify Logo"
+            className="block md:hidden h-8 w-auto dark:filter dark:invert cursor-pointer"
+            onClick={() => navigate("/pro-dashboard")}
+          />
+          {/* Desktop/Tablet logo */}
           <img
             src="/logo.png"
             alt="Fixeify Logo"
-            className="h-8 w-auto md:h-8 dark:filter dark:invert cursor-pointer"
+            className="hidden md:block h-8 w-auto dark:filter dark:invert cursor-pointer"
             onClick={() => navigate("/pro-dashboard")}
           />
         </div>

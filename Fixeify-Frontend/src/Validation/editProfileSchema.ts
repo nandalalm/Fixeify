@@ -48,5 +48,5 @@ export const editProfileSchema = z.object({
   lastName: lastNameSchema,
   phoneNo: phoneNumberSchema,
   address: locationSchema.nullable(),
-  photo: z.string().nullable(),
+  photo: z.string().optional().nullable(),
 });

@@ -155,10 +155,10 @@ export default function MessagingApp({ role }: MessagingAppProps) {
   };
 
   return (
-   <div className={`h-[calc(100vh-5rem)] flex flex-col ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
+   <div className={`h-[calc(100vh-5rem)] flex flex-col overflow-x-hidden ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
       <div className="flex flex-1 overflow-hidden">
         <div
-          className={`w-full md:w-1/3 border-r ${
+          className={`w-full md:w-1/3 border-r min-w-0 ${
             theme === "dark" ? "border-gray-700" : "border-gray-200"
           } ${showMessageBox ? "hidden md:block" : "block"}`}
         >
@@ -167,7 +167,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
             selectedConversationId={selectedConversationId}
           />
         </div>
-        <div className={`flex-1 flex flex-col ${showMessageBox ? "flex" : "hidden md:flex"}`}>
+        <div className={`flex-1 flex flex-col min-w-0 ${showMessageBox ? "flex" : "hidden md:flex"}`}>
           {selectedConversationId ? (
             <MessageBox
               conversationId={selectedConversationId}
@@ -183,7 +183,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
             />
           ) : (
             <div
-              className={`flex-1 flex items-center justify-center ${
+              className={`flex-1 flex items-center justify-center min-w-0 ${
                 theme === "dark" ? "bg-gray-800" : "bg-gray-50"
               }`}
             >

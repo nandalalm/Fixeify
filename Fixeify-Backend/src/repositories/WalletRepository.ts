@@ -46,22 +46,83 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
     return this.mapToWalletResponse(wallet, transactions);
   }
 
-  async findWalletByProIdAndPagination(proId: string, page: number, limit: number, populateQuotas: boolean = true): Promise<{ wallet: WalletResponseDTO | null; total: number }> {
+  async findWalletByProIdAndPagination(
+    proId: string,
+    page: number,
+    limit: number,
+    sortBy?: "latest" | "oldest" | "credit" | "debit",
+    search?: string
+  ): Promise<{ wallet: WalletResponseDTO | null; total: number }> {
     if (!isValidObjectId(proId)) {
       console.error("Invalid proId format:", proId);
       return { wallet: null, total: 0 };
     }
-    const total = await this._model.countDocuments({ proId });
-    let query = this._model.findOne({ proId: proId }).skip((page - 1) * limit).limit(limit);
-    const wallet = await query.exec();
+
+    let wallet = await this._model.findOne({ proId: proId }).exec();
     if (!wallet) {
-      query = this._model.findOne({ proId: new Types.ObjectId(proId) }).skip((page - 1) * limit).limit(limit);
-      const walletByObjectId = await query.exec();
-      if (!walletByObjectId) return { wallet: null, total };
-      const transactions = await this.fetchTransactionsForPro(walletByObjectId.proId.toString());
-      return { wallet: this.mapToWalletResponse(walletByObjectId, transactions), total };
+      wallet = await this._model.findOne({ proId: new Types.ObjectId(proId) }).exec();
+      if (!wallet) return { wallet: null, total: 0 };
     }
-    const transactions = await this.fetchTransactionsForPro(wallet.proId.toString());
+
+    const txFilter: any = {
+      proId: new Types.ObjectId(wallet.proId),
+      $or: [{ adminId: { $exists: false } }, { adminId: null }],
+    };
+
+    if (sortBy === "credit" || sortBy === "debit") {
+      txFilter.type = sortBy;
+    }
+
+    if (search && search.trim().length > 0) {
+      const searchRegex = new RegExp(search.trim(), "i");
+      const amountNumber = Number(search.trim());
+      const amountFilter = isNaN(amountNumber) ? [] : [{ amount: amountNumber }];
+      txFilter.$and = [
+        {
+          $or: [
+            { transactionId: searchRegex },
+            { description: searchRegex },
+            ...amountFilter,
+          ],
+        },
+      ];
+    }
+
+    const sort: any = {};
+    if (sortBy === "oldest") sort.createdAt = 1;
+    else sort.createdAt = -1; 
+
+    const skip = (page - 1) * limit;
+
+    const [total, txDocs] = await Promise.all([
+      TransactionModel.countDocuments(txFilter),
+      TransactionModel.find(txFilter)
+        .populate("quotaId", "quotaId bookingId userId totalCost")
+        .populate("bookingId", "_id")
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+    ]);
+
+    const transactions = txDocs.map((t: any) => ({
+      _id: t._id.toString(),
+      transactionId: t.transactionId,
+      amount: t.amount,
+      type: t.type,
+      date: t.date,
+      description: t.description,
+      bookingId: t.bookingId ? (t.bookingId._id?.toString?.() || t.bookingId.toString()) : undefined,
+      quotaId: t.quotaId
+        ? {
+            id: t.quotaId._id?.toString() || t.quotaId.toString(),
+            bookingId: t.quotaId?.bookingId?.toString() || undefined,
+            userId: t.quotaId?.userId?.toString() || undefined,
+            totalCost: t.quotaId?.totalCost || undefined,
+          }
+        : undefined,
+    }));
+
     return { wallet: this.mapToWalletResponse(wallet, transactions), total };
   }
 

@@ -44,20 +44,31 @@ const Avatar: React.FC<{
       return;
     }
     let cancelled = false;
-    const img = new Image();
-    img.onload = () => {
-      if (!cancelled) {
-        setDisplayedSrc(src);
-        onSrcChange && onSrcChange(src);
+    let retried = false;
+    const tryLoad = (targetSrc: string) => {
+      const img = new Image();
+      img.onload = () => {
+        if (!cancelled) {
+          setDisplayedSrc(targetSrc);
+          onSrcChange && onSrcChange(targetSrc);
+        }
+      };
+      img.onerror = () => {
+        if (cancelled) return;
+        if (!retried) {
+          retried = true;
+          tryLoad(targetSrc);
+        } else {
+          setDisplayedSrc(placeholder);
+          onSrcChange && onSrcChange(placeholder);
+        }
+      };
+      img.src = targetSrc;
+      if (img.complete && img.naturalWidth > 0) {
+        img.onload?.(new Event('load'));
       }
     };
-    img.onerror = () => {
-      if (!cancelled) {
-        setDisplayedSrc(placeholder);
-        onSrcChange && onSrcChange(placeholder);
-      }
-    };
-    img.src = src;
+    tryLoad(src);
     return () => { cancelled = true; };
   }, [src, placeholder, onSrcChange]);
 
@@ -78,6 +89,8 @@ const Avatar: React.FC<{
       src={displayedSrc}
       alt={alt}
       className={className}
+      loading="lazy"
+      decoding="async"
       onError={() => {
         setDisplayedSrc(placeholder);
         onSrcChange && onSrcChange(placeholder);
@@ -117,6 +130,15 @@ const formatTo12h = (time?: string) => {
   return `${hour12}:${mm} ${period}`;
 };
 
+const formatDateDDMMYYYY = (d: Date | string | number) => {
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "-";
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
+
 const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
   const [booking, setBooking] = useState<BookingResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
@@ -124,11 +146,17 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
   const [error, setError] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [userDisplaySrc, setUserDisplaySrc] = useState<string>("/placeholder-user.jpg");
+  const [proDisplaySrc, setProDisplaySrc] = useState<string>("/images/avatar-pro.png");
 
   const userImageSrc = useMemo(() => {
     const src = review.user?.photo?.trim();
     return src ? src : "/placeholder-user.jpg";
   }, [review.user?.photo]);
+
+  const proImageSrc = useMemo(() => {
+    const src = review.pro?.profilePhoto?.trim();
+    return src ? src : "/images/avatar-pro.png";
+  }, [review.pro?.profilePhoto]);
 
   const bookingId: string | null = useMemo(() => {
     if (!review?.bookingId) return null;
@@ -200,6 +228,7 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
                   }}
                 >
                   <Avatar
+                    key={userImageSrc}
                     src={userImageSrc}
                     placeholder="/placeholder-user.jpg"
                     alt="User"
@@ -230,13 +259,15 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
                   type="button"
                   className="relative group shrink-0"
                   aria-label="View pro image"
-                  onClick={() => setImagePreview(review.pro?.profilePhoto || "/images/avatar-pro.png")}
+                  onClick={() => setImagePreview(proDisplaySrc)}
                 >
-                  <img
-                    src={review.pro?.profilePhoto || "/images/avatar-pro.png"}
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/images/avatar-pro.png"; }}
+                  <Avatar
+                    key={proImageSrc}
+                    src={proImageSrc}
+                    placeholder="/images/avatar-pro.png"
                     alt="Pro"
                     className="w-10 h-10 rounded-full object-cover border transition filter group-hover:blur-[1px]"
+                    onSrcChange={setProDisplaySrc}
                   />
                   <span className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
                     <Eye className="w-4 h-4 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]" />
@@ -265,7 +296,7 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
               </span>
             </div>
             {review.review && <LabelValue label="Review Text" value={review.review} />}
-            <LabelValue label="Created" value={new Date(review.createdAt).toLocaleString()} />
+            <LabelValue label="Created" value={formatDateDDMMYYYY(review.createdAt)} />
           </Section>
 
           {/* Booking */}
@@ -274,7 +305,7 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
               <>
                 <LabelValue label="Booking ID" value={booking?.bookingId || bookingId || "-"} />
                 <LabelValue label="Issue Description" value={booking.issueDescription} />
-                <LabelValue label="Preferred Date" value={new Date(booking.preferredDate).toLocaleDateString()} />
+                <LabelValue label="Preferred Date" value={formatDateDDMMYYYY(booking.preferredDate)} />
                 <LabelValue
                   label="Preferred Time"
                   value={booking.preferredTime && booking.preferredTime.length > 0

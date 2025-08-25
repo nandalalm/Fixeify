@@ -52,7 +52,6 @@ export const initializeSocket = (accessToken: string): Socket => {
   });
 
   socket.on('connect', () => {
-    console.log('Socket connected successfully:', socket?.id);
     reconnectAttempts = 0;
   });
 
@@ -74,15 +73,11 @@ export const initializeSocket = (accessToken: string): Socket => {
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('Socket disconnected:', reason);
     if (reason === 'io server disconnect') {
       socket?.connect();
     }
   });
 
-  socket.on('reconnect', (attemptNumber) => {
-    console.log('Socket reconnected after', attemptNumber, 'attempts');
-  });
 
   socket.on('reconnect_error', (error) => {
     console.error('Socket reconnection error:', error);

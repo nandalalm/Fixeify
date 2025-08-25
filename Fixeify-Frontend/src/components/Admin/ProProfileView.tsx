@@ -107,16 +107,13 @@ const ProProfileView: FC = () => {
         }
         const isFromPending = location.state?.fromPending || false;
         if (isFromPending) {
-          console.log("Fetching pending pro for ID:", id);
           const pendingProData = await fetchPendingProById(id);
           setPro(pendingProData);
         } else {
           try {
-            console.log("Fetching approved pro for ID:", id);
             const approvedProData = await fetchApprovedProById(id);
             setPro(approvedProData);
           } catch (approvedError) {
-            console.log("Approved pro not found, fetching pending pro for ID:", id);
             const pendingProData = await fetchPendingProById(id);
             setPro(pendingProData);
           }
@@ -173,24 +170,18 @@ const ProProfileView: FC = () => {
     setIsProcessing(true);
     try {
       if (action === "approve" && pro && "createdAt" in pro) {
-        console.log("Calling approvePro for ID:", pro._id);
         await approvePro(pro._id, { about: null });
-        console.log("approvePro completed, closing modal");
         setShowConfirmModal(false);
         setAction(null);
         navigate("/admin/pro-management", { state: { tab: "approved", fromNavigation: true } });
       } else if (action === "reject" && pro && "createdAt" in pro && reason) {
-        console.log("Calling rejectPro for ID:", pro._id, "with reason:", reason);
         await rejectPro(pro._id, { reason });
-        console.log("rejectPro completed, closing modal");
         setShowConfirmModal(false);
         setAction(null);
         navigate("/admin/pro-management", { state: { tab: "pending", fromNavigation: true } });
       } else if ((action === "ban" || action === "unban") && pro && !("createdAt" in pro)) {
-        console.log("Calling toggleBanPro for ID:", pro._id, "ban:", action === "ban");
         await toggleBanPro(pro._id, action === "ban");
         setPro((prev) => (prev ? { ...prev, isBanned: action === "ban" } : null));
-        console.log("toggleBanPro completed, closing modal");
         setShowConfirmModal(false);
         setAction(null);
       }
@@ -199,14 +190,12 @@ const ProProfileView: FC = () => {
       setError(`Failed to ${action} pro. Please try again.`);
     } finally {
       setIsProcessing(false);
-      console.log("Resetting modal state");
       setReason("");
       setCustomReason("");
     }
   };
 
   const handleCancel = () => {
-    console.log("Cancel modal, resetting state");
     setShowConfirmModal(false);
     setAction(null);
     setReason("");

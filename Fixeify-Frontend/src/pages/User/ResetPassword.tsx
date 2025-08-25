@@ -49,7 +49,6 @@ const ResetPassword = () => {
         if (err.response?.status || err.status) {
           const status = err.response?.status || err.status;
           const message = err.response?.data?.message || err.message || "Password reset failed";
-          console.log(`API Error - Status: ${status}, Message: ${message}`);
 
           switch (status) {
             case 400:

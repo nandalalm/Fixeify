@@ -60,6 +60,15 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
     return `${hour12}:${mm} ${period}`;
   };
 
+  const formatDateDDMMYYYY = (d: Date | string | number) => {
+    const date = new Date(d);
+    if (isNaN(date.getTime())) return "-";
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  };
+
   const OutlineBadge: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = "" }) => (
     <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded border ${className}`}>{children}</span>
   );
@@ -202,7 +211,7 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
         <Section title="Booking Details">
           <LabelValue label="Booking ID" value={booking?.bookingId || ticket.bookingId} />
           <LabelValue label="Issue Description" value={booking?.issueDescription} />
-          <LabelValue label="Preferred Date" value={booking ? new Date(booking.preferredDate).toLocaleDateString() : "-"} />
+          <LabelValue label="Preferred Date" value={booking ? formatDateDDMMYYYY(booking.preferredDate) : "-"} />
           <LabelValue
             label="Preferred Time"
             value={booking?.preferredTime && booking.preferredTime.length > 0

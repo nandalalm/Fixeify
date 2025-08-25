@@ -67,18 +67,42 @@ export const createBooking = async (
   return response.data;
 };
 
-export const fetchBookingDetails = async (userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> => {
+export const fetchBookingDetails = async (
+  userId: string,
+  page: number = 1,
+  limit: number = 5,
+  search?: string,
+  status?: string,
+  sortBy: "latest" | "oldest" = "latest",
+  bookingId?: string
+): Promise<{ bookings: BookingResponse[]; total: number }> => {
+  const params: any = { page, limit, sortBy };
+  if (search && search.trim().length > 0) params.search = search;
+  if (status && status.trim().length > 0) params.status = status;
+  if (bookingId && bookingId.trim().length > 0) params.bookingId = bookingId;
   const response = await api.get(`${UserBase}/bookings/${userId}`, {
     withCredentials: true,
-    params: { page, limit },
+    params,
   });
-  return response.data; 
+  return response.data;
 };
 
-export const fetchBookingHistoryDetails = async (userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> => {
+export const fetchBookingHistoryDetails = async (
+  userId: string,
+  page: number = 1,
+  limit: number = 5,
+  search?: string,
+  status?: string,
+  sortBy: "latest" | "oldest" = "latest",
+  bookingId?: string
+): Promise<{ bookings: BookingResponse[]; total: number }> => {
+  const params: any = { page, limit, sortBy };
+  if (search && search.trim().length > 0) params.search = search;
+  if (status && status.trim().length > 0) params.status = status;
+  if (bookingId && bookingId.trim().length > 0) params.bookingId = bookingId;
   const response = await api.get(`${UserBase}/bookings/history/${userId}`, {
     withCredentials: true,
-    params: { page, limit },
+    params,
   });
   return response.data; 
 };

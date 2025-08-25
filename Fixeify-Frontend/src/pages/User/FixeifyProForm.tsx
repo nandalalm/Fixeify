@@ -219,13 +219,15 @@ const FixeifyProForm = () => {
     if (name === "location") {
       setFormData((prev) => ({ ...prev, location: null }));
       if (!value.trim()) {
-        setErrors((prev) => ({ ...prev, location: "Please provide your location." }));
-      } else {
+        // Clear any existing location errors when field is empty
         setErrors((prev) => {
           const newErrors = { ...prev };
           delete newErrors.location;
           return newErrors;
         });
+      } else {
+        // Show error only when user types but doesn't select from suggestions
+        setErrors((prev) => ({ ...prev, location: "Please select a location from the suggestions or use current location" }));
       }
     }
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -500,12 +502,17 @@ const FixeifyProForm = () => {
           return aStart - bStart;
         }
       );
+      const updatedAvailability = {
+        ...prev.availability,
+        [day]: updatedSlots,
+      };
+      
+      // Validate with the updated availability data
+      setTimeout(() => validateField("availability", updatedAvailability), 0);
+      
       return {
         ...prev,
-        availability: {
-          ...prev.availability,
-          [day]: updatedSlots,
-        },
+        availability: updatedAvailability,
       };
     });
 
@@ -518,7 +525,6 @@ const FixeifyProForm = () => {
       delete newErrors[`${day}_timeSlot`];
       return newErrors;
     });
-    validateField("availability", formData.availability);
   };
 
   const removeTimeSlot = (day: keyof Availability, index: number) => {
@@ -529,9 +535,12 @@ const FixeifyProForm = () => {
         [day]: updatedSlots.length > 0 ? updatedSlots : undefined,
       };
       if (!updatedAvailability[day]?.length) delete updatedAvailability[day];
+      
+      // Validate with the updated availability data
+      setTimeout(() => validateField("availability", updatedAvailability), 0);
+      
       return { ...prev, availability: updatedAvailability };
     });
-    validateField("availability", formData.availability);
   };
 
   const handleCategoryChange = (categoryId: string) => {
@@ -560,6 +569,13 @@ const FixeifyProForm = () => {
             fieldSchema.parse(formData.idProofUrls);
           } else {
             throw new z.ZodError([{ code: "custom", message: "At least one ID proof image is required", path: [] }]);
+          }
+        } else if (name === "location") {
+          // Validate location object
+          if (value === null || value === undefined) {
+            throw new z.ZodError([{ code: "custom", message: "Please provide your location", path: [] }]);
+          } else {
+            fieldSchema.parse(value);
           }
         } else {
           fieldSchema.parse(value);
@@ -594,7 +610,18 @@ const FixeifyProForm = () => {
       }
       try {
         const fieldSchema = fixeifyProFormSchema.shape[field as keyof typeof fixeifyProFormSchema.shape];
-        if (fieldSchema) fieldSchema.parse(value);
+        if (fieldSchema) {
+          if (field === "location") {
+            // Use custom location validation logic
+            if (value === null || value === undefined || value === "") {
+              throw new z.ZodError([{ code: "custom", message: "Please select a valid location", path: [] }]);
+            } else {
+              fieldSchema.parse(value);
+            }
+          } else {
+            fieldSchema.parse(value);
+          }
+        }
       } catch (error) {
         if (error instanceof z.ZodError) {
           setErrors((prev) => ({ ...prev, [field]: error.errors[0].message }));
@@ -644,7 +671,7 @@ const FixeifyProForm = () => {
         bankName: formData.bankName,
         availability: formData.availability,
       });
-      console.log("Application submitted:", response.data);
+      console.log("Application submitted:", response.status);
       navigate("/success");
     } catch (error) {
       console.error("Submission error:", error);

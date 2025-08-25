@@ -117,7 +117,6 @@ const server = new Server(app);
 const accessLogStream = fs.createWriteStream(path.join(logDir, "access.log"), { flags: "a" });
 app.use(morgan("combined", { stream: accessLogStream }));
 
-console.log(process.env.FRONTEND_URL);
 if (!process.env.FRONTEND_URL) {
   throw new Error("No Frontend URL");
 }

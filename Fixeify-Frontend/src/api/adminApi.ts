@@ -115,10 +115,11 @@ export const fetchAdminBookings = async (
   limit: number = 5,
   search?: string,
   status?: string,
-  sortBy?: "latest" | "oldest"
+  sortBy?: "latest" | "oldest",
+  bookingId?: string
 ): Promise<{ bookings: BookingResponse[]; total: number }> => {
   const response = await api.get(`${AdminBase}/fetchBookings`, {
-    params: { page, limit, search, status, sortBy },
+    params: { page, limit, search, status, sortBy, bookingId },
     withCredentials: true,
   });
   return response.data;

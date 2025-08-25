@@ -7,7 +7,7 @@ import { UserRole, User } from "../../store/authSlice";
 import { ProNavbar } from "../../components/Pro/ProNavbar";
 import ProTopNavbar from "../../components/Pro/ProTopNavbar";
 import { Send } from "lucide-react";
-import { findWalletByProId, getWalletWithPagination, requestWithdrawal, fetchProWithdrawalRequests } from "../../api/proApi";
+import { getWalletWithPagination, requestWithdrawal, fetchProWithdrawalRequests } from "../../api/proApi";
 import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
 import { WithdrawalFormData, IWithdrawalRequest } from "../../interfaces/withdrawalRequestInterface";
 import { ChevronLeft, ChevronRight, RotateCcw } from "lucide-react";
@@ -15,6 +15,15 @@ import { type WalletResponse, type ITransaction } from "../../interfaces/walletI
 import TransactionDetails from "@/components/Reuseable/TransactionDetails";
 import WithdrawalRequestDetails from "@/components/Reuseable/WithdrawalRequestDetails";
 import { SkeletonLine } from "@/components/Reuseable/Skeleton";
+
+const formatDateDDMMYYYY = (d: Date | string | number) => {
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "-";
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
 
 const ProWalletManagement = () => {
   const user = useSelector((state: RootState) => state.auth.user) as User | null;
@@ -60,13 +69,24 @@ const ProWalletManagement = () => {
   const [withdrawalsTotalPages, setWithdrawalsTotalPages] = useState<number>(1);
   const [withdrawalsSearch, setWithdrawalsSearch] = useState<string>("");
   const [withdrawalsSortBy, setWithdrawalsSortBy] = useState<string>("latest"); // latest, oldest, pending, approved, rejected
+  // Transactions filter (single select like Admin: latest, oldest, credit, debit)
+  const [txnSortBy, setTxnSortBy] = useState<"latest" | "oldest" | "credit" | "debit">("latest");
+  const [txnSearch, setTxnSearch] = useState<string>("");
+  const [debouncedTxnSearch, setDebouncedTxnSearch] = useState<string>("");
 
   // Helpers to refresh wallet transactions and withdrawals, returning fresh data
   const refreshWallet = async (opts?: { silent?: boolean }): Promise<WalletResponse | null> => {
     if (!user || !accessToken || user.role !== UserRole.PRO) return null;
     if (!opts?.silent) setLoading(true);
     try {
-      const { wallet: walletData, total } = await getWalletWithPagination(user.id, currentPage, itemsPerPage);
+      const searchParam = debouncedTxnSearch.trim() || undefined;
+      const { wallet: walletData, total } = await getWalletWithPagination(
+        user.id,
+        currentPage,
+        itemsPerPage,
+        txnSortBy,
+        searchParam
+      );
       setWallet(walletData || { id: "", proId: user.id, balance: 0, transactions: [], createdAt: new Date(), updatedAt: new Date() });
       setTotalPages(Math.ceil(total / itemsPerPage));
       return walletData || null;
@@ -113,6 +133,7 @@ const ProWalletManagement = () => {
   };
 
   useEffect(() => {
+    // Show skeleton on first load to avoid flashing empty state
     refreshWallet();
 
     const handleResize = () => {
@@ -131,14 +152,21 @@ const ProWalletManagement = () => {
   }, [isLargeScreen]);
 
   useEffect(() => {
-    refreshWallet();
+    // Silent refresh to avoid unmounting input causing focus loss
+    refreshWallet({ silent: true });
 
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize); // Cleanup
-  }, [user, accessToken, dispatch, navigate, currentPage, itemsPerPage]);
+  }, [user, accessToken, dispatch, navigate, currentPage, itemsPerPage, txnSortBy, debouncedTxnSearch]);
+
+  // Debounce search input for transactions
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedTxnSearch(txnSearch), 400);
+    return () => clearTimeout(t);
+  }, [txnSearch]);
 
   // Load pro withdrawal requests when the withdrawals tab becomes active or pagination/filter changes
   useEffect(() => {
@@ -247,7 +275,6 @@ const ProWalletManagement = () => {
   const handleWithdrawalRequest = async () => {
     if (!user) return;
     setActionLoading(true);
-    console.log("Requesting withdrawal for proId:", user.id); // Log proId for debugging
     try {
       const amountNum = typeof withdrawalForm.amount === "string" ? parseFloat(withdrawalForm.amount) : withdrawalForm.amount;
       if (isNaN(amountNum)) {
@@ -264,17 +291,13 @@ const ProWalletManagement = () => {
         }),
         ...(withdrawalForm.paymentMode === "upi" && { upiCode: withdrawalForm.upiCode }),
       };
-      console.log("Withdrawal data sent:", withdrawalData); // Log sent data
       await requestWithdrawal(user.id, withdrawalData);
       setSuccessMessage("Withdrawal request sent successfully");
       setIsConfirmationModalOpen(false);
       setTimeout(() => setSuccessMessage(null), 1000);
-      const walletData = await findWalletByProId(user.id);
-      setWallet(walletData);
-      console.log("Withdrawal successful, updated wallet:", walletData);
-      // Reset to first page after update
       setCurrentPage(1);
-      // Refresh withdrawals table to include the newly created request
+      setWithdrawalsPage(1);
+      await refreshWallet({ silent: true });
       await refreshProWithdrawals({ silent: true });
     } catch (err: any) {
       console.error("Withdrawal request error:", err.response?.data);
@@ -407,6 +430,30 @@ const ProWalletManagement = () => {
                   </div>
                   {activeTab === 'transactions' && wallet.transactions.length > 0 ? (
                     <>
+                      {/* Transactions toolbar: Match Admin Booking Management layout */}
+                      <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                        <div className="relative w-full sm:w-5/6">
+                          <input
+                            type="text"
+                            placeholder="Search by transaction ID, description, or amount..."
+                            value={txnSearch}
+                            onChange={(e) => { setTxnSearch(e.target.value); setCurrentPage(1); }}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="relative w-full sm:w-1/6">
+                          <select
+                            value={txnSortBy}
+                            onChange={(e) => { setTxnSortBy(e.target.value as any); setCurrentPage(1); }}
+                            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                          >
+                            <option value="latest">Sort by Latest</option>
+                            <option value="oldest">Sort by Oldest</option>
+                            <option value="credit">Sort by Credit</option>
+                            <option value="debit">Sort by Debit</option>
+                          </select>
+                        </div>
+                      </div>
                       {/* If a transaction is selected, show inline details instead of list/table */}
                       {selectedTransaction ? (
                         <div className="mt-2">
@@ -463,7 +510,7 @@ const ProWalletManagement = () => {
                                     <p className="text-sm text-gray-700">
                                       <strong>Amount:</strong> {transaction.type === "credit" ? "+" : "-"}₹{transaction.amount.toFixed(2)}
                                     </p>
-                                    <p className="text-sm text-gray-700"><strong>Date:</strong> {new Date(transaction.date).toLocaleDateString()}</p>
+                                    <p className="text-sm text-gray-700"><strong>Date:</strong> {formatDateDDMMYYYY(transaction.date)}</p>
                                     <div className="mt-2">
                                       <button
                                         onClick={async () => {
@@ -528,13 +575,13 @@ const ProWalletManagement = () => {
                                 <table className="min-w-full divide-y divide-gray-200">
                                   <thead className="bg-gray-100">
                                     <tr>
-                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
-                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-3/12">Description</th>
-                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Transaction ID</th>
-                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">Type</th>
-                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">Amount</th>
-                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
-                                      <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Action</th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">S.No</th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Description</th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Transaction ID</th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Type</th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Amount</th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Date</th>
+                                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Action</th>
                                     </tr>
                                   </thead>
                                   <tbody className="bg-white divide-y divide-gray-200">
@@ -556,7 +603,7 @@ const ProWalletManagement = () => {
                                           {transaction.type === "credit" ? "+" : "-"}₹{transaction.amount.toFixed(2)}
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-700 border-b">
-                                          {new Date(transaction.date).toLocaleDateString()}
+                                          {formatDateDDMMYYYY(transaction.date)}
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                           <button
@@ -605,7 +652,23 @@ const ProWalletManagement = () => {
                       )}
                     </>
                   ) : activeTab === 'transactions' ? (
-                    <p className="text-gray-500 text-center">No transactions yet.</p>
+                    <>
+                      {txnSearch.trim() || txnSortBy !== 'latest' ? (
+                        <div className="text-center text-gray-600 space-y-2">
+                          <p>No results found for your search or sort criteria.</p>
+                          <button
+                            onClick={() => { setTxnSearch(""); setTxnSortBy('latest'); setCurrentPage(1); }}
+                            className="text-blue-600 flex items-center justify-center mx-auto"
+                            aria-label="Clear search and sort filters"
+                          >
+                            <RotateCcw className="mr-2 h-5 w-5 text-blue-600" />
+                            Clear filter
+                          </button>
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 text-center">No transactions yet.</p>
+                      )}
+                    </>
                   ) : (
                     <div className="overflow-x-auto">
                       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
@@ -736,7 +799,7 @@ const ProWalletManagement = () => {
                                     <p className="text-sm text-gray-700"><strong>S.No:</strong> {index + 1 + (withdrawalsPage - 1) * itemsPerPage}</p>
                                     <p className="text-sm text-gray-700"><strong>Payment Mode:</strong> {wr.paymentMode === 'bank' ? 'Bank' : 'UPI'}</p>
                                     <p className="text-sm text-gray-700"><strong>Amount:</strong> ₹{wr.amount.toFixed(2)}</p>
-                                    <p className="text-sm text-gray-700"><strong>Date:</strong> {new Date(wr.createdAt).toLocaleDateString()}</p>
+                                    <p className="text-sm text-gray-700"><strong>Date:</strong> {formatDateDDMMYYYY(wr.createdAt)}</p>
                                     <p className="text-sm text-gray-700"><strong>Status:</strong> {renderStatusBadge(wr.status)}</p>
                                     <div className="mt-2">
                                       <button onClick={async () => {
@@ -771,12 +834,12 @@ const ProWalletManagement = () => {
                                   <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-100">
                                       <tr>
-                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">S.No</th>
-                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Payment Mode</th>
-                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Amount</th>
-                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Date</th>
-                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-2/12">Status</th>
-                                        <th className="py-3 px-4 text-left text-sm font-semibold text-gray-900 border-b w-1/12">Action</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">S.No</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Payment Mode</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Amount</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Date</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Status</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">Action</th>
                                       </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
@@ -785,7 +848,7 @@ const ProWalletManagement = () => {
                                           <td className="py-3 px-4 text-sm text-gray-900 border-b">{index + 1 + (withdrawalsPage - 1) * itemsPerPage}</td>
                                           <td className="py-3 px-4 text-sm text-gray-700 border-b">{wr.paymentMode === 'bank' ? 'Bank' : 'UPI'}</td>
                                           <td className="py-3 px-4 text-sm text-gray-700 border-b">₹{wr.amount.toFixed(2)}</td>
-                                          <td className="py-3 px-4 text-sm text-gray-700 border-b">{new Date(wr.createdAt).toLocaleDateString()}</td>
+                                          <td className="py-3 px-4 text-sm text-gray-700 border-b">{formatDateDDMMYYYY(wr.createdAt)}</td>
                                           <td className="py-3 px-4 text-sm text-gray-700 border-b">{renderStatusBadge(wr.status)}</td>
                                               <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                             <button onClick={async () => {

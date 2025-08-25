@@ -329,17 +329,6 @@ export class AuthService implements IAuthService {
     }
 
     const newAccessToken = generateAccessToken(user.id, userRole);
-    const newRefreshToken = generateRefreshToken(user.id, userRole);
-
-    await this._redisConnector.getClient().setEx(`refresh:${user.id}`, 7 * 24 * 60 * 60, newRefreshToken);
-
-    res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
     return newAccessToken;
   }
 

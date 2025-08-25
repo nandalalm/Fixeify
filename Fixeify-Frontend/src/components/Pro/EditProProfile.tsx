@@ -110,18 +110,17 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
 
             const locationData: LocationData = {
               address,
-              city,
-              state,
+              city: city || "",
+              state: state || "",
               coordinates: { type: "Point", coordinates: [lng, lat] },
             };
 
             if (!city || !state) {
               setErrors((prev) => ({
                 ...prev,
-                location: "Please include both city and state in your location.",
+                location: "Please provide a location with city and state.",
               }));
               setFormData((prev) => ({ ...prev, location: prev.location }));
-              validateField("location", locationData);
               return;
             }
 
@@ -138,7 +137,6 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
               location: "Please provide a valid location with city and state.",
             }));
             setFormData((prev) => ({ ...prev, location: prev.location }));
-            validateField("location", formData.location);
           }
         });
       }
@@ -193,7 +191,6 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
                     ...prev,
                     location: "Unable to fetch location coordinates.",
                   }));
-                  validateField("location", formData.location);
                   return;
                 }
 
@@ -206,18 +203,17 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
 
                 const locationData: LocationData = {
                   address,
-                  city,
-                  state,
+                  city: city || "",
+                  state: state || "",
                   coordinates: { type: "Point", coordinates: [longitude, latitude] },
                 };
 
                 if (!city || !state) {
                   setErrors((prev) => ({
                     ...prev,
-                    location: "Please include both city and state in your location.",
+                    location: "Please provide a location with city and state.",
                   }));
                   setFormData((prev) => ({ ...prev, location: prev.location }));
-                  validateField("location", formData.location);
                   return;
                 }
 
@@ -234,7 +230,6 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
                   ...prev,
                   location: "Unable to fetch current location details.",
                 }));
-                validateField("location", formData.location);
               }
             }
           );
@@ -254,7 +249,6 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
               break;
           }
           setErrors((prev) => ({ ...prev, location: errorMessage }));
-          validateField("location", formData.location);
         }
       );
     } else {
@@ -263,7 +257,6 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
         ...prev,
         location: "Geolocation is not supported by this browser.",
       }));
-      validateField("location", formData.location);
     }
   };
 
@@ -359,17 +352,18 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
     if (name === "location") {
       setFormData((prev) => ({ ...prev, location: prev.location }));
       if (!value.trim()) {
-        setErrors((prev) => ({
-          ...prev,
-          location: "Please provide your location.",
-        }));
-        validateField("location", formData.location);
-      } else {
+        // Clear any existing location errors when field is empty
         setErrors((prev) => {
           const newErrors = { ...prev };
           delete newErrors.location;
           return newErrors;
         });
+      } else {
+        // Show error only when user types but doesn't select from suggestions
+        setErrors((prev) => ({
+          ...prev,
+          location: "Please select a location from the suggestions or use current location",
+        }));
       }
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -384,6 +378,16 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
       delete newErrors.general;
       return newErrors;
     });
+
+    // Check if there are any existing validation errors
+    const hasErrors = Object.keys(errors).some(key => key !== 'general' && errors[key]);
+    if (hasErrors) {
+      setErrors((prev) => ({
+        ...prev,
+        general: "Please fix all validation errors before submitting",
+      }));
+      return;
+    }
 
     try {
       const validatedData = editProProfileSchema.parse({

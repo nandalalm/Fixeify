@@ -6,7 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ClipLoader } from "react-spinners";
 import { z } from "zod";
 import { registerSchema, baseRegisterSchema } from "../../Validation/validationSchemas";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import { EyeIcon, EyeSlashIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -370,6 +370,16 @@ const Register = () => {
                 Login Now
               </Link>
             </p>
+            <div className="mt-2 flex justify-center">
+              <Link
+                to="/home"
+                className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-[#032B44] transition-colors dark:text-gray-300 dark:hover:text-white"
+                aria-label="Back Home"
+              >
+                <ArrowLeftIcon className="h-4 w-4" />
+                Back Home
+              </Link>
+            </div>
           </div>
         </div>
       </div>

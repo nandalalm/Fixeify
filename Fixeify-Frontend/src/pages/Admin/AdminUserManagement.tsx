@@ -295,12 +295,12 @@ const UserManagement: FC = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Serial No.</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Serial No.</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Image</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Email</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -317,15 +317,15 @@ const UserManagement: FC = () => {
                             ))
                           : displayedUsers.map((user, index) => (
                               <tr key={user.id} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                <td className="py-3 px-4 text-sm text-gray-900 border-b">
                                   {(currentPage - 1) * limit + index + 1}
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                   <Avatar src={user.photo} alt={user.name} className="h-10 w-10 rounded-full object-cover" />
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{user.email}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
+                                <td className="py-3 px-4 text-sm text-gray-700 border-b">{user.name}</td>
+                                <td className="py-3 px-4 text-sm text-gray-700 border-b">{user.email}</td>
+                                <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                   <span
                                     className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                       user.isBanned ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
@@ -334,7 +334,7 @@ const UserManagement: FC = () => {
                                     {user.isBanned ? "Banned" : "Active"}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                   <button
                                     onClick={() => openDetailsModal(user)}
                                     className="bg-[#032B44] text-white px-4 py-1 rounded-md text-sm hover:bg-[#054869] transition-colors"

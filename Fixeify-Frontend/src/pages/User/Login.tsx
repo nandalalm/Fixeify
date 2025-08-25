@@ -6,7 +6,7 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { z } from "zod";
 import { loginSchema } from "../../Validation/validationSchemas";
-import { EyeIcon, EyeSlashIcon } from "@heroicons/react/24/outline";
+import { EyeIcon, EyeSlashIcon, ArrowLeftIcon } from "@heroicons/react/24/outline";
 import ForgotPassword from "../../components/User/ForgotPassword";
 import { GoogleLogin } from '@react-oauth/google';
 
@@ -22,7 +22,6 @@ const LoginPage = () => {
   const location = useLocation();
 
   useEffect(() => {
-    console.log("LoginPage location:", location.pathname);
     dispatch({ type: "auth/clearError" });
     dispatch({ type: "auth/logoutUserSync" });
   }, [location, dispatch]);
@@ -41,7 +40,6 @@ const LoginPage = () => {
 
     try {
       const validatedData = loginSchema.parse({ ...formData, role: userRole });
-      console.log("Attempting login with:", validatedData);
       const { accessToken, user } = await loginUser(
         validatedData.email,
         validatedData.password,
@@ -52,15 +50,11 @@ const LoginPage = () => {
         role: user.role === "user" ? UserRole.USER : user.role === "pro" ? UserRole.PRO : UserRole.ADMIN,
       };
       dispatch(setAuth({ user: mappedUser, accessToken }));
-      console.log("Login successful, user role:", user.role);
       if (user.role === "user") {
-        console.log("Navigating to /home");
         navigate("/home", { replace: true });
       } else if (user.role === "pro") {
-        console.log("Navigating to /pro-dashboard");
         navigate("/pro-dashboard", { replace: true });
       } else if (user.role === "admin") {
-        console.log("Navigating to /admin-dashboard");
         navigate("/admin-dashboard", { replace: true });
       }
     } catch (error) {
@@ -74,7 +68,6 @@ const LoginPage = () => {
         if (err.response?.status || err.status) {
           const status = err.response?.status || err.status;
           const message = err.response?.data?.message || err.message || "Login failed";
-          console.log(`API Error - Status: ${status}, Message: ${message}`);
 
           switch (status) {
             case 400:
@@ -124,7 +117,6 @@ const LoginPage = () => {
         role: user.role === "user" ? UserRole.USER : UserRole.ADMIN,
       };
       dispatch(setAuth({ user: mappedUser, accessToken }));
-      console.log("Google login successful, user role:", user.role);
       navigate("/home", { replace: true });
     } catch (error: any) {
       console.error("Google login error:", error);
@@ -170,7 +162,13 @@ const LoginPage = () => {
 
               <Tabs
                 defaultValue="user"
-                onValueChange={(value) => setUserRole(value as "user" | "pro")}
+                onValueChange={(value) => {
+                  setUserRole(value as "user" | "pro");
+                  // Clear any previous errors when switching tabs to avoid leakage across roles
+                  setErrors({});
+                  setServerError("");
+                  setFormData({ email: "", password: "" });
+                }}
                 className="mb-4"
               >
                 <TabsList className="grid w-full grid-cols-2 bg-gray-200 dark:bg-gray-700">
@@ -178,7 +176,7 @@ const LoginPage = () => {
                     User
                   </TabsTrigger>
                   <TabsTrigger value="pro" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-600">
-                    Fixeify Pro
+                    Provider
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -276,10 +274,23 @@ const LoginPage = () => {
               <div className="mt-2 text-center">
                 <p className="text-sm text-gray-600 dark:text-gray-300">
                   Don't Have An Account?{" "}
-                  <Link to="/register" className="text-blue-600 hover:underline dark:text-blue-400">
+                  <Link
+                    to={userRole === "pro" ? "/become-pro" : "/register"}
+                    className="text-blue-600 hover:underline dark:text-blue-400"
+                  >
                     Sign Up Now
                   </Link>
                 </p>
+                <div className="mt-2 flex justify-center">
+                  <Link
+                    to="/home"
+                    className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-[#032B44] transition-colors dark:text-gray-300 dark:hover:text-white"
+                    aria-label="Back Home"
+                  >
+                    <ArrowLeftIcon className="h-4 w-4" />
+                    Back Home
+                  </Link>
+                </div>
               </div>
             </>
           )}

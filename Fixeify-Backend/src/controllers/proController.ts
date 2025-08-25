@@ -94,6 +94,16 @@ export class ProController {
     }
   }
 
+  async getPopularCategories(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 2;
+      const categories = await this._proService.getPopularCategories(limit);
+      res.status(HttpStatus.OK).json(categories);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async fetchProBookings(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const proId = req.params.id;
@@ -101,7 +111,9 @@ export class ProController {
       const limit = parseInt(req.query.limit as string) || 5;
       const status = req.query.status as string; // New status filter
       const sortBy = (req.query.sortBy as "latest" | "oldest") || undefined;
-      const { bookings, total } = await this._proService.fetchProBookings(proId, page, limit, status, sortBy);
+      const search = (req.query.search as string) || undefined;
+      const bookingId = (req.query.bookingId as string) || undefined;
+      const { bookings, total } = await this._proService.fetchProBookings(proId, page, limit, status, sortBy, search, bookingId);
       res.status(HttpStatus.OK).json({ bookings, total });
     } catch (error) {
       next(error);
@@ -176,7 +188,9 @@ export class ProController {
       const { proId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { wallet, total } = await this._proService.getWalletWithPagination(proId, page, limit);
+      const sortBy = (req.query.sortBy as "latest" | "oldest" | "credit" | "debit") || undefined;
+      const search = (req.query.search as string) || undefined;
+      const { wallet, total } = await this._proService.getWalletWithPagination(proId, page, limit, sortBy, search);
       if (!wallet) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WALLET_NOT_FOUND);
       res.status(HttpStatus.OK).json({ wallet, total });
     } catch (error: any) {

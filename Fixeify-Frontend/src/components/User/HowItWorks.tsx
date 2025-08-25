@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 interface StepProps {
@@ -40,28 +40,46 @@ const StepCard = ({ number, title, description, image }: StepProps) => {
 
 const HowItWorks = () => {
   const carouselRef = useRef<HTMLDivElement>(null);
+  const [isDesktop, setIsDesktop] = useState<boolean>(false);
 
   const infiniteSteps = [...steps, ...steps, ...steps];
+  const data = infiniteSteps; // Always use infinite data so left scroll is available on mobile too
+
+  useEffect(() => {
+    const onResize = () => {
+      // Tailwind md breakpoint ~768px
+      setIsDesktop(window.innerWidth >= 768);
+    };
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     const carousel = carouselRef.current;
     if (!carousel) return;
 
+    // Keep loop behavior on both mobile and desktop
     const handleScroll = () => {
       const scrollLeft = carousel.scrollLeft;
       const scrollWidth = carousel.scrollWidth;
       const clientWidth = carousel.clientWidth;
-
       if (scrollLeft + clientWidth >= scrollWidth - 1) {
-        carousel.scrollTo({ left: clientWidth, behavior: "auto" });
-      }
-      else if (scrollLeft <= 0) {
-        carousel.scrollTo({ left: clientWidth * 2, behavior: "auto" });
+        // Jump back near the middle block
+        const targetIndex = steps.length; // start of middle block
+        const child = carousel.children.item(targetIndex) as HTMLElement | null;
+        if (child) carousel.scrollTo({ left: child.offsetLeft, behavior: "auto" });
+      } else if (scrollLeft <= 0) {
+        // Jump forward near the middle block
+        const targetIndex = steps.length * 2 - 1; // end of middle block
+        const child = carousel.children.item(targetIndex) as HTMLElement | null;
+        if (child) carousel.scrollTo({ left: child.offsetLeft, behavior: "auto" });
       }
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      const scrollAmount = 300; 
+      if (!isDesktop) return;
+      const scrollAmount = 300;
       if (event.key === "ArrowRight") {
         carousel.scrollBy({ left: scrollAmount, behavior: "smooth" });
       } else if (event.key === "ArrowLeft") {
@@ -69,32 +87,60 @@ const HowItWorks = () => {
       }
     };
 
-    carousel.addEventListener("scroll", handleScroll);
-    document.addEventListener("keydown", handleKeyDown);
+    const handleWheel = (event: WheelEvent) => {
+      if (!isDesktop) return;
+      // Convert vertical wheel to horizontal scroll when hovering the carousel
+      if (Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+        event.preventDefault();
+        carousel.scrollBy({ left: event.deltaY, behavior: "auto" });
+      }
+    };
 
-    carousel.scrollTo({ left: carousel.clientWidth, behavior: "auto" });
+    // Attach scroll handler for both
+    carousel.addEventListener("scroll", handleScroll);
+
+    // Desktop-only inputs
+    if (isDesktop) {
+      document.addEventListener("keydown", handleKeyDown);
+      carousel.addEventListener("wheel", handleWheel, { passive: false });
+    }
+
+    // Position: show Step 1 (from middle block) first so content exists on the left
+    const targetIndex = steps.length; // first item of middle block is Step 1
+    const child = carousel.children.item(targetIndex) as HTMLElement | null;
+    if (child) {
+      carousel.scrollTo({ left: child.offsetLeft, behavior: "auto" });
+    }
 
     return () => {
       carousel.removeEventListener("scroll", handleScroll);
       document.removeEventListener("keydown", handleKeyDown);
+      carousel.removeEventListener("wheel", handleWheel as EventListener);
     };
-  }, []);
+  }, [isDesktop]);
 
   return (
     <section className="container text-center mb-20 mx-auto px-8 py-12 dark:bg-gray-900">
       <h2 className="text-3xl font-bold mb-8 dark:text-white">How It Works</h2>
       <div
         ref={carouselRef}
-        className="flex p-4 w-full overflow-x-auto scroll-smooth scrollbar-none snap-x space-x-6"
+        className="flex p-4 w-full overflow-x-auto overflow-y-hidden scroll-smooth scrollbar-none snap-x space-x-6"
+        style={{ touchAction: "pan-x" }}
       >
-        {infiniteSteps.map((step, index) => (
-          <div
-            key={`${step.number}-${index}`}
-            className="w-[250px] lg:w-[300px] md:w-[280px] shrink-0 snap-center"
-          >
-            <StepCard {...step} />
-          </div>
-        ))}
+        {data.map((step, index) => {
+          const logicalIndex = index % steps.length;
+          const blockIndex = Math.floor(index / steps.length); // 0,1,2
+          return (
+            <div
+              key={`${step.number}-${index}`}
+              data-step-index={logicalIndex}
+              data-block-index={blockIndex}
+              className="w-[250px] lg:w-[300px] md:w-[280px] shrink-0 snap-center"
+            >
+              <StepCard {...step} />
+            </div>
+          );
+        })}
       </div>
       <style>{`
         .scrollbar-none::-webkit-scrollbar {

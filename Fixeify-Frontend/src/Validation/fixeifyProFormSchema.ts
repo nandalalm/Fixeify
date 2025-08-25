@@ -42,21 +42,10 @@ const customServiceSchema = z
   .optional();
 
 const locationSchema = z.object({
-  city: z
-    .string()
-    .regex(/^[\w\s.,-]+$/, "City can only contain letters, numbers, spaces, commas, periods, and hyphens")
-    .trim()
-    .min(1, "City is required"),
-  state: z
-    .string()
-    .regex(/^[\w\s.,-]+$/, "State can only contain letters, numbers, spaces, commas, periods, and hyphens")
-    .trim()
-    .min(1, "State is required"),
-  country: z
-    .string()
-    .regex(/^[\w\s.,-]+$/, "Country can only contain letters, numbers, spaces, commas, periods, and hyphens")
-    .trim()
-    .min(1, "Country is required"),
+  city: z.string().trim().min(1, "City is required"),
+  state: z.string().trim().min(1, "State is required"),
+  country: z.string().trim().min(1, "Country is required"),
+  address: z.string().trim().min(1, "Address is required"),
   coordinates: z.object({
     type: z.literal("Point"),
     coordinates: z
@@ -74,7 +63,7 @@ const imageFileSchema = z
 
 const profilePhotoSchema = z.union([
   imageFileSchema,
-  z.string().url("Invalid profile photo URL").min(1, "Profile photo is required"),
+  z.string().min(1, "Profile photo is required"),
 ]).refine((val) => val !== null && val !== undefined, "Profile photo is required");
 
 const idProofSchema = z.union([
@@ -105,9 +94,18 @@ const availabilitySchema = z
     sunday: z.array(timeSlotSchema).optional(),
   })
   .refine(
-    (data) =>
-      Object.values(data).some((slots) => Array.isArray(slots) && slots.length > 0),
-    "Please select at least one day with valid time slots"
+    (data) => {
+      const daysWithSlots = Object.values(data).filter((slots) => Array.isArray(slots) && slots.length > 0);
+      return daysWithSlots.length >= 2;
+    },
+    "Please select at least 2 days with time slots"
+  )
+  .refine(
+    (data) => {
+      const daysWithSlots = Object.entries(data).filter(([_, slots]) => Array.isArray(slots) && slots.length > 0);
+      return daysWithSlots.every(([_, slots]) => slots.length >= 1);
+    },
+    "Each selected day must have at least 1 time slot"
   );
 
 export const fixeifyProFormSchema = z.object({
@@ -118,11 +116,11 @@ export const fixeifyProFormSchema = z.object({
   categoryId: z.string().min(1, "Category is required"),
   customService: customServiceSchema,
   location: locationSchema.nullable().refine((val) => val !== null, {
-    message: "Please provide your location",
+    message: "Please select a location from the suggestions or use current location",
   }),
   profilePhoto: profilePhotoSchema,
   idProof: idProofSchema,
-  accountHolderName: nameSchema.optional().or(z.literal("")),
+  accountHolderName: nameSchema,
   accountNumber: accountNumberSchema,
   bankName: bankNameSchema,
   availability: availabilitySchema,

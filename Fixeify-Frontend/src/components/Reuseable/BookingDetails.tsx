@@ -49,20 +49,33 @@ const Avatar: React.FC<{
       return;
     }
     let cancelled = false;
-    const img = new Image();
-    img.onload = () => {
-      if (!cancelled) {
-        setDisplayedSrc(src);
-        onSrcChange && onSrcChange(src);
+    let retried = false;
+    const tryLoad = (targetSrc: string) => {
+      const img = new Image();
+      img.onload = () => {
+        if (!cancelled) {
+          setDisplayedSrc(targetSrc);
+          onSrcChange && onSrcChange(targetSrc);
+        }
+      };
+      img.onerror = () => {
+        if (cancelled) return;
+        if (!retried) {
+          retried = true;
+          // Retry once; some transient network hiccups resolve on retry
+          tryLoad(targetSrc);
+        } else {
+          setDisplayedSrc(placeholder);
+          onSrcChange && onSrcChange(placeholder);
+        }
+      };
+      img.src = targetSrc;
+      // Handle browser cached images where onload may not fire reliably
+      if (img.complete && img.naturalWidth > 0) {
+        img.onload?.(new Event('load'));
       }
     };
-    img.onerror = () => {
-      if (!cancelled) {
-        setDisplayedSrc(placeholder);
-        onSrcChange && onSrcChange(placeholder);
-      }
-    };
-    img.src = src;
+    tryLoad(src);
     return () => { cancelled = true; };
   }, [src, placeholder, onSrcChange]);
 
@@ -88,6 +101,8 @@ const Avatar: React.FC<{
       src={displayedSrc}
       alt={alt}
       className={className}
+      loading="lazy"
+      decoding="async"
       onError={() => {
         setDisplayedSrc(placeholder);
         onSrcChange && onSrcChange(placeholder);
@@ -137,6 +152,15 @@ const formatTo12h = (time?: string) => {
   return `${hour12}:${mm} ${period}`;
 };
 
+const formatDateDDMMYYYY = (d: Date | string | number) => {
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "-";
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
+
 const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, onBack, onRate, onRaiseComplaint, onAccept, onReject, onGenerateQuota, refreshKey = 0, showQuotaSection = true, onReady }) => {
   const [booking, setBooking] = useState<BookingCompleteResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
@@ -145,6 +169,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [userDisplaySrc, setUserDisplaySrc] = useState<string>("/placeholder-user.jpg");
   const [proDisplaySrc, setProDisplaySrc] = useState<string>("/placeholder.jpg");
+  const [bannerError, setBannerError] = useState<string | null>(null);
 
   // Precompute image sources to avoid flicker when image is missing
   const userImageSrc = useMemo(() => {
@@ -164,17 +189,33 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
       try {
         const b = await fetchUserBookingById(bookingId);
         if (mounted) setBooking(b);
-      } catch (e) {
-        if (mounted) setError("Failed to load booking details");
-      }
-      try {
-        const q = await fetchUserQuotaByBookingId(bookingId);
-        if (mounted) setQuota(q);
-      } catch {
-        try {
-          const q2 = await fetchProQuotaByBookingId(bookingId);
-          if (mounted) setQuota(q2 as any);
-        } catch {}
+        // Only attempt to fetch quota if status is not pending/rejected/cancelled and quota section is enabled
+        if (mounted && b && !["pending", "rejected", "cancelled"].includes(b.status) && showQuotaSection) {
+          try {
+            const q = await fetchUserQuotaByBookingId(bookingId);
+            if (mounted) setQuota(q);
+          } catch (e: any) {
+            // Try pro quota as fallback
+            try {
+              const q2 = await fetchProQuotaByBookingId(bookingId);
+              if (mounted) setQuota(q2 as any);
+            } catch (e2: any) {
+              // No quota available or backend error; surface backend error message if present
+              const msg = e2?.response?.data?.message || e?.response?.data?.message;
+              if (mounted && msg) setBannerError(msg);
+              // Keep quota as null
+            }
+          }
+        } else {
+          // Pending/Rejected/Cancelled bookings won't have quota
+          if (mounted) setQuota(null);
+        }
+      } catch (e: any) {
+        if (mounted) {
+          const msg = e?.response?.data?.message || "Failed to load booking details";
+          setError(msg);
+          setBannerError(msg);
+        }
       }
       if (mounted) {
         setLoading(false);
@@ -184,7 +225,14 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
     };
     load();
     return () => { mounted = false; };
-  }, [bookingId, refreshKey]);
+  }, [bookingId, refreshKey, showQuotaSection]);
+
+  // Auto-dismiss error banner after a short delay
+  useEffect(() => {
+    if (!bannerError) return;
+    const t = setTimeout(() => setBannerError(null), 3000);
+    return () => clearTimeout(t);
+  }, [bannerError]);
 
   const canDownloadInvoice = useMemo(() => viewerRole === "user" && booking?.status === "completed" && !!quota, [viewerRole, booking?.status, quota]);
   const canRate = useMemo(() => viewerRole === "user" && booking?.status === "completed" && booking?.isRated === false, [viewerRole, booking?.status, booking?.isRated]);
@@ -236,6 +284,12 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         </div>
       )}
 
+      {bannerError && (
+        <div className="p-3 bg-red-100 text-red-800 rounded-md border border-red-200">
+          {bannerError}
+        </div>
+      )}
+
       {/* People */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Section title="User Details">
@@ -251,6 +305,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
               }}
             >
               <Avatar
+                key={userImageSrc}
                 src={userImageSrc}
                 placeholder="/placeholder-user.jpg"
                 alt="User"
@@ -287,6 +342,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
               onClick={() => setImagePreview(proDisplaySrc)}
             >
               <Avatar
+                key={proImageSrc}
                 src={proImageSrc}
                 placeholder="/placeholder.jpg"
                 alt="Pro"
@@ -314,7 +370,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         <LabelValue label="Booking ID" value={booking.bookingId} />
         <LabelValue label="Issue Description" value={booking.issueDescription} />
         <LabelValue label="Service Category" value={booking.category?.name} />
-        <LabelValue label="Preferred Date" value={new Date(booking.preferredDate).toLocaleDateString()} />
+        <LabelValue label="Preferred Date" value={formatDateDDMMYYYY(booking.preferredDate)} />
         <LabelValue
           label="Preferred Time"
           value={booking.preferredTime && booking.preferredTime.length > 0
@@ -374,7 +430,10 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
         {canDownloadInvoice && (
-          <button onClick={handleDownloadInvoice} className="flex-1 bg-[#032b44] text-white py-2 px-4 rounded-md hover:bg-[#054869] transition-colors flex items-center justify-center gap-2">
+          <button
+            onClick={handleDownloadInvoice}
+            className="flex-1 bg-[#032b44] dark:bg-[#032b44] text-white dark:!text-white py-2 px-4 rounded-md hover:bg-[#054869] dark:hover:bg-[#054869] transition-colors shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#032b44] dark:focus-visible:ring-offset-gray-900 flex items-center justify-center gap-2"
+          >
             <Download className="w-4 h-4" />
             Download Invoice
           </button>

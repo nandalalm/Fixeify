@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, useCallback } from "react";
+import { FC, useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
@@ -50,20 +50,9 @@ const AdminReviewManagement: FC = () => {
 
   const [selectedReview, setSelectedReview] = useState<RatingReviewResponse | null>(null);
 
-  // Search and sort state (sorting delegated to backend; search is frontend)
+  // Search and sort state (both delegated to backend)
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "lowest" | "highest">("latest");
-
-  // Filter reviews by pro name or user name (frontend only)
-  const filteredReviews = reviews.filter((review) => {
-    const proName = review.pro && review.pro.firstName ? review.pro.firstName.toLowerCase() : "";
-    const userName = review.user && review.user.name ? review.user.name.toLowerCase() : "";
-    const term = searchTerm.toLowerCase();
-    return proName.includes(term) || userName.includes(term);
-  });
-
-  // Backend provides sorted order; we only filter client-side
-  const orderedAndFiltered = filteredReviews;
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
@@ -72,10 +61,20 @@ const AdminReviewManagement: FC = () => {
     }
   }, [user, navigate]);
 
-  const fetchReviews = useCallback(async (pageNum: number, sortBy: typeof sortOption) => {
+  // Ensure only the latest request with matching args updates state to avoid flicker back to page 1
+  const latestReq = useRef(0);
+  const lastArgsRef = useRef<{ page: number; sort: typeof sortOption; search?: string }>({ page: 1, sort: "latest", search: "" });
+  const fetchReviews = useCallback(async (pageNum: number, sortBy: typeof sortOption, search?: string) => {
+    const reqId = ++latestReq.current;
+    lastArgsRef.current = { page: pageNum, sort: sortBy, search };
     setLoading(true);
     try {
-      const data: PaginatedReviews = await getAllReviews(pageNum, limit, sortBy);
+      const data: PaginatedReviews = await getAllReviews(pageNum, limit, sortBy, search);
+      if (reqId !== latestReq.current) return; // stale by sequence
+      const { page: expectedPage, sort: expectedSort, search: expectedSearch } = lastArgsRef.current;
+      if (data.page !== expectedPage || sortBy !== expectedSort || (search || "") !== (expectedSearch || "")) {
+        return; // stale by args
+      }
       setReviews(data.items);
       setTotal(data.total);
       setPage(data.page);
@@ -83,18 +82,43 @@ const AdminReviewManagement: FC = () => {
       // fetch service names for new reviews
       fetchServices(data.items);
     } catch (err) {
+      if (reqId !== latestReq.current) return;
       console.error(err);
       setError("Failed to fetch reviews");
     } finally {
-      setLoading(false);
+      if (reqId === latestReq.current) setLoading(false);
     }
   }, [fetchServices]);
 
+  // Track first load to avoid empty-state flicker
+  const didInitialLoad = useRef(false);
+
+  // Immediate fetch on mount (no debounce). Do not depend on fetchReviews identity to avoid unwanted re-runs.
   useEffect(() => {
-    if (user) {
-      fetchReviews(1, sortOption);
+    if (!user) return;
+    if (!didInitialLoad.current) {
+      setLoading(true); // avoid initial empty-state frame
+      fetchReviews(1, sortOption, searchTerm);
+      didInitialLoad.current = true;
     }
-  }, [user, sortOption, fetchReviews]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  // Debounced loads for subsequent sort/search changes (avoid depending on fetchReviews identity)
+  const skippedFirstDebounce = useRef(false);
+  useEffect(() => {
+    if (!user) return;
+    if (!didInitialLoad.current) return; // skip first render; handled by immediate fetch
+    // Skip the very first debounce after mount to prevent an extra page 1 fetch
+    if (!skippedFirstDebounce.current) {
+      skippedFirstDebounce.current = true;
+      return;
+    }
+    const t = setTimeout(() => {
+      fetchReviews(1, sortOption, searchTerm);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [user, sortOption, searchTerm]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -113,12 +137,12 @@ const AdminReviewManagement: FC = () => {
 
   const handlePrev = () => {
     if (page === 1) return;
-    fetchReviews(page - 1, sortOption);
+    fetchReviews(page - 1, sortOption, searchTerm);
   };
 
   const handleNext = () => {
     if (page * limit >= total) return;
-    fetchReviews(page + 1, sortOption);
+    fetchReviews(page + 1, sortOption, searchTerm);
   };
 
   const handleView = (review: RatingReviewResponse) => {
@@ -127,6 +151,8 @@ const AdminReviewManagement: FC = () => {
 
   const handleBackFromDetails = () => {
     setSelectedReview(null);
+    // Refetch latest data with current criteria
+    fetchReviews(page, sortOption, searchTerm);
   };
 
   // Show skeleton only for the table while keeping the header and filters visible
@@ -143,14 +169,14 @@ const AdminReviewManagement: FC = () => {
           <AdminNavbar isOpen={sidebarOpen} />
           <main className="flex-1 overflow-y-auto p-6 transition-all duration-300">
             <div className="max-w-7xl mx-auto mb-[50px]">
-              <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Ratings & Reviews</h1>
+              <h2 className="text-2xl font-semibold text-gray-800 mb-6">Ratings & Reviews</h2>
               
               {/* Search & Sort Controls - Keep these visible */}
               <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
                 <div className="relative w-full sm:w-5/6">
                   <input
                     type="text"
-                    placeholder="Search by pro name or user name..."
+                    placeholder="Search by pro, user, or service..."
                     className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     disabled
                   />
@@ -241,76 +267,79 @@ const AdminReviewManagement: FC = () => {
               </div>
             ) : (
               <>
-                <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Ratings & Reviews</h1>
+                <h2 className="text-2xl font-semibold text-gray-800 mb-6">Ratings & Reviews</h2>
 
                 {error && (
                   <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-center">{error}</div>
                 )}
 
-                {reviews.length === 0 ? (
-                  <p className="text-center text-gray-600">No reviews currently.</p>
-                ) : orderedAndFiltered.length === 0 ? (
-                  <div className="text-center text-gray-600 space-y-2">
-                    <p>No results match the provided search criteria.</p>
-                    <button
-                      onClick={() => {
-                        setSearchTerm("");
-                        setSortOption("latest");
-                      }}
-                      className="text-blue-600 flex items-center justify-center mx-auto"
-                      aria-label="Clear search and sort filters"
-                    >
-                      Clear filter
-                      <RotateCcw className="ml-2 h-5 w-5 text-blue-600" />
-                    </button>
+                {/* Search & Sort Bar - always visible when not in details view */}
+                <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                  <div className="relative w-full sm:w-5/6">
+                    <input
+                      type="text"
+                      placeholder="Search by pro, user, or service..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
                   </div>
+                  <div className="relative w-full sm:w-1/6">
+                    <select
+                      value={sortOption}
+                      onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
+                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                    >
+                      <option value="latest">Sort by Latest</option>
+                      <option value="oldest">Sort by Oldest</option>
+                      <option value="lowest">Lowest Ratings</option>
+                      <option value="highest">Highest Ratings</option>
+                    </select>
+                  </div>
+                </div>
+
+                {reviews.length === 0 ? (
+                  (searchTerm.trim() !== "" || sortOption !== "latest") ? (
+                    <div className="text-center text-gray-600 space-y-2">
+                      <p>No results match the provided search criteria.</p>
+                      <button
+                        onClick={() => {
+                          setSearchTerm("");
+                          setSortOption("latest");
+                          fetchReviews(1, "latest", "");
+                        }}
+                        className="text-blue-600 flex items-center justify-center mx-auto"
+                        aria-label="Clear search and sort filters"
+                      >
+                        Clear filter
+                        <RotateCcw className="ml-2 h-5 w-5 text-blue-600" />
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-center text-gray-600">No reviews currently.</p>
+                  )
                 ) : (
                   <>
-                    {/* Search & Sort Bar */}
-                    <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-                      <div className="relative w-full sm:w-5/6">
-                        <input
-                          type="text"
-                          placeholder="Search by pro name or user name..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div className="relative w-full sm:w-1/6">
-                        <select
-                          value={sortOption}
-                          onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
-                          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                        >
-                          <option value="latest">Sort by Latest</option>
-                          <option value="oldest">Sort by Oldest</option>
-                          <option value="lowest">Lowest Ratings</option>
-                          <option value="highest">Highest Ratings</option>
-                        </select>
-                      </div>
-                    </div>
-
                     {/* Desktop Table (hidden on mobile) */}
                     <div className="hidden lg:block bg-white dark:bg-gray-800 p-0 rounded-md shadow border border-gray-200 dark:border-gray-700">
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.No</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Professional</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rating</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">S.No</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">User</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Professional</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Service</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Rating</th>
+                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">Action</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {orderedAndFiltered.map((review, idx) => (
+                          {reviews.map((review, idx) => (
                             <tr key={review.id}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{(page - 1) * limit + idx + 1}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{review.user?.name || '-'}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{`${review.pro?.firstName || '-'} ${review.pro?.lastName || ''}`.trim()}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{
+                              <td className="py-3 px-4 text-sm text-gray-900 border-b">{(page - 1) * limit + idx + 1}</td>
+                              <td className="py-3 px-4 text-sm text-gray-700 border-b">{review.user?.name || '-'}</td>
+                              <td className="py-3 px-4 text-sm text-gray-700 border-b">{`${review.pro?.firstName || '-'} ${review.pro?.lastName || ''}`.trim()}</td>
+                              <td className="py-3 px-4 text-sm text-gray-700 border-b">{
                                 (() => {
                                   const direct = review.category?.name as string | undefined;
                                   if (direct) return direct;
@@ -321,7 +350,7 @@ const AdminReviewManagement: FC = () => {
                                   return fromMap || fromBookingIdObj || fromBookingObj || '-';
                                 })()
                               }</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                 {Array.from({ length: 5 }).map((_, i) => (
                                   <Star
                                     key={i}
@@ -329,7 +358,7 @@ const AdminReviewManagement: FC = () => {
                                   />
                                 ))}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                 <button
                                   onClick={() => handleView(review)}
                                   className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors"
@@ -367,7 +396,7 @@ const AdminReviewManagement: FC = () => {
 
                     {/* Mobile Cards (visible on <lg) */}
                     <div className="space-y-4 lg:hidden">
-                      {orderedAndFiltered.map((review, idx) => (
+                      {reviews.map((review, idx) => (
                         <div key={review.id} className="bg-white shadow rounded-lg p-4 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="font-semibold">{review.user?.name || '-'}</span>

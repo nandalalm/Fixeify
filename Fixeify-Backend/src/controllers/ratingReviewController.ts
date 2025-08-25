@@ -28,7 +28,9 @@ export class RatingReviewController {
       const { proId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const result = await this._ratingReviewService.getRatingReviewsByPro(proId, page, limit);
+      const sortBy = (req.query.sortBy as "latest" | "oldest" | "lowest" | "highest") || undefined;
+      const search = (req.query.search as string) || undefined;
+      const result = await this._ratingReviewService.getRatingReviewsByPro(proId, page, limit, sortBy, search);
       res.json(result);
     } catch (error) {
       next(error);
@@ -52,7 +54,8 @@ export class RatingReviewController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const sortBy = (req.query.sortBy as "latest" | "oldest" | "lowest" | "highest") || undefined;
-      const result = await this._ratingReviewService.getAllRatingReviews(page, limit, sortBy);
+      const search = (req.query.search as string) || undefined;
+      const result = await this._ratingReviewService.getAllRatingReviews(page, limit, sortBy, search);
       res.json(result);
     } catch (error) {
       next(error);

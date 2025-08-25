@@ -1,5 +1,4 @@
 import { Route } from "react-router-dom";
-import AdminRegister from "../pages/Admin/AdminRegister";
 import AdminLogin from "../pages/Admin/AdminLogin";
 import AdminDashboard from "../pages/Admin/AdminDashboard";
 import UserManagement from "../pages/Admin/AdminUserManagement";
@@ -16,7 +15,6 @@ import AdminConflictManagement from "@/pages/Admin/AdminConflictManagement";
 const adminRoutes = (
   <>
     <Route element={<PublicRoute />}>
-      <Route path="/admin-register" element={<AdminRegister />} />
       <Route path="/admin-login" element={<AdminLogin />} />
     </Route>
     <Route element={<AdminPrivateRoute />}>

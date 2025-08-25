@@ -160,11 +160,6 @@ const ProDashboard: FC = () => {
     return null;
   }
 
-  
-
-
-
-
   return (
     <div className="flex flex-col h-screen bg-gray-50">
      <ProTopNavbar 

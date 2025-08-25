@@ -26,11 +26,15 @@ const initialState: RatingReviewState = {
   error: null,
 };
 
-export const fetchReviewsByPro = createAsyncThunk<PaginatedReviews, { proId: string; page?: number }, { rejectValue: string }>(
+export const fetchReviewsByPro = createAsyncThunk<
+  PaginatedReviews,
+  { proId: string; page?: number; limit?: number; sortBy?: "latest" | "oldest" | "lowest" | "highest"; search?: string; append?: boolean },
+  { rejectValue: string }
+>(
   "ratingReview/fetchByPro",
-  async ({ proId, page = 1 }, { rejectWithValue }) => {
+  async ({ proId, page = 1, limit = 5, sortBy, search }, { rejectWithValue }) => {
     try {
-      return await getReviewsByPro(proId, page, 5);
+      return await getReviewsByPro(proId, page, limit, sortBy, search);
     } catch (err: any) {
       return rejectWithValue(err.response?.data?.message || "Failed to load reviews");
     }
@@ -74,7 +78,8 @@ const ratingReviewSlice = createSlice({
       })
       .addCase(fetchReviewsByPro.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = action.payload.items;
+        const shouldAppend = Boolean(action.meta?.arg?.append) && (action.payload.page ?? 1) > 1;
+        state.items = shouldAppend ? [...state.items, ...action.payload.items] : action.payload.items;
         state.total = action.payload.total;
         state.page = action.payload.page;
       })

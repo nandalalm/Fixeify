@@ -54,17 +54,14 @@ const UserLocation = () => {
 
     const loadGoogleMapsScript = () => {
       if (window.google && window.google.maps) {
-        console.log("Google Maps already loaded, initializing autocomplete");
         initAutocomplete();
         return;
       }
-      console.log("Loading Google Maps script");
       const script = document.createElement("script");
       script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places`;
       script.async = true;
       script.defer = true;
       script.onload = () => {
-        console.log("Google Maps script loaded successfully");
         initAutocomplete();
       };
       script.onerror = () => {
@@ -76,7 +73,6 @@ const UserLocation = () => {
 
     const initAutocomplete = () => {
       if (locationInputRef.current) {
-        console.log("Initializing autocomplete on input");
         autocompleteRef.current = new google.maps.places.Autocomplete(locationInputRef.current, {
           types: ["geocode"],
           fields: ["formatted_address", "geometry", "address_components"],
@@ -84,7 +80,6 @@ const UserLocation = () => {
 
         autocompleteRef.current.addListener("place_changed", () => {
           const place = autocompleteRef.current?.getPlace();
-          console.log("Place selected:", place);
           if (place && place.formatted_address && place.geometry?.location) {
             const lat = place.geometry.location.lat();
             const lng = place.geometry.location.lng();
@@ -125,7 +120,6 @@ const UserLocation = () => {
     loadGoogleMapsScript();
 
     return () => {
-      console.log("Cleaning up Google Maps scripts");
       const scripts = document.querySelectorAll('script[src*="maps.googleapis.com"]');
       scripts.forEach((script) => script.remove());
     };
@@ -205,6 +199,18 @@ const UserLocation = () => {
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setSelectedLocation(null);
+    if (!value.trim()) {
+      // Clear any existing location errors when field is empty
+      setErrors({});
+    } else {
+      // Show error only when user types but doesn't select from suggestions
+      setErrors({ location: "Please select a location from the suggestions or use current location" });
+    }
+  };
+
   const handleUseSavedLocation = () => {
     if (savedLocation) {
       setSelectedLocation(savedLocation);
@@ -215,7 +221,7 @@ const UserLocation = () => {
 
   const handleContinue = () => {
     if (!selectedLocation) {
-      setErrors({ location: "Please select a location." });
+      setErrors({ location: "Please select a valid location." });
       return;
     }
     navigate(`/nearby-pros?categoryId=${categoryId}`, { state: { location: selectedLocation } });
@@ -265,6 +271,7 @@ const UserLocation = () => {
                   <input
                     ref={locationInputRef}
                     type="text"
+                    onChange={handleInputChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 dark:bg-gray-700 dark:text-white dark:border-gray-600 pr-10"
                     placeholder="Enter your location"
                   />

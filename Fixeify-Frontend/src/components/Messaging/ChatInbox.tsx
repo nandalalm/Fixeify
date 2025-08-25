@@ -13,8 +13,6 @@ interface ChatInboxProps {
 
 const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversationId }) => {
 
-  const conversationsDebug = useSelector((state: RootState) => state.chat.conversations);
-  console.log('[ChatInbox Render] conversations:', conversationsDebug.map(c => ({id: c.id, unreadCount: c.unreadCount, lastMessage: c.lastMessage?.content?.slice(0, 30)})), 'selectedConversationId:', selectedConversationId);
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
   const conversations = useSelector((state: RootState) => state.chat.conversations);
@@ -30,15 +28,10 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
   }, [user, role, dispatch]);
 
 
-  // ChatInbox should NOT auto-join chats - only listen for updates
-  // Joining chats should only happen when MessageBox is opened
-
   useEffect(() => {
     if (!socket || !isConnected) return;
 
     const handleNewMessage = (raw: any) => {
-      console.log('[SOCKET][ChatInbox] newMessage received:', raw);
-      // Normalize payload to our Message shape
       const message = {
         id: raw.id || raw._id || raw.messageId,
         chatId: raw.chatId,
@@ -131,8 +124,8 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
   };
 
   const truncateMessage = (message: string) => {
-    if (message.length > 30) {
-      return message.substring(0, 30) + "...";
+    if (message.length > 15) {
+      return message.substring(0, 15) + "...";
     }
     return message;
   };

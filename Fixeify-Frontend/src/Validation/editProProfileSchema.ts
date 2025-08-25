@@ -20,18 +20,9 @@ export const phoneNumberSchema = z
   .trim();
 
 export const locationSchema = z.object({
-  address: z
-    .string()
-    .trim()
-    .min(1, "Please provide a valid address"),
-  city: z
-    .string()
-    .trim()
-    .min(1, "Please provide the city"),
-  state: z
-    .string()
-    .trim()
-    .min(1, "Please provide the state"),
+  city: z.string().trim().min(1, "City is required"),
+  state: z.string().trim().min(1, "State is required"),
+  address: z.string().trim().min(1, "Address is required"),
   coordinates: z.object({
     type: z.literal("Point"),
     coordinates: z

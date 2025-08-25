@@ -97,7 +97,7 @@ const ProfileInfo = ({ onEdit, onChangePassword }: ProfileInfoProps) => {
   if (initialLoading) {
     return (
       <div className="flex-1 p-6 md:p-10 mb-[70px] mt-5">
-        <h1 className="text-3xl font-bold mb-8 text-center dark:text-gray-200">Profile Info</h1>
+        <h2 className="text-2xl font-bold mb-8 text-center dark:text-gray-200">Profile Info</h2>
         <div className="flex flex-col items-center">
           {/* Avatar skeleton */}
           <div className="w-32 h-32 rounded-full overflow-hidden mb-8">

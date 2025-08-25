@@ -103,7 +103,6 @@ const AdminProManagement: FC = () => {
   };
 
   const handleViewProfile = (proId: string) => {
-    console.log("Navigating to profile with ID:", proId);
     if (!proId) {
       console.error("Invalid proId:", proId);
       return;
@@ -112,12 +111,10 @@ const AdminProManagement: FC = () => {
   };
 
   const handleTabChange = (tab: "approved" | "pending") => {
-    console.log("Switching to tab:", tab);
     setActiveTab(tab);
     setCurrentPage(1);
   };
 
-  // If user switches to pending tab, drop active/banned sort options
   useEffect(() => {
     if (activeTab === "pending" && (sortOption === "active" || sortOption === "banned")) {
       setSortOption("latest");

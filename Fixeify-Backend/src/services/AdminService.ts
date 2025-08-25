@@ -69,8 +69,8 @@ export class AdminService implements IAdminService {
   }
 
 
-  async getBookings(page: number, limit: number, search?: string, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }> {
-    const { bookings, total } = await this._bookingRepository.fetchAllBookings(page, limit, search, status, sortBy);
+  async getBookings(page: number, limit: number, search?: string, status?: string, sortBy?: "latest" | "oldest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const { bookings, total } = await this._bookingRepository.fetchAllBookings(page, limit, search, status, sortBy, bookingId);
     return { bookings, total };
   }
 
@@ -109,6 +109,27 @@ export class AdminService implements IAdminService {
 
     if (isBanned) {
       await this._redisConnector.getClient().del(`refresh:${userId}`);
+      try {
+        await this._notificationService.createNotification({
+          type: "general",
+          title: "Account Banned",
+          description: "Your account has been banned by the admin. Please contact support if you believe this is a mistake.",
+          userId: userId,
+        });
+      } catch (error) {
+        console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+      }
+    } else {
+      try {
+        await this._notificationService.createNotification({
+          type: "general",
+          title: "Account Unbanned",
+          description: "Good news! Your account has been unbanned. You can now continue using Fixeify.",
+          userId: userId,
+        });
+      } catch (error) {
+        console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+      }
     }
 
     return new UserResponse({
@@ -129,6 +150,27 @@ export class AdminService implements IAdminService {
 
     if (isBanned) {
       await this._redisConnector.getClient().del(`refresh:${proId}`);
+      try {
+        await this._notificationService.createNotification({
+          type: "general",
+          title: "Account Banned",
+          description: "Your professional account has been banned by the admin. Please contact support for assistance.",
+          proId: proId,
+        });
+      } catch (error) {
+        console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+      }
+    } else {
+      try {
+        await this._notificationService.createNotification({
+          type: "general",
+          title: "Account Unbanned",
+          description: "Good news! Your professional account has been unbanned. You can now continue offering services on Fixeify.",
+          proId: proId,
+        });
+      } catch (error) {
+        console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+      }
     }
 
     const category = await this._categoryRepository.findCategoryById(updatedPro.categoryId.toString());
@@ -426,7 +468,6 @@ export class AdminService implements IAdminService {
 
     try {
       await transporter.sendMail(mailOptions);
-      console.log(MESSAGES.PRO_APPROVED_SUCCESSFULLY);
     } catch (error) {
       console.error(MESSAGES.FAILED_SEND_APPROVAL_EMAIL + ":", error);
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_APPROVAL_EMAIL);
@@ -513,7 +554,6 @@ export class AdminService implements IAdminService {
 
     try {
       await transporter.sendMail(mailOptions);
-      console.log(MESSAGES.PRO_REJECTED_SUCCESSFULLY);
     } catch (error) {
       console.error(MESSAGES.FAILED_SEND_REJECTION_EMAIL + ":", error);
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_REJECTION_EMAIL);

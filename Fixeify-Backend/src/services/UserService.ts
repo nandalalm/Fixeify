@@ -281,13 +281,45 @@ export class UserService implements IUserService {
     return createdBooking;
   }
 
- async fetchBookingDetails(userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> {
-  const { bookings, total } = await this._bookingRepository.fetchBookingDetails(userId, page, limit);
+ async fetchBookingDetails(
+  userId: string,
+  page: number = 1,
+  limit: number = 5,
+  search?: string,
+  status?: string,
+  sortBy: "latest" | "oldest" = "latest",
+  bookingId?: string
+): Promise<{ bookings: BookingResponse[]; total: number }> {
+  const { bookings, total } = await this._bookingRepository.fetchBookingDetails(
+    userId,
+    page,
+    limit,
+    search,
+    status,
+    sortBy,
+    bookingId
+  );
   return { bookings, total };
 }
 
- async fetchBookingHistoryDetails(userId: string, page: number = 1, limit: number = 5): Promise<{ bookings: BookingResponse[]; total: number }> {
-    const { bookings, total } = await this._bookingRepository.fetchBookingHistoryDetails(userId, page, limit);
+ async fetchBookingHistoryDetails(
+    userId: string,
+    page: number = 1,
+    limit: number = 5,
+    search?: string,
+    status?: string,
+    sortBy: "latest" | "oldest" = "latest",
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const { bookings, total } = await this._bookingRepository.fetchBookingHistoryDetails(
+      userId,
+      page,
+      limit,
+      search,
+      status,
+      sortBy,
+      bookingId
+    );
     return { bookings, total };
   }
   

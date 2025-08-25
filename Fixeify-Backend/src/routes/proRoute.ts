@@ -11,6 +11,7 @@ export default function createProRoutes(container: Container): Router {
   router.post("/apply", proController.applyPro.bind(proController));
   router.get("/fetchProfile/:id", proController.getProfile.bind(proController));
   router.get("/fetchCategories", proController.getAllCategories.bind(proController));
+  router.get("/popularCategories", proController.getPopularCategories.bind(proController));
   router.get("/pending/:id", proController.getPendingProById.bind(proController));
   
   router.put("/updateProfile/:id", authenticateToken, proController.updateProfile.bind(proController));

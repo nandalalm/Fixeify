@@ -55,6 +55,26 @@ const formatTo12h = (time?: string) => {
   return `${hour12}:${mm} ${period}`;
 };
 
+const formatDateDDMMYYYY = (d: Date | string | number) => {
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "-";
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+};
+
+const formatDateTimeDDMMYYYY12h = (d: Date | string | number) => {
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "-";
+  const ddmmyyyy = formatDateDDMMYYYY(date);
+  const hours = date.getHours();
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const period = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  return `${ddmmyyyy}, ${hour12}:${minutes} ${period}`;
+};
+
 interface TransactionDetailsProps {
   transaction: ITransaction;
   onClose: () => void;
@@ -107,7 +127,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, on
           <div className="flex items-center"><StatusBadge value={transaction.type} /></div>
         </div>
         <LabelValue label="Amount" value={`₹${transaction.amount.toFixed(2)}`} />
-        <LabelValue label="Date" value={new Date(transaction.date).toLocaleString()} />
+        <LabelValue label="Date" value={formatDateTimeDDMMYYYY12h(transaction.date)} />
         <LabelValue label="Description" value={transaction.description || "-"} />
       </Section>
 
@@ -124,7 +144,7 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, on
               <LabelValue label="Booking ID" value={booking?.bookingId || transaction.bookingId} />
               <LabelValue label="Issue Description" value={booking.issueDescription} />
               <LabelValue label="Service Category" value={booking.category?.name} />
-              <LabelValue label="Preferred Date" value={new Date(booking.preferredDate).toLocaleDateString()} />
+              <LabelValue label="Preferred Date" value={formatDateDDMMYYYY(booking.preferredDate)} />
               <LabelValue label="Preferred Time" value={booking.preferredTime && booking.preferredTime.length > 0 ? booking.preferredTime.map(t => `${formatTo12h(t.startTime)} - ${formatTo12h(t.endTime)}`).join(", ") : "-"} />
               <div className="py-1 flex flex-col sm:flex-row sm:items-center gap-1">
                 <span className="w-44 text-sm font-medium text-gray-600 dark:text-gray-300">Status</span>

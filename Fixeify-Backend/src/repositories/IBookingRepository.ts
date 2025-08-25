@@ -69,10 +69,34 @@ export interface PopulatedLeanBooking {
 
 export interface IBookingRepository {
   createBooking(bookingData: Partial<BookingDocument>): Promise<BookingResponse>;
-  fetchBookingDetails(userId: string, page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>;
-  fetchBookingHistoryDetails(userId: string, page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>;
-  fetchProBookings(proId: string, page?: number, limit?: number, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }>;
-  fetchAllBookings(page?: number, limit?: number, search?: string, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }>; // supports filters and sorting
+  fetchBookingDetails(
+    userId: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+    status?: string,
+    sortBy?: "latest" | "oldest",
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }>;
+  fetchBookingHistoryDetails(
+    userId: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+    status?: string,
+    sortBy?: "latest" | "oldest",
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }>;
+  fetchProBookings(
+    proId: string,
+    page?: number,
+    limit?: number,
+    status?: string,
+    sortBy?: "latest" | "oldest",
+    search?: string,
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }>;
+  fetchAllBookings(page?: number, limit?: number, search?: string, status?: string, sortBy?: "latest" | "oldest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }>; // supports filters and sorting, includes bookingId filter
   updateBooking(bookingId: string, updateData: Partial<BookingDocument>): Promise<BookingDocument | null>;
   findBookingById(bookingId: string): Promise<BookingDocument | null>;
   findBookingByIdPopulated(bookingId: string): Promise<BookingResponse | null>;
@@ -93,6 +117,7 @@ export interface IBookingRepository {
     status: string
   ): Promise<BookingDocument[]>;
   getTrendingService(): Promise<{ categoryId: string; name: string; bookingCount: number } | null>;
+  getTopCategoriesByCompleted(limit: number): Promise<Array<{ categoryId: string; name: string; image?: string; bookingCount: number }>>;
   getAdminRevenueMetrics(): Promise<{
     totalRevenue: number;
     monthlyRevenue: number;

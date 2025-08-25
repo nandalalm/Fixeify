@@ -108,7 +108,19 @@ export class UserController {
       const { userId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { bookings, total } = await this._userService.fetchBookingDetails(userId, page, limit);
+      const search = (req.query.search as string) || undefined;
+      const status = (req.query.status as string) || undefined; // e.g., "pending,accepted" | "pending" | "accepted"
+      const sortBy = ((req.query.sortBy as string) as "latest" | "oldest") || "latest";
+      const bookingId = (req.query.bookingId as string) || undefined;
+      const { bookings, total } = await this._userService.fetchBookingDetails(
+        userId,
+        page,
+        limit,
+        search,
+        status,
+        sortBy,
+        bookingId
+      );
       res.status(HttpStatus.OK).json({ bookings, total });
     } catch (error) {
       next(error);
@@ -120,7 +132,19 @@ export class UserController {
       const { userId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const { bookings, total } = await this._userService.fetchBookingHistoryDetails(userId, page, limit);
+      const search = (req.query.search as string) || undefined;
+      const status = (req.query.status as string) || undefined;
+      const sortBy = ((req.query.sortBy as string) as "latest" | "oldest") || "latest";
+      const bookingId = (req.query.bookingId as string) || undefined;
+      const { bookings, total } = await this._userService.fetchBookingHistoryDetails(
+        userId,
+        page,
+        limit,
+        search,
+        status,
+        sortBy,
+        bookingId
+      );
       res.status(HttpStatus.OK).json({ bookings, total });
     } catch (error) {
       next(error);

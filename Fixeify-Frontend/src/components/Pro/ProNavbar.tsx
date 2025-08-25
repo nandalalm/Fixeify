@@ -1,6 +1,6 @@
 import type { FC } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Home, Briefcase, Wallet, User, MessageSquare, Star, Calendar1, LogOut, OctagonAlert, ChevronLeft, ChevronRight } from "lucide-react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Home, Briefcase, Wallet, User, MessageSquare, Star, Calendar1, LogOut, OctagonAlert } from "lucide-react";
 import type { LucideProps } from "lucide-react";
 import { useDispatch,useSelector } from "react-redux";
 import { AppDispatch,RootState } from "../../store/store";
@@ -23,49 +23,27 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
   const location = useLocation();
   const dispatch = useDispatch<AppDispatch>();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [isSidebarShrunk, setIsSidebarShrunk] = useState(false);
-  const [isSidebarVisible, setIsSidebarVisible] = useState(true);
-  const [isExtraSmallScreen, setIsExtraSmallScreen] = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const user = useSelector((state: RootState) => state.auth.user);
   const proId = user?.id;
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleResize = () => {
-      const width = window.innerWidth;
-      setIsExtraSmallScreen(width <= 768);
-      if (width <= 768) {
-        setIsSidebarVisible(false);
-      } else {
-        setIsSidebarVisible(true);
-      }
+      setIsLargeScreen(window.innerWidth >= 1024);
     };
-
-    handleResize();
     window.addEventListener("resize", handleResize);
-
-    const savedState = localStorage.getItem("isProSidebarShrunk");
-    if (savedState !== null) {
-      setIsSidebarShrunk(JSON.parse(savedState));
-    }
-
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("isProSidebarShrunk", JSON.stringify(isSidebarShrunk));
-  }, [isSidebarShrunk]);
-
-  useEffect(() => {
-    setIsSidebarVisible(isOpen);
-  }, [isOpen]);
-
-  const toggleSidebarShrink = () => {
-    setIsSidebarShrunk(!isSidebarShrunk);
-  };
+  // Sidebar shrinking removed: keep fixed width and visible labels
 
   const handleLogout = () => {
-    dispatch(logoutUser("pro")).then(() => {
-      window.location.href = "/home";
+    // Navigate away from protected pro routes first to avoid ProPrivateRoute redirect to /login
+    navigate("/home", { replace: true });
+    // Then perform logout (no full reload)
+    dispatch(logoutUser("pro")).finally(() => {
+      // no-op; already navigated
     });
   };
 
@@ -97,17 +75,13 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
   return (
     <>
       <aside
-        className={`${
-          isExtraSmallScreen
-            ? `absolute top-9 left-0 z-40 h-full transition-transform duration-300 ${
-                isSidebarVisible ? "translate-x-0" : "-translate-x-full"
-              }`
-            : "relative z-20"
-        } ${isSidebarShrunk ? "w-20" : "w-64"} bg-white border-r border-gray-200 shadow-sm transition-all duration-300 ${
-          isSidebarShrunk ? "md:w-20" : "md:w-64"
-        } overflow-visible`}
+        className={`bg-white w-64 border-r border-gray-200 shadow-sm overflow-visible transition-all duration-300 ease-in-out z-20 ${
+          isLargeScreen
+            ? "relative h-full top-0"
+            : `fixed left-0 top-16 h-[calc(100vh-4rem)] ${isOpen ? "translate-x-0" : "-translate-x-full"}`
+        }`}
       >
-        <nav className={`p-4 ${isExtraSmallScreen ? "pt-12" : ""} h-full overflow-y-auto`}>
+        <nav className={`py-4 h-full overflow-y-auto`}>
           <ul className="space-y-2">
             {navItems.map((item) =>
               item.label === "Log Out" ? (
@@ -118,12 +92,12 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
                       location.pathname === item.path
                         ? "bg-gray-100 text-gray-900"
                         : "text-gray-700 hover:bg-gray-50"
-                    } ${isSidebarShrunk ? "justify-center" : ""} cursor-pointer`}
+                    } cursor-pointer`}
                   >
-                    <span className={`${isSidebarShrunk ? "mx-auto" : "mr-3"}`}>
+                    <span className={`mr-3`}>
                       <item.icon className="h-5 w-5 text-red-600" />
                     </span>
-                    <span className={`font-medium ${isSidebarShrunk ? "hidden" : "block"} text-red-600`}>{item.label}</span> 
+                    <span className={`font-medium text-red-600`}>{item.label}</span> 
                   </div>
                 </li>
               ) : (
@@ -135,31 +109,19 @@ export const ProNavbar: FC<ProNavbarProps> = ({ isOpen }) => {
                       location.pathname === item.path
                         ? "bg-gray-100 text-gray-900"
                         : "text-gray-700 hover:bg-gray-50"
-                    } ${isSidebarShrunk ? "justify-center" : ""}`}
-                    title={isSidebarShrunk ? item.label : ""}
+                    }`}
+                    title={""}
                   >
-                    <span className={`${isSidebarShrunk ? "mx-auto" : "mr-3"}`}>
+                    <span className={`mr-3`}>
                       <item.icon className="h-5 w-5" />
                     </span>
-                    <span className={`font-medium ${isSidebarShrunk ? "hidden" : "block"}`}>{item.label}</span>
+                    <span className={`font-medium`}>{item.label}</span>
                   </Link>
                 </li>
               )
             )}
           </ul>
         </nav>
-        {isSidebarVisible && (
-          <button
-            onClick={toggleSidebarShrink}
-            className="absolute top-72 -right-4 p-2 bg-white border border-gray-300 rounded-md shadow-md hover:bg-gray-100 transition-colors z-[30]"
-          >
-            {isSidebarShrunk ? (
-              <ChevronRight className="w-6 h-6 text-blue-600" />
-            ) : (
-              <ChevronLeft className="w-6 h-6 text-blue-600" />
-            )}
-          </button>
-        )}
       </aside>
       <ConfirmationModal
         isOpen={showLogoutModal}

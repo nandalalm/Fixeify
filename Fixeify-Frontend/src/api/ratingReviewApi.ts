@@ -39,9 +39,14 @@ export const createReview = async (payload: CreateReviewPayload): Promise<Rating
 export const getReviewsByPro = async (
   proId: string,
   page: number = 1,
-  limit: number = 5
+  limit: number = 5,
+  sortBy?: "latest" | "oldest" | "lowest" | "highest",
+  search?: string
 ): Promise<PaginatedReviews> => {
-  const { data } = await axiosInstance.get(`${ReviewBase}/pro/${proId}`, { params: { page, limit } });
+  const params: Record<string, any> = { page, limit };
+  if (sortBy) params.sortBy = sortBy;
+  if (search) params.search = search;
+  const { data } = await axiosInstance.get(`${ReviewBase}/pro/${proId}`, { params });
   return data;
 };
 
@@ -62,10 +67,12 @@ export const getSingleReview = async (id: string): Promise<RatingReviewResponse>
 export const getAllReviews = async (
   page: number = 1,
   limit: number = 5,
-  sortBy?: "latest" | "oldest" | "lowest" | "highest"
+  sortBy?: "latest" | "oldest" | "lowest" | "highest",
+  search?: string
 ): Promise<PaginatedReviews> => {
   const params: Record<string, any> = { page, limit };
   if (sortBy) params.sortBy = sortBy;
+  if (search) params.search = search;
   const { data } = await axiosInstance.get(`${ReviewBase}/all`, { params });
   return data;
 };

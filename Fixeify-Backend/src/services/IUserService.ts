@@ -51,8 +51,24 @@ export interface IUserService {
       preferredTime: ITimeSlot[];
     }
   ): Promise<BookingResponse>;
-  fetchBookingDetails(userId: string, page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>;
-  fetchBookingHistoryDetails(userId: string, page?: number, limit?: number): Promise<{ bookings: BookingResponse[]; total: number }>;
+  fetchBookingDetails(
+    userId: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+    status?: string,
+    sortBy?: "latest" | "oldest",
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }>;
+  fetchBookingHistoryDetails(
+    userId: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+    status?: string,
+    sortBy?: "latest" | "oldest",
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }>;
   cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }>;
   createPaymentIntent(bookingId: string, amount: number): Promise<{ clientSecret: string }>;
   handlePaymentFailure(bookingId: string): Promise<void>;

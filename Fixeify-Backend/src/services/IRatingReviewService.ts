@@ -6,7 +6,9 @@ export interface IRatingReviewService {
   getRatingReviewsByPro(
     proId: string,
     page: number,
-    limit: number
+    limit: number,
+    sortBy?: "latest" | "oldest" | "lowest" | "highest",
+    search?: string
   ): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }>;
   getRatingReviewsByUser(
     userId: string,
@@ -17,7 +19,8 @@ export interface IRatingReviewService {
   getAllRatingReviews(
     page: number,
     limit: number,
-    sortBy?: "latest" | "oldest" | "lowest" | "highest"
+    sortBy?: "latest" | "oldest" | "lowest" | "highest",
+    search?: string
   ): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }>;
 
 }

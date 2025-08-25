@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../store/store";
 import { fetchBookingDetails, createPaymentIntent, cancelBooking } from "../../api/userApi";
@@ -12,7 +12,6 @@ import { fetchQuotaByBookingId } from "../../api/proApi";
 import { loadStripe, type Stripe, type StripeError, type PaymentIntent } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { setPaymentSuccessData, UserRole } from "../../store/authSlice";
-import { SkeletonLine, SkeletonBlock } from "../../components/Reuseable/Skeleton";
 import { useNavigate } from "react-router-dom";
 
 const OngoingRequest = () => {
@@ -33,10 +32,25 @@ const OngoingRequest = () => {
   const [detailsLoading, setDetailsLoading] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "">("latest");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "pending" | "accepted">("latest");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 5;
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Debounce search input
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
+    return () => clearTimeout(id);
+  }, [searchTerm]);
+
+  // Keep focus on the search input across re-renders when user is typing
+  useEffect(() => {
+    if (!selectedBooking) {
+      inputRef.current?.focus();
+    }
+  }, [loading, selectedBooking]);
 
   useEffect(() => {
     const loadBookings = async () => {
@@ -47,7 +61,18 @@ const OngoingRequest = () => {
       }
       try {
         setLoading(true);
-        const response = await fetchBookingDetails(userId, currentPage, limit);
+        const isStatusMode = sortOption === "pending" || sortOption === "accepted";
+        const statusParam = isStatusMode ? sortOption : "pending,accepted";
+        const sortByParam = isStatusMode ? "latest" : (sortOption as "latest" | "oldest");
+        const response = await fetchBookingDetails(
+          userId,
+          currentPage,
+          limit,
+          debouncedSearch || undefined,
+          statusParam,
+          sortByParam,
+          undefined
+        );
         setBookings(response.bookings);
         setTotalPages(Math.ceil(response.total / limit));
       } catch (err) {
@@ -57,7 +82,7 @@ const OngoingRequest = () => {
       }
     };
     loadBookings();
-  }, [userId, currentPage]);
+  }, [userId, currentPage, debouncedSearch, sortOption]);
 
   const handleViewDetails = (booking: BookingResponse) => {
     setSelectedBooking(booking);
@@ -69,7 +94,10 @@ const OngoingRequest = () => {
   const handleBack = () => {
     setSelectedBooking(null);
     setCurrentPage(1);
-    fetchBookingDetails(userId, 1, limit).then((response) => {
+    const isStatusMode = sortOption === "pending" || sortOption === "accepted";
+    const statusParam = isStatusMode ? sortOption : "pending,accepted";
+    const sortByParam = isStatusMode ? "latest" : (sortOption as "latest" | "oldest");
+    fetchBookingDetails(userId, 1, limit, debouncedSearch || undefined, statusParam, sortByParam).then((response) => {
       setBookings(response.bookings);
       setTotalPages(Math.ceil(response.total / limit));
     });
@@ -97,20 +125,13 @@ const OngoingRequest = () => {
     setCurrentPage(page);
   };
 
-  const filteredAndSortedBookings = bookings
-    .filter((booking) =>
-      booking.issueDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.location.address.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (sortOption === "latest" || sortOption === "") return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      if (sortOption === "oldest") return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      return 0;
-    });
+  // Server-side filtered/sorted results
+  const filteredAndSortedBookings = bookings;
 
   const handleClearFilter = () => {
     setSearchTerm("");
     setSortOption("latest");
+    setCurrentPage(1);
   };
 
   // Load quota and Stripe key when a booking is selected
@@ -158,6 +179,23 @@ const OngoingRequest = () => {
     setLocalPaymentStatus("pending");
   };
 
+  // Only allow payment after the booked day and last time slot end has passed (IST)
+  const isPaymentWindowOpen = (booking: BookingResponse | null) => {
+    if (!booking) return false;
+    const slots = (booking as any).preferredTime as Array<{ startTime: string; endTime: string }> | undefined;
+    if (!slots || slots.length === 0) return false;
+    const toMinutes = (t: string) => {
+      const [h, m] = t.split(":").map(Number); return h * 60 + m;
+    };
+    const lastEnd = slots.reduce((acc, s) => Math.max(acc, toMinutes(s.endTime)), 0);
+    const preferredDate = new Date(booking.preferredDate);
+    const preferredDateIST = new Date(preferredDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const releaseAtIST = new Date(preferredDateIST);
+    releaseAtIST.setHours(Math.floor(lastEnd / 60), lastEnd % 60, 0, 0);
+    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    return nowIST.getTime() >= releaseAtIST.getTime();
+  };
+
   const onPaymentSuccess = () => {
     if (!selectedBooking || !quota) return;
     // Cast to any to accommodate broader status values like 'completed'
@@ -195,7 +233,10 @@ const OngoingRequest = () => {
       },
     });
     // Refresh list silently on success
-    fetchBookingDetails(userId, currentPage, limit).then((response) => {
+    const isStatusMode = sortOption === "pending" || sortOption === "accepted";
+    const statusParam2 = isStatusMode ? sortOption : "pending,accepted";
+    const sortByParam2 = isStatusMode ? "latest" : (sortOption as "latest" | "oldest");
+    fetchBookingDetails(userId, currentPage, limit, debouncedSearch || undefined, statusParam2, sortByParam2).then((response) => {
       setBookings(response.bookings);
       setTotalPages(Math.ceil(response.total / limit));
     });
@@ -275,24 +316,7 @@ const OngoingRequest = () => {
     );
   };
 
-  if (loading) {
-    return (
-      <div className="p-6 mb-[350px] mt-8">
-        <div className="mb-6">
-          <SkeletonLine width="w-1/3" height="h-8" className="mb-4" />
-          <div className="flex flex-col sm:flex-row gap-4">
-            <SkeletonLine width="w-full sm:w-5/6" height="h-10" />
-            <SkeletonLine width="w-full sm:w-1/6" height="h-10" />
-          </div>
-        </div>
-        <div className="space-y-3">
-          <SkeletonBlock height="h-20" />
-          <SkeletonBlock height="h-20" />
-          <SkeletonBlock height="h-20" />
-        </div>
-      </div>
-    );
-  }
+  // Do not early-return on loading; keep controls mounted to preserve input focus
 
   if (error) {
     return <p className="text-red-500 text-center py-8">{error}</p>;
@@ -301,7 +325,7 @@ const OngoingRequest = () => {
   if (selectedBooking) {
     return (
       <div className="p-6 mb-[350px] mt-8 space-y-6">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Ongoing Requests</h2>
+        <h2 className="text-2xl font-bold text-center text-gray-900 dark:text-gray-100">Ongoing Requests</h2>
         <BookingDetails
           bookingId={selectedBooking.id}
           viewerRole="user"
@@ -383,6 +407,15 @@ const OngoingRequest = () => {
 
               {(() => {
                 const status = localPaymentStatus ?? String(quota.paymentStatus);
+                const paymentWindowOpen = isPaymentWindowOpen(selectedBooking);
+                if (!paymentWindowOpen && (status === "pending" || status === "failed")) {
+                  // Show requested message before payment window opens
+                  return (
+                    <div className="mt-4 text-sm text-gray-600 dark:text-gray-300">
+                      Payment option will be shown once the job is completed.
+                    </div>
+                  );
+                }
                 if ((status === "pending" || status === "failed") && stripePromise && clientSecret) {
                   return (
                     <div className="mt-4">
@@ -392,14 +425,14 @@ const OngoingRequest = () => {
                     </div>
                   );
                 }
-                if (status === "pending" && !clientSecret) {
+                if (status === "pending" && !clientSecret && isPaymentWindowOpen(selectedBooking)) {
                   return (
                     <button onClick={handleStartPayment} className="mt-4 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white">
                       Go to Payment
                     </button>
                   );
                 }
-                if (status === "failed") {
+                if (status === "failed" && isPaymentWindowOpen(selectedBooking)) {
                   return (
                     <div className="mt-3">
                       <p className="text-sm text-red-500 dark:text-red-400">Your payment was not successful, please try again.</p>
@@ -420,56 +453,123 @@ const OngoingRequest = () => {
 
   return (
     <div className="p-6 mb-[350px] mt-8">
-      <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Ongoing Requests</h2>
-      {bookings.length > 0 && (
-        <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-          <input
-            type="text"
-            placeholder="Search by issue or location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <select
-            value={sortOption}
-            onChange={(e) => setSortOption(e.target.value as "latest" | "oldest" | "")}
-            className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-          >
-            <option value="latest">Sort by Latest</option>
-            <option value="oldest">Sort by Oldest</option>
-          </select>
-        </div>
-      )}
+      <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100">Ongoing Requests</h2>
+      <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+        <input
+          type="text"
+          placeholder="Search by booking ID, issue, or location..."
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            // ensure focus is retained while typing
+            inputRef.current?.focus();
+          }}
+          ref={inputRef}
+          autoFocus
+          className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400 dark:border-gray-600 dark:focus:ring-blue-400 transition-colors"
+        />
+        <select
+          value={sortOption}
+          onChange={(e) => {
+            setSortOption(e.target.value as "latest" | "oldest" | "pending" | "accepted");
+            setCurrentPage(1);
+          }}
+          className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:focus:ring-blue-400"
+        >
+          <option value="latest">Latest</option>
+          <option value="oldest">Oldest</option>
+          <option value="pending">Pending</option>
+          <option value="accepted">Accepted</option>
+        </select>
+      </div>
 
-      {bookings.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-500 dark:text-gray-400">No ongoing requests currently.</p>
-        </div>
-      ) : filteredAndSortedBookings.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8">
-          <p className="text-gray-500 dark:text-gray-400 mb-2">No ongoing requests that matched the search or sort criteria found.</p>
-          <div className="flex items-center gap-1">
-            <a
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                handleClearFilter();
-              }}
-              className="mt-2 inline-flex items-center text-blue-500 hover:text-blue-700"
-            >
-              <RotateCcw className="w-4 h-4 mr-1" /> Clear Filter
-            </a>
+      {loading ? (
+        <div>
+          {/* Mobile skeleton */}
+          <div className="md:hidden flex flex-col gap-4 animate-pulse">
+            {[...Array(3)].map((_, idx) => (
+              <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-md shadow border border-gray-200 dark:border-gray-700">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-6 w-24 bg-gray-300 dark:bg-gray-600 rounded-full mt-2" />
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table skeleton */}
+          <div className="hidden md:block overflow-x-auto animate-pulse">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-100 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">S.No</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Booking ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/6">Issue</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Booking Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {[...Array(5)].map((_, i) => (
+                    <tr key={i}>
+                      <td className="py-3 px-4 border-b"><div className="h-4 w-8 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-6 w-24 bg-gray-300 dark:bg-gray-600 rounded-full" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {/* Pagination skeleton */}
+              <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+            </div>
           </div>
         </div>
-      ) : (
-        <BookingTable
-          bookings={filteredAndSortedBookings}
-          onViewDetails={handleViewDetails}
-          totalPages={totalPages}
-          currentPage={currentPage}
-          onPageChange={handlePageChange}
-        />
-      )}
+      ) : (() => {
+        const isFiltered = (debouncedSearch && debouncedSearch.length > 0) || sortOption !== "latest";
+        if (bookings.length === 0) {
+          if (isFiltered) {
+            return (
+              <div className="flex flex-col items-center justify-center py-8">
+                <p className="text-gray-500 dark:text-gray-400 mb-2">No results found with the given search or sort criteria.</p>
+                <div className="flex items-center gap-1">
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleClearFilter();
+                    }}
+                    className="mt-2 inline-flex items-center text-blue-500 hover:text-blue-700"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-1" /> Clear Filter
+                  </a>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400">No ongoing requests currently.</p>
+            </div>
+          );
+        }
+        return (
+          <BookingTable
+            bookings={filteredAndSortedBookings}
+            onViewDetails={handleViewDetails}
+            totalPages={totalPages}
+            currentPage={currentPage}
+            onPageChange={handlePageChange}
+          />
+        );
+      })()}
 
       {/* Confirmation Modal for cancelling booking */}
       <ConfirmationModal

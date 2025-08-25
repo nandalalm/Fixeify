@@ -1,5 +1,5 @@
 // components/BookingHistory.tsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch } from "../../store/store";
 import { RootState } from "../../store/store";
@@ -11,7 +11,6 @@ import BookingTable from "../../components/Reuseable/BookingTable";
 import RaiseComplaintModal from "../Modals/RaiseComplaintModal";
 import RatingModal from "../Modals/RatingModal";
 import BookingDetails from "../../components/Reuseable/BookingDetails";
-import { SkeletonLine, SkeletonBlock } from "../../components/Reuseable/Skeleton";
 
 import { RotateCcw } from "lucide-react";
 import { fetchReviewsByUser } from "../../store/ratingReviewSlice";
@@ -58,24 +57,48 @@ const BookingHistory: React.FC = () => {
   useSelector((state: RootState) => state.ratingReview);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "">("latest");
-  const [currentPage] = useState<number>(1);
-  const [, setTotalPages] = useState<number>(1);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Build server-side query params from UI state
+  const serverParams = useMemo(() => {
+    const isStatus = ["completed", "rejected", "cancelled"].includes(sortOption);
+    const status = isStatus ? (sortOption as "completed" | "rejected" | "cancelled") : undefined;
+    const sortBy: "latest" | "oldest" = sortOption === "oldest" ? "oldest" : "latest";
+    return { status, sortBy };
+  }, [sortOption]);
+
+  const filtersActive = useMemo(() => {
+    const hasSearch = searchTerm.trim().length > 0;
+    const hasStatus = ["completed", "rejected", "cancelled"].includes(sortOption);
+    return hasSearch || hasStatus;
+  }, [searchTerm, sortOption]);
+
+  // Debounced fetch on userId, page, search, or sort changes
   useEffect(() => {
-    const loadBookings = async () => {
-      if (!userId) {
-        setError("User not authenticated. Please log in.");
-        setLoading(false);
-        return;
-      }
+    if (!userId) {
+      setError("User not authenticated. Please log in.");
+      setLoading(false);
+      return;
+    }
+
+    const run = async () => {
       try {
         setLoading(true);
-        const response = await fetchBookingHistoryDetails(userId, currentPage, 5); // Fetch 5 bookings per page
-        console.log("Booking history from API:", response); // Debug log
+        const response = await fetchBookingHistoryDetails(
+          userId,
+          currentPage,
+          5,
+          searchTerm.trim().length ? searchTerm.trim() : undefined,
+          serverParams.status,
+          serverParams.sortBy
+        );
         setBookings(response.bookings || []);
-        setTotalPages(Math.ceil(response.total / 5)); // Assuming backend returns total count
+        setTotalPages(Math.ceil((response.total || 0) / 5));
 
-        const quotaPromises = response.bookings
+        const quotaPromises = (response.bookings || [])
           .filter((booking) => booking.status.toLowerCase() === "completed")
           .map(async (booking) => {
             const quota = await fetchQuotaByBookingId(booking.id);
@@ -85,7 +108,7 @@ const BookingHistory: React.FC = () => {
         const quotasMap = quotaResults.reduce((acc, { bookingId, quota }) => ({
           ...acc,
           [bookingId]: quota,
-        }), {});
+        }), {} as { [key: string]: QuotaResponse | null });
         setQuotas(quotasMap);
       } catch (err) {
         console.error("Error fetching booking history:", err);
@@ -94,8 +117,14 @@ const BookingHistory: React.FC = () => {
         setLoading(false);
       }
     };
-    loadBookings();
-  }, [userId, currentPage]);
+
+    // debounce search
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(run, 350);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [userId, currentPage, searchTerm, serverParams.status, serverParams.sortBy]);
 
   useEffect(() => {
     if (userId) {
@@ -110,52 +139,8 @@ const BookingHistory: React.FC = () => {
   const handleClearFilter = () => {
     setSearchTerm("");
     setSortOption("latest");
+    setCurrentPage(1);
   };
-
-  const filteredAndSortedBookings = bookings
-    .filter((booking) => {
-      const matchesSearch =
-        booking.issueDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.location.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.pro.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        booking.pro.lastName.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      if (["completed", "rejected", "cancelled"].includes(sortOption)) {
-        return booking.status.toLowerCase() === sortOption && matchesSearch;
-      }
-      return matchesSearch;
-    })
-    .sort((a, b) => {
-      if (sortOption === "latest" || sortOption === "") {
-        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      }
-      if (sortOption === "oldest") {
-        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-      }
-      return 0;
-    });
-
-  const hasMatchingBookings = filteredAndSortedBookings.length > 0;
-
-  if (loading) {
-    return (
-      <div className="p-6 mb-[350px] mt-8">
-        <div className="mb-6">
-          <SkeletonLine width="w-1/3" height="h-8" className="mb-4" />
-          <div className="flex flex-col sm:flex-row gap-4">
-            <SkeletonLine width="w-full sm:w-5/6" height="h-10" />
-            <SkeletonLine width="w-full sm:w-1/6" height="h-10" />
-          </div>
-        </div>
-        <div className="space-y-3">
-          <SkeletonBlock height="h-20" />
-          <SkeletonBlock height="h-20" />
-          <SkeletonBlock height="h-20" />
-        </div>
-      </div>
-    );
-  }
 
   if (error) {
     // Keep inline error for full-page failures
@@ -184,7 +169,14 @@ const BookingHistory: React.FC = () => {
       setComplaintBookingId(null);
       // Refetch bookings to reflect complaint flags so button hides
       try {
-        const refreshed = await fetchBookingHistoryDetails(userId, currentPage, 5);
+        const refreshed = await fetchBookingHistoryDetails(
+          userId,
+          currentPage,
+          5,
+          searchTerm.trim().length ? searchTerm.trim() : undefined,
+          serverParams.status,
+          serverParams.sortBy
+        );
         setBookings(refreshed.bookings || []);
         setTotalPages(Math.ceil((refreshed.total || 0) / 5));
       } catch (e) {
@@ -211,20 +203,22 @@ const BookingHistory: React.FC = () => {
       {error && (
         <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-center">{error}</div>
       )}
-      <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">Booking History</h2>
-      {bookings.length > 0 && !selectedBookingId && (
+      <h2 className="text-2xl font-bold mb-8 text-center dark:text-gray-200">Booking History</h2>
+      {!selectedBookingId && (
         <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
           <input
             type="text"
             placeholder="Search by issue, category, professional, or location..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            ref={searchInputRef}
+            autoFocus
+            className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400 dark:border-gray-600 dark:focus:ring-blue-400 transition-colors"
           />
           <select
             value={sortOption}
             onChange={(e) => setSortOption(e.target.value as "latest" | "oldest" | "completed" | "rejected" | "cancelled" | "")}
-            className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+            className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:focus:ring-blue-400"
           >
             <option value="latest">Sort by Latest</option>
             <option value="oldest">Sort by Oldest</option>
@@ -235,20 +229,68 @@ const BookingHistory: React.FC = () => {
         </div>
       )}
 
-      {bookings.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-500 dark:text-gray-400">No booking history available.</p>
+      {loading ? (
+        <div>
+          <div className="md:hidden flex flex-col gap-4 animate-pulse">
+            {[...Array(3)].map((_, idx) => (
+              <div key={idx} className="bg-white dark:bg-gray-800 p-4 rounded-md shadow border border-gray-200 dark:border-gray-700">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-6 w-24 bg-gray-300 dark:bg-gray-600 rounded-full mt-2" />
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table skeleton */}
+          <div className="hidden md:block overflow-x-auto animate-pulse">
+            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-100 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-1/12">S.No</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-3/12">Booking ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/6">Issue</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Booking Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase dark:text-gray-100 w-2/12">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {[...Array(5)].map((_, i) => (
+                    <tr key={i}>
+                      <td className="py-3 px-4 border-b"><div className="h-4 w-8 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-6 w-24 bg-gray-300 dark:bg-gray-600 rounded-full" /></td>
+                      <td className="py-3 px-4 border-b"><div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {/* Pagination skeleton */}
+              <div className="bg-white px-4 py-3 flex items-center justify-center border-t border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+              </div>
+            </div>
+          </div>
         </div>
-      ) : !hasMatchingBookings ? (
+      ) : bookings.length === 0 && filtersActive ? (
         <div className="flex flex-col items-center justify-center py-8">
           <p className="text-gray-500 dark:text-gray-400 mb-2">
-            No bookings match the search or sort criteria.
+            No results found for the current search or sort criteria.
           </p>
           <div className="flex items-center gap-1">
             <a href="#" onClick={(e) => { e.preventDefault(); handleClearFilter(); }} className="mt-2 inline-flex items-center text-blue-500 hover:text-blue-700">
               <RotateCcw className="w-4 h-4 mr-1" /> Clear Filter
             </a>
           </div>
+        </div>
+      ) : bookings.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500 dark:text-gray-400">No booking history available.</p>
         </div>
       ) : (
         selectedBookingId ? (
@@ -258,7 +300,14 @@ const BookingHistory: React.FC = () => {
             onBack={async () => {
               setSelectedBookingId(null);
               try {
-                const refreshed = await fetchBookingHistoryDetails(userId, currentPage, 5);
+                const refreshed = await fetchBookingHistoryDetails(
+                  userId,
+                  currentPage,
+                  5,
+                  searchTerm.trim().length ? searchTerm.trim() : undefined,
+                  serverParams.status,
+                  serverParams.sortBy
+                );
                 setBookings(refreshed.bookings || []);
                 setTotalPages(Math.ceil((refreshed.total || 0) / 5));
               } catch (e) {
@@ -283,13 +332,13 @@ const BookingHistory: React.FC = () => {
           />
         ) : (
           <BookingTable
-            bookings={filteredAndSortedBookings}
+            bookings={bookings}
             onViewDetails={(booking: BookingResponse) => {
               setSelectedBookingId(booking.id);
             }}
-            totalPages={1}
-            currentPage={1}
-            onPageChange={() => {}}
+            totalPages={totalPages}
+            currentPage={currentPage}
+            onPageChange={(page) => setCurrentPage(page)}
           />
         )
       )}
@@ -314,7 +363,14 @@ const BookingHistory: React.FC = () => {
           onSuccess={async () => {
             // Refresh list so isRated is updated and button hides after closing modal
             try {
-              const refreshed = await fetchBookingHistoryDetails(userId, currentPage, 5);
+              const refreshed = await fetchBookingHistoryDetails(
+                userId,
+                currentPage,
+                5,
+                searchTerm.trim().length ? searchTerm.trim() : undefined,
+                serverParams.status,
+                serverParams.sortBy
+              );
               setBookings(refreshed.bookings || []);
               setTotalPages(Math.ceil((refreshed.total || 0) / 5));
             } catch (e) {

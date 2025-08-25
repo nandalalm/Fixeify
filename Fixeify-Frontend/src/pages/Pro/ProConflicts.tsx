@@ -127,7 +127,7 @@ const ProConflicts: React.FC = () => {
   const isListLoading = loading && !selected;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gray-50">
       <ProTopNavbar 
         toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
         isLargeScreen={isLargeScreen}
@@ -144,7 +144,7 @@ const ProConflicts: React.FC = () => {
                 <div className="h-8 bg-gray-200 rounded w-64" />
               </div>
             ) : (
-              <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">Your Conflicts</h1>
+              <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Your Conflicts</h1>
             )}
 
             {anyTicketsExist ? (

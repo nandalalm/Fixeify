@@ -18,7 +18,7 @@ export interface IAdminService {
   createCategory(name: string, image: string): Promise<CategoryResponse>;
   getCategories(page: number, limit: number): Promise<{ categories: CategoryResponse[]; total: number }>;
   updateCategory(categoryId: string, data: { name?: string; image?: string }): Promise<CategoryResponse | null>;
-  getBookings(page: number, limit: number, search?: string, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }>;
+  getBookings(page: number, limit: number, search?: string, status?: string, sortBy?: "latest" | "oldest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }>;
   getQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null>;
   getWithdrawalRequests(
     page: number,

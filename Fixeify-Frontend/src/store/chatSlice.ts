@@ -186,12 +186,6 @@ const chatSlice = createSlice({
   reducers: {
     addMessage: (state, action: PayloadAction<Message>) => {
       const message = action.payload;
-      console.log('🔄 addMessage reducer called:', {
-        chatId: message.chatId,
-        senderId: message.senderId,
-        content: message.content?.substring(0, 50),
-        isRead: message.isRead
-      });
       
       if (!state.messages[message.chatId]) {
         state.messages[message.chatId] = [];
@@ -210,8 +204,6 @@ const chatSlice = createSlice({
       
       const conversation = state.conversations.find((conv) => conv.id === message.chatId);
       if (conversation) {
-        const prevUnreadCount = conversation.unreadCount;
-        const prevLastMessage = conversation.lastMessage?.content;
         
         conversation.lastMessage = {
           id: message.id,
@@ -229,13 +221,6 @@ const chatSlice = createSlice({
         
         conversation.updatedAt = new Date().toISOString();
         
-        console.log('📊 Conversation updated:', {
-          chatId: message.chatId,
-          prevUnreadCount,
-          newUnreadCount: conversation.unreadCount,
-          prevLastMessage: prevLastMessage?.substring(0, 30),
-          newLastMessage: conversation.lastMessage.content?.substring(0, 30)
-        });
       }
     },
   

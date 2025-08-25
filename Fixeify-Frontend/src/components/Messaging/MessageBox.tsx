@@ -104,6 +104,9 @@ const MessageBox: FC<MessageBoxProps> = ({
     );
   };
 
+  // Apply mobile-specific tweaks only for Pro side
+  const isPro = currentUser.role === "pro";
+
   const [newMessage, setNewMessage] = useState("");
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -698,7 +701,7 @@ const MessageBox: FC<MessageBoxProps> = ({
       </div>
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-2 relative"
+        className={`flex-1 overflow-y-auto p-4 space-y-2 relative ${isPro ? 'pb-28' : ''}`}
         style={{ minHeight: '200px' }}
         onScroll={handleScroll}
       >
@@ -729,7 +732,7 @@ const MessageBox: FC<MessageBoxProps> = ({
           </button>
         )}
       </div>
-      <div className="p-4 border-t bg-gray-50 dark:bg-gray-700">
+      <div className={`p-4 border-t bg-gray-50 dark:bg-gray-700 ${isPro ? 'sticky bottom-0 z-10' : ''}`}> 
         <div className="border-t border-gray-200 dark:border-gray-700">
           {/* Image Preview */}
           {imagePreview && (
@@ -779,7 +782,7 @@ const MessageBox: FC<MessageBoxProps> = ({
               onKeyPress={handleKeyPress}
               placeholder="Type a message..."
               disabled={isSending || isUploadingImage}
-              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white rounded-full focus:outline-none focus:ring-2 focus:ring-[#032b44] dark:focus:ring-gray-50 focus:border-transparent disabled:opacity-50 resize-none"
+              className={`flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white rounded-full focus:outline-none focus:ring-2 focus:ring-[#032b44] dark:focus:ring-gray-50 focus:border-transparent disabled:opacity-50 resize-none ${isPro ? 'min-h-[40px] max-h-28 overflow-y-auto' : ''}`}
               rows={1}
             />
             

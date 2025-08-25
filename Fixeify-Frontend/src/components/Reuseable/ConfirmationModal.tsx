@@ -80,7 +80,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
     >
       <div
         className={`p-6 rounded-lg shadow-lg w-96 relative ${
-          action === "logout" ? "bg-white dark:bg-[#1E2939]" : "bg-white"
+          action === "logout" ? "bg-white dark:bg-[#1E2939]" : "bg-white dark:bg-gray-800"
         }`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -90,7 +90,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           </div>
         )}
         <h3
-          className={`text-lg font-semibold mb-4 ${action === "logout" ? "dark:text-white" : ""}`}
+          className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100"
         >
           {action === "approve" && `Approve ${entityType === "pro" ? "Pro" : "User"}`}
           {action === "reject" && `Reject ${entityType === "pro" ? "Pro" : "User"}`}
@@ -111,7 +111,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           {action === "openTicket" && (customTitle || "Open Ticket")}
           {action === "closeTicket" && (customTitle || "Close Ticket")}
         </h3>
-        <p className={`mb-4 ${action === "logout" ? "dark:text-white" : ""}`}>
+        <p className="mb-4 text-gray-700 dark:text-gray-200">
           {action === null && customReason
             ? customReason
             : action === "approve" && `Are you sure you want to approve this ${entityType === "pro" ? "pro" : "user"}?`}
@@ -150,7 +150,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
                   setCustomReason("");
                 }
               }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
               disabled={isProcessing}
             >
               <option value="">Select a reason</option>
@@ -168,7 +168,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
                   setCustomReason(e.target.value);
                   setReason(e.target.value);
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md mt-2"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md mt-2 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                 placeholder="Enter custom reason"
                 autoFocus
                 disabled={isProcessing}
@@ -190,8 +190,7 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 rounded-md text-white hover:opacity-95 border shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:!bg-gray-700 dark:!text-gray-100 dark:!hover:bg-gray-600 dark:!border-gray-600 dark:!shadow-sm dark:!focus-visible:ring-gray-500 dark:!focus-visible:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: "#032b44", borderColor: "#032b44" }}
+            className="px-4 py-2 rounded-md bg-[#032b44] dark:bg-[#032b44] text-white dark:!text-white hover:bg-[#054869] dark:hover:bg-[#054869] border border-[#032b44] shadow-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#032b44] dark:focus-visible:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isProcessing || ((action === "reject" || action === "rejectBooking" || action === "rejectWithdrawal" || (action === "cancel" && customTitle === "Select Cancellation Reason")) && !reason)}
           >
             {isProcessing ? "Processing..." : "Confirm"}

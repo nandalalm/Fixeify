@@ -24,7 +24,6 @@ class DatabaseConnector {
       const conn = mongoose.connection;
       conn.on("connected", () => console.log("MongoDB connected to Atlas"));
       conn.on("error", (err) => console.error("MongoDB connection error:", err));
-      conn.on("disconnected", () => console.warn("MongoDB disconnected"));
 
       const graceful = async (signal: string) => {
         try {

@@ -26,6 +26,7 @@ export const AdminTopNavbar: FC<AdminTopNavbarProps> = ({ sidebarOpen, setSideba
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const unreadNotificationCount = useMemo(
     () => notifications.filter((n) => !n.isRead).length,
@@ -36,6 +37,12 @@ export const AdminTopNavbar: FC<AdminTopNavbarProps> = ({ sidebarOpen, setSideba
     if (!user || user.role !== "admin" || !accessToken) return;
     dispatch(fetchAllNotifications({ userId: user.id, role: "admin", page: 1, limit: 10, filter }));
   }, [user, accessToken, filter, dispatch]);
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleLoadMore = async () => {
     if (loading || !hasMore || !user) return;
@@ -92,38 +99,44 @@ export const AdminTopNavbar: FC<AdminTopNavbarProps> = ({ sidebarOpen, setSideba
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 p-4 flex items-center justify-between z-30">
-      <div className="flex items-center">
-        {!isLargeScreen && (
+    <header
+      className={`sticky top-0 z-50 w-full bg-white border-b border-gray-200 transition-all duration-300 ${
+        isScrolled ? "shadow-md" : "shadow-none"
+      }`}
+    >
+      <div className="w-full flex items-center justify-between px-3 md:px-4 lg:px-6 py-3">
+        <div className="flex items-center">
+          {!isLargeScreen && (
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
+              aria-label="Toggle sidebar"
+            >
+              {sidebarOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
+          )}
+          <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
+        </div>
+        <div className="flex items-center space-x-4 ml-auto">
           <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md text-gray-600 hover:bg-gray-100"
-            aria-label="Toggle sidebar"
+            onClick={() => setIsNotificationPanelOpen(true)}
+            className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200"
+            aria-label="Open notifications"
           >
-            {sidebarOpen ? (
-              <X className="h-6 w-6" />
-            ) : (
-              <Menu className="h-6 w-6" />
+            <Bell className="h-5 w-5" />
+            {unreadNotificationCount > 0 && (
+              <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
+                {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+              </span>
             )}
           </button>
-        )}
-        <h1 className="text-xl font-semibold text-gray-800 ml-4">Fixeify Admin</h1>
-      </div>
-      <div className="flex items-center space-x-4">
-        <button
-          onClick={() => setIsNotificationPanelOpen(true)}
-          className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200"
-          aria-label="Open notifications"
-        >
-          <Bell className="h-5 w-5" />
-          {unreadNotificationCount > 0 && (
-            <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
-              {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-            </span>
-          )}
-        </button>
-        <div className="flex items-center">
-          <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{userName}</span>
+          <div className="flex items-center">
+            <span className="text-lg font-medium text-gray-700 mr-2 hidden sm:inline">{userName}</span>
+          </div>
         </div>
       </div>
 

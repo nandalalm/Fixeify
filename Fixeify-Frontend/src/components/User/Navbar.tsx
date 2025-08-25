@@ -21,7 +21,6 @@ const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
 
-  // When opening the panel, always set filter to 'all'
   useEffect(() => {
     if (isNotificationPanelOpen) {
       setFilter('all');
@@ -30,19 +29,15 @@ const Navbar = () => {
   const auth = useSelector((state: RootState) => state.auth);
   const user = auth.user as import("../../interfaces/messagesInterface").User;
   const accessToken = auth.accessToken;
-  // Do NOT return null for the whole navbar. Only guard user-specific features below.
   const { theme, toggleTheme } = useTheme();
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
-    // Use Redux notifications state
   const notifications = useSelector((state: RootState) => state.chat.notifications);
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  // Remove setInitialLoad and initialLoad (not implemented)
-
 
   useEffect(() => {
     const handleScroll = () => {
@@ -67,7 +62,6 @@ const Navbar = () => {
         fetchAllNotifications({ userId: user.id, role: "user", page: nextPage, limit: 10, filter })
       ).unwrap();
       setPage(nextPage);
-      // If fewer than 10 notifications returned, no more to fetch
       setHasMore(result.length === 10);
     } catch {
       setHasMore(false);
@@ -89,12 +83,10 @@ const Navbar = () => {
     const socket = getSocket();
     if (!socket) return;
     const handler = (notif: NotificationItem & { receiverId?: string }) => {
-      console.log('[SOCKET] newNotification received:', notif);
       if ((notif.userId || notif.receiverId) === user.id) {
         const isValid = notif.title || notif.description;
         if (!isValid) return;
         dispatch(addNotification(notif));
-        // Real-time update - no need to fetch from backend
       }
     };
 
@@ -139,7 +131,6 @@ const Navbar = () => {
 
   const unreadNotificationCount = useMemo(() => {
     const count = notifications.filter((n: NotificationItem) => !n.isRead).length;
-    console.log('[SOCKET][DEBUG] unreadNotificationCount recalculated:', count);
     return count;
   }, [notifications]);
 
@@ -153,20 +144,22 @@ const Navbar = () => {
       } bg-white dark:bg-gray-900`}
       style={{ top: 0, margin: 0, padding: 0, transform: "translateY(0)" }}
     >
-      <div className="container flex justify-between items-center mx-auto px-4 py-3" style={{ margin: 0 }}>
+      <div className="w-full flex justify-between items-center px-3 md:px-4 lg:px-6 py-3" style={{ margin: 0 }}>
+        {/* Mobile logo */}
+        <img
+          src="/logo2.png"
+          alt="Fixeify Logo"
+          className="block md:hidden h-10 w-auto dark:filter dark:invert cursor-pointer"
+          onClick={() => navigate("/home")}
+        />
+        {/* Desktop/Tablet logo */}
         <img
           src="/logo.png"
           alt="Fixeify Logo"
-          className="h-8 w-auto md:h-10 dark:filter dark:invert"
+          className="hidden md:block h-10 w-auto dark:filter dark:invert cursor-pointer"
           onClick={() => navigate("/home")}
         />
-        <nav className="gap-6 hidden items-center md:flex">
-          <Link to="#how-it-works" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
-            How It Works
-          </Link>
-          <Link to="#help" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
-            Help
-          </Link>
+        <nav className="ml-auto gap-6 hidden items-center md:flex">
           <div className="flex items-center gap-2">
             <button
               onClick={toggleTheme}
@@ -251,7 +244,7 @@ const Navbar = () => {
             </button>
           )}
         </nav>
-        <div className="md:hidden flex items-center gap-4">
+        <div className="md:hidden ml-auto flex items-center gap-4">
           <button onClick={toggleTheme} className="p-2">
             {theme === "light" ? <Moon className="h-5 w-5 text-gray-700 dark:text-white" /> : <Sun className="h-5 w-5 text-yellow-400" />}
           </button>
@@ -301,15 +294,6 @@ const Navbar = () => {
             className="fixed top-[60px] left-0 w-full bg-white shadow-md md:hidden pb-4 px-4 py-2 z-50 dark:bg-gray-900 dark:border-gray-700"
           >
             <nav className="flex flex-col space-y-3">
-              <Link
-                to="#how-it-works"
-                className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
-              >
-                How It Works
-              </Link>
-              <Link to="#help" className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white">
-                Help
-              </Link>
               <Link
                 to="/become-pro"
                 className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"

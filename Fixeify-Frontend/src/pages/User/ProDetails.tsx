@@ -27,19 +27,20 @@ const ProDetails = () => {
   const selectedLocation = location.state?.location as ILocation | undefined;
 
   const [pro, setPro] = useState<IApprovedPro | undefined>(proFromState);
-  const [visibleCount, setVisibleCount] = useState(5);
   const dispatch = useDispatch<AppDispatch>();
-  const { items: reviews, loading } = useSelector((state: RootState) => state.ratingReview);
+  const { items: reviews, loading, total, page } = useSelector((state: RootState) => state.ratingReview);
 
   useEffect(() => {
     if (proFromState?._id) {
-      dispatch(fetchReviewsByPro({ proId: proFromState._id, page: 1 }));
+      dispatch(fetchReviewsByPro({ proId: proFromState._id, page: 1, limit: 3, append: false }));
     }
   }, [dispatch, proFromState?._id]);
 
   const handleLoadMore = () => {
-    if (visibleCount < reviews.length) {
-      setVisibleCount((prev) => prev + 5);
+    if (!proFromState?._id) return;
+    if (loading) return;
+    if (reviews.length < total) {
+      dispatch(fetchReviewsByPro({ proId: proFromState._id, page: (page || 1) + 1, limit: 3, append: true }));
     }
   };
 
@@ -263,7 +264,7 @@ const ProDetails = () => {
                     <p className="text-base text-gray-900 dark:text-gray-300">No reviews yet.</p>
                   ) : (
                     <div className="flex flex-col gap-4">
-                      {reviews.slice(0, visibleCount).map((review, index) => (
+                      {reviews.map((review, index) => (
                         <div key={index} className="bg-gray-50 dark:bg-gray-800/60 rounded-md p-4 shadow-sm">
                           <div className="flex items-center gap-3 mb-3">
                             <div className="w-10 h-10 rounded-full overflow-hidden">
@@ -287,7 +288,7 @@ const ProDetails = () => {
                       ))}
                     </div>
                   )}
-                  {visibleCount < reviews.length && (
+                  {reviews.length < total && (
                     <button
                       onClick={handleLoadMore}
                       className="mt-4 w-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 px-4 rounded-md font-medium hover:bg-gray-200 dark:hover:bg-gray-600 text-sm text-center"

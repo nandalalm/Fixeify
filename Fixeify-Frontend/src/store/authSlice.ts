@@ -109,9 +109,9 @@ export const refreshToken = createAsyncThunk<RefreshTokenResponse, void, { rejec
   }
 );
 
-export const checkBanStatus = createAsyncThunk<void, void, { rejectValue: string }>(
+export const checkBanStatus = createAsyncThunk<{ isBanned: boolean } | void, void, { rejectValue: string }>(
   "auth/checkBanStatus",
-  async (_, { rejectWithValue, dispatch, getState }) => {
+  async (_, { rejectWithValue, getState }) => {
     try {
       const state = getState() as RootState;
       const user = state.auth.user;
@@ -122,13 +122,9 @@ export const checkBanStatus = createAsyncThunk<void, void, { rejectValue: string
         withCredentials: true,
       });
 
-      if (response.data.isBanned) {
-        dispatch(logoutUserSync());
-        return rejectWithValue("User is banned");
-      }
+      return { isBanned: !!response.data.isBanned };
     } catch (err: any) {
       console.error("Ban status check failed:", err);
-      dispatch(logoutUserSync());
       return rejectWithValue(err.response?.data?.message || "Failed to check ban status");
     }
   }

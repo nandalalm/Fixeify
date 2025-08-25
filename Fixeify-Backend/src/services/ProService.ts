@@ -186,10 +186,18 @@ export class ProService implements IProService {
     return this._categoryRepository.getCategoriesWithPagination(0, 100);
   }
 
-  async fetchProBookings(proId: string, page?: number, limit?: number, status?: string, sortBy?: "latest" | "oldest"): Promise<{ bookings: BookingResponse[]; total: number }> {
+  async fetchProBookings(
+    proId: string,
+    page?: number,
+    limit?: number,
+    status?: string,
+    sortBy?: "latest" | "oldest",
+    search?: string,
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }> {
     const pro = await this._proRepository.findApprovedProById(proId);
     if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
-    return this._bookingRepository.fetchProBookings(proId, page, limit, status, sortBy);
+    return this._bookingRepository.fetchProBookings(proId, page, limit, status, sortBy, search, bookingId);
   }
 
   async getBookingById(id: string): Promise<BookingResponse> {
@@ -253,7 +261,6 @@ export class ProService implements IProService {
 
       const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, true);
       if (!availabilityUpdate) {
-        console.log(MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY + " Pro document:", await this._proRepository.findApprovedProById(pro.id));
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
       }
 
@@ -317,7 +324,6 @@ export class ProService implements IProService {
 
     const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
     if (!availabilityUpdate) {
-      console.log(MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY + " Pro document:", await this._proRepository.findApprovedProById(pro.id));
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
     }
 
@@ -386,8 +392,14 @@ export class ProService implements IProService {
     return this._walletRepository.findWalletByProId(proId);
   }
 
-  async getWalletWithPagination(proId: string, page: number, limit: number): Promise<{ wallet: WalletResponseDTO | null; total: number }> {
-    return this._walletRepository.findWalletByProIdAndPagination(proId, page, limit);
+  async getWalletWithPagination(
+    proId: string,
+    page: number,
+    limit: number,
+    sortBy?: "latest" | "oldest" | "credit" | "debit",
+    search?: string
+  ): Promise<{ wallet: WalletResponseDTO | null; total: number }> {
+    return this._walletRepository.findWalletByProIdAndPagination(proId, page, limit, sortBy, search);
   }
 
   async requestWithdrawal(
@@ -569,7 +581,22 @@ export class ProService implements IProService {
     };
   }
 
-  async getMonthlyRevenueSeries(proId: string, lastNMonths?: number): Promise<Array<{ year: number; month: number; revenue: number }>> {
+  async getMonthlyRevenueSeries(
+    proId: string,
+    lastNMonths?: number
+  ): Promise<Array<{ year: number; month: number; revenue: number }>> {
     return this._bookingRepository.getProMonthlyRevenueSeries(proId, lastNMonths);
+  }
+
+  async getPopularCategories(
+    limit: number = 2
+  ): Promise<Array<{ id: string; name: string; image?: string; bookingCount: number }>> {
+    const top = await this._bookingRepository.getTopCategoriesByCompleted(limit);
+    return top.map((t) => ({
+      id: (t as any).categoryId?.toString?.() ?? String(t.categoryId),
+      name: t.name,
+      image: t.image,
+      bookingCount: t.bookingCount,
+    }));
   }
 }

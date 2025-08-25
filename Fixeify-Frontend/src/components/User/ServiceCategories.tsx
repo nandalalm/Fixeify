@@ -28,6 +28,25 @@ const ServiceCategories = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    // Desktop only: translate wheel to horizontal scroll
+    if (window.innerWidth < 768) return;
+    const el = carouselRef.current;
+    if (!el) return;
+    // Normalize delta across devices: deltaMode 0=pixels, 1=lines, 2=pages
+    const native = e.nativeEvent as WheelEvent;
+    const baseDelta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (baseDelta === 0) return;
+    const LINE_HEIGHT = 40; // px per wheel line
+    const SPEED = 2.5; // multiplier for snappier feel
+    let deltaPx = baseDelta;
+    if (native.deltaMode === 1) deltaPx = baseDelta * LINE_HEIGHT; // lines -> px
+    else if (native.deltaMode === 2) deltaPx = baseDelta * el.clientWidth; // pages -> px
+    const move = deltaPx * SPEED;
+    e.preventDefault();
+    el.scrollLeft += move;
+  };
+
   useEffect(() => {
     const fetchCategories = async () => {
       try {
@@ -81,11 +100,17 @@ const ServiceCategories = () => {
     }
   }, [loading, categories]);
 
+  // wheel handled via onWheel prop on the container for reliability
+
   return (
     <section className="container text-center mx-auto px-6 py-8 dark:bg-gray-900">
       <h2 className="text-2xl font-bold mb-5 pb-5 dark:text-white">Our Services</h2>
       {loading ? (
-        <div className="flex p-4 w-full overflow-x-auto scroll-smooth scrollbar-none snap-x space-x-4">
+        <div
+          onWheel={handleWheel}
+          className="flex p-4 w-full overflow-x-auto overflow-y-hidden overscroll-contain scroll-smooth scrollbar-none snap-x space-x-4"
+          style={{ touchAction: "pan-x" }}
+        >
           {[...Array(8)].map((_, index) => (
             <div key={index} className="w-40 lg:w-56 md:w-48 shrink-0 snap-center">
               <div className="rounded-lg aspect-square mb-2 bg-gray-200 animate-pulse" />
@@ -100,7 +125,9 @@ const ServiceCategories = () => {
       ) : (
         <div
           ref={carouselRef}
-          className="flex p-4 w-full overflow-x-auto scroll-smooth scrollbar-none snap-x space-x-4"
+          onWheel={handleWheel}
+          className="flex p-4 w-full overflow-x-auto overflow-y-hidden overscroll-contain scroll-smooth scrollbar-none snap-x space-x-4"
+          style={{ touchAction: "pan-x" }}
         >
           {categories.map((category) => (
             <div key={category.id} className="w-40 lg:w-56 md:w-48 shrink-0 snap-center">

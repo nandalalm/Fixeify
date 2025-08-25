@@ -55,7 +55,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
     email: "",
     phoneNo: "",
     address: null,
-    photo: null,
+    photo: "",
   });
   const [originalData, setOriginalData] = useState<UserProfile | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -88,7 +88,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
             email: fetchedUser.email, 
             phoneNo: fetchedUser.phoneNo || "",
             address,
-            photo: fetchedUser.photo || null,
+            photo: fetchedUser.photo || "",
           });
           setOriginalData({ ...fetchedUser, id: user.id });
         } catch (error) {
@@ -135,19 +135,17 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
 
             const locationData: LocationData = {
               address,
-              city,
-              state,
+              city: city || "",
+              state: state || "",
               coordinates: { type: "Point", coordinates: [lng, lat] },
             };
 
             if (!city || !state) {
-              const errorMessage = "Please include both city and state in your location.";
               setErrors((prev) => ({
                 ...prev,
-                address: errorMessage,
+                address: "Please provide a location with city and state.",
               }));
               setFormData((prev) => ({ ...prev, address: null }));
-              validateField("address", null);
               return;
             }
 
@@ -164,7 +162,6 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
               address: "Please provide a valid location with city and state.",
             }));
             setFormData((prev) => ({ ...prev, address: null }));
-            validateField("address", null);
           }
         });
       }
@@ -216,7 +213,6 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
 
                 if (!lat || !lng) {
                   setErrors((prev) => ({ ...prev, address: "Unable to fetch location coordinates." }));
-                  validateField("address", null);
                   return;
                 }
 
@@ -229,19 +225,17 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
 
                 const locationData: LocationData = {
                   address,
-                  city,
-                  state,
+                  city: city || "",
+                  state: state || "",
                   coordinates: { type: "Point", coordinates: [longitude, latitude] },
                 };
 
                 if (!city || !state) {
-                  const errorMessage = "Please include both city and state in your location.";
                   setErrors((prev) => ({
                     ...prev,
-                    address: errorMessage,
+                    address: "Please provide a location with city and state.",
                   }));
                   setFormData((prev) => ({ ...prev, address: null }));
-                  validateField("address", null);
                   return;
                 }
 
@@ -255,7 +249,6 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
                 validateField("address", locationData);
               } else {
                 setErrors((prev) => ({ ...prev, address: "Unable to fetch current location details." }));
-                validateField("address", null);
               }
             }
           );
@@ -275,13 +268,11 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
               break;
           }
           setErrors((prev) => ({ ...prev, address: errorMessage }));
-          validateField("address", null);
         }
       );
     } else {
       setIsLoadingLocation(false);
       setErrors((prev) => ({ ...prev, address: "Geolocation is not supported by this browser." }));
-      validateField("address", null);
     }
   };
 
@@ -304,8 +295,8 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
     if (files && files.length > 0) {
       const file = files[0];
       if (!file.type.startsWith("image/")) {
-        setErrors((prev) => ({ ...prev, photo: "Only images are allowed" }));
-        validateField("photo", null);
+        setErrors((prev) => ({ ...prev, photo: "Please select an image file only (JPG, PNG, GIF, etc.)" }));
+        // Don't call validateField for photo errors to avoid Zod validation
         return;
       }
       try {
@@ -320,7 +311,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
         validateField("photo", url);
       } catch (error) {
         setErrors((prev) => ({ ...prev, photo: "Failed to upload image" }));
-        validateField("photo", null);
+        // Don't call validateField for photo errors to avoid Zod validation
       } finally {
         setIsUploadingProfilePhoto(false);
       }
@@ -337,8 +328,8 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
     if (files && files.length > 0) {
       const file = files[0];
       if (!file.type.startsWith("image/")) {
-        setErrors((prev) => ({ ...prev, photo: "Only images are allowed" }));
-        validateField("photo", null);
+        setErrors((prev) => ({ ...prev, photo: "Please select an image file only (JPG, PNG, GIF, etc.)" }));
+        // Don't call validateField for photo errors to avoid Zod validation
         return;
       }
       try {
@@ -353,7 +344,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
         validateField("photo", url);
       } catch (error) {
         setErrors((prev) => ({ ...prev, photo: "Failed to upload image" }));
-        validateField("photo", null);
+        // Don't call validateField for photo errors to avoid Zod validation
       } finally {
         setIsUploadingProfilePhoto(false);
       }
@@ -365,19 +356,19 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
     if (name === "location") {
       setFormData((prev) => ({ ...prev, address: null }));
       if (!value.trim()) {
-        setErrors((prev) => ({
-          ...prev,
-          address: "Please provide your location.",
-        }));
-        validateField("address", null);
-      } else {
+        // Clear any existing location errors when field is empty
         setErrors((prev) => {
           const newErrors = { ...prev };
           delete newErrors.address;
           return newErrors;
         });
+      } else {
+        // Show error only when user types but doesn't select from suggestions
+        setErrors((prev) => ({
+          ...prev,
+          address: "Please select a location from the suggestions or use current location",
+        }));
       }
-      setFormData((prev) => ({ ...prev, address: null }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
       validateField(name, value);
@@ -391,6 +382,16 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
       delete newErrors.general;
       return newErrors;
     });
+
+    // Check if there are any existing validation errors
+    const hasErrors = Object.keys(errors).some(key => key !== 'general' && errors[key]);
+    if (hasErrors) {
+      setErrors((prev) => ({
+        ...prev,
+        general: "Please fix all validation errors before submitting",
+      }));
+      return;
+    }
 
     try {
       const validatedData = editProfileSchema.parse({
@@ -579,6 +580,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
                     <p className="text-gray-500 dark:text-gray-400">Or if you prefer...</p>
                     <input
                       type="file"
+                      accept="image/*"
                       onChange={handleFileChange}
                       className="hidden"
                       id="profilePhotoInput"
@@ -629,7 +631,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
                           coordinates: originalData.address.coordinates,
                         }
                       : null,
-                    photo: originalData?.photo || null,
+                    photo: originalData?.photo || "",
                   });
                   sessionStorage.setItem("isEditing", "false");
                 }}

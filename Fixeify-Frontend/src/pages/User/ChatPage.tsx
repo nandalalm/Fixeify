@@ -73,13 +73,11 @@ const ChatPage = () => {
       let conversation = await dispatch(
         fetchExistingChat({ userId: user.id, proId, role: user.role })
       ).unwrap();
-      console.log("Existing chat fetched:", { conversation, userId: user.id, proId });
 
       if (!conversation) {
         conversation = await dispatch(
           createChat({ userId: user.id, proId, role: user.role })
         ).unwrap();
-        console.log("New chat created:", { conversation });
       }
 
       if (!conversation?.id || !conversation.participants) {
@@ -103,7 +101,6 @@ const ChatPage = () => {
         role: UserRole.PRO,
       });
 
-      console.log("Fetching messages for chatId:", conversation.id);
       await dispatch(
         fetchConversationMessages({ chatId: conversation.id, page: 1, limit: 20, role: user.role })
       ).unwrap();
