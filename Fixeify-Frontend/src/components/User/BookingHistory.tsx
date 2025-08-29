@@ -204,7 +204,7 @@ const BookingHistory: React.FC = () => {
         <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-center">{error}</div>
       )}
       <h2 className="text-2xl font-bold mb-8 text-center dark:text-gray-200">Booking History</h2>
-      {!selectedBookingId && (
+      {!selectedBookingId && (bookings.length > 0 || filtersActive) && (
         <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
           <input
             type="text"
@@ -212,7 +212,6 @@ const BookingHistory: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             ref={searchInputRef}
-            autoFocus
             className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400 dark:border-gray-600 dark:focus:ring-blue-400 transition-colors"
           />
           <select
@@ -290,7 +289,7 @@ const BookingHistory: React.FC = () => {
         </div>
       ) : bookings.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-gray-500 dark:text-gray-400">No booking history available.</p>
+          <p className="text-gray-500 dark:text-gray-400">No Booking History currently.</p>
         </div>
       ) : (
         selectedBookingId ? (

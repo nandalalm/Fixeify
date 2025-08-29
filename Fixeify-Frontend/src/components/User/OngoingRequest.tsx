@@ -45,12 +45,6 @@ const OngoingRequest = () => {
     return () => clearTimeout(id);
   }, [searchTerm]);
 
-  // Keep focus on the search input across re-renders when user is typing
-  useEffect(() => {
-    if (!selectedBooking) {
-      inputRef.current?.focus();
-    }
-  }, [loading, selectedBooking]);
 
   useEffect(() => {
     const loadBookings = async () => {
@@ -128,6 +122,9 @@ const OngoingRequest = () => {
   // Server-side filtered/sorted results
   const filteredAndSortedBookings = bookings;
 
+  // Whether any filter or sort (other than default latest) is active
+  const isFiltered = (debouncedSearch && debouncedSearch.length > 0) || sortOption !== "latest";
+
   const handleClearFilter = () => {
     setSearchTerm("");
     setSortOption("latest");
@@ -179,22 +176,7 @@ const OngoingRequest = () => {
     setLocalPaymentStatus("pending");
   };
 
-  // Only allow payment after the booked day and last time slot end has passed (IST)
-  const isPaymentWindowOpen = (booking: BookingResponse | null) => {
-    if (!booking) return false;
-    const slots = (booking as any).preferredTime as Array<{ startTime: string; endTime: string }> | undefined;
-    if (!slots || slots.length === 0) return false;
-    const toMinutes = (t: string) => {
-      const [h, m] = t.split(":").map(Number); return h * 60 + m;
-    };
-    const lastEnd = slots.reduce((acc, s) => Math.max(acc, toMinutes(s.endTime)), 0);
-    const preferredDate = new Date(booking.preferredDate);
-    const preferredDateIST = new Date(preferredDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    const releaseAtIST = new Date(preferredDateIST);
-    releaseAtIST.setHours(Math.floor(lastEnd / 60), lastEnd % 60, 0, 0);
-    const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-    return nowIST.getTime() >= releaseAtIST.getTime();
-  };
+  // Payment actions are now available regardless of preferred time/day
 
   const onPaymentSuccess = () => {
     if (!selectedBooking || !quota) return;
@@ -407,15 +389,6 @@ const OngoingRequest = () => {
 
               {(() => {
                 const status = localPaymentStatus ?? String(quota.paymentStatus);
-                const paymentWindowOpen = isPaymentWindowOpen(selectedBooking);
-                if (!paymentWindowOpen && (status === "pending" || status === "failed")) {
-                  // Show requested message before payment window opens
-                  return (
-                    <div className="mt-4 text-sm text-gray-600 dark:text-gray-300">
-                      Payment option will be shown once the job is completed.
-                    </div>
-                  );
-                }
                 if ((status === "pending" || status === "failed") && stripePromise && clientSecret) {
                   return (
                     <div className="mt-4">
@@ -425,14 +398,14 @@ const OngoingRequest = () => {
                     </div>
                   );
                 }
-                if (status === "pending" && !clientSecret && isPaymentWindowOpen(selectedBooking)) {
+                if (status === "pending" && !clientSecret) {
                   return (
                     <button onClick={handleStartPayment} className="mt-4 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white">
                       Go to Payment
                     </button>
                   );
                 }
-                if (status === "failed" && isPaymentWindowOpen(selectedBooking)) {
+                if (status === "failed") {
                   return (
                     <div className="mt-3">
                       <p className="text-sm text-red-500 dark:text-red-400">Your payment was not successful, please try again.</p>
@@ -454,34 +427,33 @@ const OngoingRequest = () => {
   return (
     <div className="p-6 mb-[350px] mt-8">
       <h2 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100">Ongoing Requests</h2>
-      <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-        <input
-          type="text"
-          placeholder="Search by booking ID, issue, or location..."
-          value={searchTerm}
-          onChange={(e) => {
-            setSearchTerm(e.target.value);
-            // ensure focus is retained while typing
-            inputRef.current?.focus();
-          }}
-          ref={inputRef}
-          autoFocus
-          className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400 dark:border-gray-600 dark:focus:ring-blue-400 transition-colors"
-        />
-        <select
-          value={sortOption}
-          onChange={(e) => {
-            setSortOption(e.target.value as "latest" | "oldest" | "pending" | "accepted");
-            setCurrentPage(1);
-          }}
-          className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:focus:ring-blue-400"
-        >
-          <option value="latest">Latest</option>
-          <option value="oldest">Oldest</option>
-          <option value="pending">Pending</option>
-          <option value="accepted">Accepted</option>
-        </select>
-      </div>
+      {(bookings.length > 0 || isFiltered) && (
+        <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+          <input
+            type="text"
+            placeholder="Search by booking ID, issue, or location..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+            }}
+            ref={inputRef}
+            className="w-full sm:w-5/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400 dark:bg-gray-800 dark:text-gray-200 dark:placeholder-gray-400 dark:border-gray-600 dark:focus:ring-blue-400 transition-colors"
+          />
+          <select
+            value={sortOption}
+            onChange={(e) => {
+              setSortOption(e.target.value as "latest" | "oldest" | "pending" | "accepted");
+              setCurrentPage(1);
+            }}
+            className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:focus:ring-blue-400"
+          >
+            <option value="latest">Latest</option>
+            <option value="oldest">Oldest</option>
+            <option value="pending">Pending</option>
+            <option value="accepted">Accepted</option>
+          </select>
+        </div>
+      )}
 
       {loading ? (
         <div>
@@ -533,7 +505,6 @@ const OngoingRequest = () => {
           </div>
         </div>
       ) : (() => {
-        const isFiltered = (debouncedSearch && debouncedSearch.length > 0) || sortOption !== "latest";
         if (bookings.length === 0) {
           if (isFiltered) {
             return (

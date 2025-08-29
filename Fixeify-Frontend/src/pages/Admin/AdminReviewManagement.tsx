@@ -273,30 +273,32 @@ const AdminReviewManagement: FC = () => {
                   <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-md text-center">{error}</div>
                 )}
 
-                {/* Search & Sort Bar - always visible when not in details view */}
-                <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-                  <div className="relative w-full sm:w-5/6">
-                    <input
-                      type="text"
-                      placeholder="Search by pro, user, or service..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+                {/* Search & Sort Bar - hidden when there are no reviews and no filters active */}
+                {(reviews.length > 0 || searchTerm.trim() !== "" || sortOption !== "latest") && (
+                  <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between">
+                    <div className="relative w-full sm:w-5/6">
+                      <input
+                        type="text"
+                        placeholder="Search by pro, user, or service..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div className="relative w-full sm:w-1/6">
+                      <select
+                        value={sortOption}
+                        onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
+                        className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                      >
+                        <option value="latest">Sort by Latest</option>
+                        <option value="oldest">Sort by Oldest</option>
+                        <option value="lowest">Lowest Ratings</option>
+                        <option value="highest">Highest Ratings</option>
+                      </select>
+                    </div>
                   </div>
-                  <div className="relative w-full sm:w-1/6">
-                    <select
-                      value={sortOption}
-                      onChange={(e) => setSortOption(e.target.value as typeof sortOption)}
-                      className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                    >
-                      <option value="latest">Sort by Latest</option>
-                      <option value="oldest">Sort by Oldest</option>
-                      <option value="lowest">Lowest Ratings</option>
-                      <option value="highest">Highest Ratings</option>
-                    </select>
-                  </div>
-                </div>
+                )}
 
                 {reviews.length === 0 ? (
                   (searchTerm.trim() !== "" || sortOption !== "latest") ? (

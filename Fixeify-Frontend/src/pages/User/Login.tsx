@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { setAuth, UserRole } from "../../store/authSlice";
 import { loginUser, googleLogin } from "../../api/authApi";
@@ -17,6 +17,9 @@ const LoginPage = () => {
   const [serverError, setServerError] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  // Responsive Google button width (GIS only accepts 120–400px)
+  const [gsiWidth, setGsiWidth] = useState<number>(400);
+  const gsiContainerRef = useRef<HTMLDivElement | null>(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -25,6 +28,30 @@ const LoginPage = () => {
     dispatch({ type: "auth/clearError" });
     dispatch({ type: "auth/logoutUserSync" });
   }, [location, dispatch]);
+
+  // Compute a valid pixel width for Google button based on container width
+  useEffect(() => {
+    const updateWidth = () => {
+      const containerWidth = gsiContainerRef.current?.clientWidth ?? 400;
+      const clamped = Math.max(120, Math.min(400, Math.floor(containerWidth)));
+      setGsiWidth(clamped);
+    };
+
+    updateWidth();
+
+    let ro: ResizeObserver | null = null;
+    if (typeof window !== 'undefined' && 'ResizeObserver' in window && gsiContainerRef.current) {
+      ro = new ResizeObserver(() => updateWidth());
+      ro.observe(gsiContainerRef.current);
+    } else if (typeof window !== 'undefined') {
+      window.addEventListener('resize', updateWidth);
+    }
+
+    return () => {
+      if (ro && gsiContainerRef.current) ro.unobserve(gsiContainerRef.current);
+      if (typeof window !== 'undefined') window.removeEventListener('resize', updateWidth);
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -256,7 +283,7 @@ const LoginPage = () => {
                     </div>
                   </div>
                   <div className="mt-4">
-                    <div className="w-full">
+                    <div ref={gsiContainerRef} className="w-full max-w-[400px] mx-auto">
                       <GoogleLogin
                         onSuccess={handleGoogleLoginSuccess}
                         onError={() => {
@@ -264,7 +291,7 @@ const LoginPage = () => {
                         }}
                         theme="outline"
                         size="large"
-                        width="100%"
+                        width={String(gsiWidth)}
                       />
                     </div>
                   </div>

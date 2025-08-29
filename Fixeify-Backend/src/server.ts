@@ -117,14 +117,18 @@ const server = new Server(app);
 const accessLogStream = fs.createWriteStream(path.join(logDir, "access.log"), { flags: "a" });
 app.use(morgan("combined", { stream: accessLogStream }));
 
-if (!process.env.FRONTEND_URL) {
-  throw new Error("No Frontend URL");
+if (!process.env.FRONTEND_URL && !process.env.FRONTEND_URLS) {
+  throw new Error("No Frontend URL(s)");
 }
+
+const allowedOrigins = (process.env.FRONTEND_URLS
+  ? process.env.FRONTEND_URLS.split(",").map((s) => s.trim()).filter(Boolean)
+  : [process.env.FRONTEND_URL!]);
 
 app.use(
   cors({
     credentials: true,
-    origin: process.env.FRONTEND_URL,
+    origin: allowedOrigins,
   })
 );
 app.use(cookieParser());
