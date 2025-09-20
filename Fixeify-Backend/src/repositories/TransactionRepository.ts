@@ -10,9 +10,37 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
     super(TransactionModel);
   }
 
+  async findOneByKeys(filter: { bookingId: string; type: "credit" | "debit"; proId: string; amount: number; adminId?: string }): Promise<TransactionResponseDTO | null> {
+    const query: any = {
+      bookingId: new Types.ObjectId(filter.bookingId),
+      type: filter.type,
+      proId: new Types.ObjectId(filter.proId),
+      amount: filter.amount,
+    };
+    if (filter.adminId) {
+      query.adminId = new Types.ObjectId(filter.adminId);
+    }
+    const doc = await TransactionModel.findOne(query).exec();
+    return doc ? this.map(doc) : null;
+  }
+
   async createTransaction(data: Partial<TransactionDocument>): Promise<TransactionResponseDTO> {
-    const created = await this._model.create(data);
-    return this.map(created);
+    try {
+      const created = await this._model.create(data);
+      return this.map(created);
+    } catch (error: any) {
+      if (error.code === 11000) {
+        const existing = await this.findOneByKeys({
+          bookingId: data.bookingId!.toString(),
+          type: data.type as "credit" | "debit",
+          proId: data.proId!.toString(),
+          amount: data.amount!,
+          adminId: data.adminId?.toString()
+        });
+        if (existing) return existing;
+      }
+      throw error;
+    }
   }
 
   async findByProIdPaginated(proId: string, page: number, limit: number): Promise<{ transactions: TransactionResponseDTO[]; total: number }> {

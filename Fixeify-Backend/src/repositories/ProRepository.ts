@@ -323,6 +323,12 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
 
   async updateAvailability(proId: string, dayOfWeek: string, timeSlots: ITimeSlot[], booked: boolean = true): Promise<ApprovedProDocument | null> {
     try {
+      try { 
+        const slotsStr = timeSlots.map(s => `${s.startTime}-${s.endTime}`).join(','); 
+        if (!booked) {
+          const stack = new Error().stack?.split('\n').slice(2, 6).join(' | ') || 'no-stack';
+        }
+      } catch {}
       const startTimes = timeSlots.map(slot => slot.startTime);
       const endTimes = timeSlots.map(slot => slot.endTime);
 

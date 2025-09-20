@@ -1,18 +1,22 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
-import { Sun, Moon, Bell } from "lucide-react";
+import { Sun, Moon, Bell, MessageCircle, MapPin, PencilLine } from "lucide-react";
 import { useTheme } from "../../context/ThemeContext";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
-import { fetchAllNotifications, markNotificationRead, markAllNotificationsRead, addNotification } from "../../store/chatSlice";
+import MessagePanel from "../Messaging/MessagePanel";
+import { addNotification } from "../../store/chatSlice";
 import { NotificationItem } from "../../interfaces/messagesInterface";
 import { getSocket } from "../../services/socket";
+import ChangeLocationModal from "./ChangeLocationModal";
+import { useMessageNotifications } from "../../hooks/useMessageNotifications";
+import { useNonMessageNotifications } from "../../hooks/useNonMessageNotifications";
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -20,12 +24,10 @@ const Navbar = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [isMessagePanelOpen, setIsMessagePanelOpen] = useState(false);
+  const [isChangeLocationOpen, setIsChangeLocationOpen] = useState(false);
 
-  useEffect(() => {
-    if (isNotificationPanelOpen) {
-      setFilter('all');
-    }
-  }, [isNotificationPanelOpen]);
+
   const auth = useSelector((state: RootState) => state.auth);
   const user = auth.user as import("../../interfaces/messagesInterface").User;
   const accessToken = auth.accessToken;
@@ -33,11 +35,18 @@ const Navbar = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
-  const notifications = useSelector((state: RootState) => state.chat.notifications);
-  const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  // Legacy notification state - keeping for compatibility but using hooks instead
+
+  // NEW: Separate hooks for message and non-message notifications
+  const messageNotifications = useMessageNotifications({
+    userId: user?.id || '',
+    role: user?.role || 'user'
+  });
+
+  const nonMessageNotifications = useNonMessageNotifications({
+    userId: user?.id || '',
+    role: user?.role || 'user'
+  });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -46,36 +55,6 @@ const Navbar = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  useEffect(() => {
-    if (!user || !accessToken) return;
-    dispatch(fetchAllNotifications({ userId: user.id, role: "user", page: 1, limit: 10, filter }));
-  }, [user, accessToken, filter, dispatch]);
-
-  const handleLoadMore = async () => {
-    if (loading || !hasMore) return;
-    setLoading(true);
-    await new Promise(res => setTimeout(res, 1000));
-    try {
-      const nextPage = page + 1;
-      const result = await dispatch(
-        fetchAllNotifications({ userId: user.id, role: "user", page: nextPage, limit: 10, filter })
-      ).unwrap();
-      setPage(nextPage);
-      setHasMore(result.length === 10);
-    } catch {
-      setHasMore(false);
-    }
-    setLoading(false);
-  };
-
-  const handleToggleFilter = (newFilter: 'all' | 'unread') => {
-    if (filter !== newFilter) {
-      setFilter(newFilter);
-      setPage(1);
-      setHasMore(true);
-    }
-  };
 
 
   useEffect(() => {
@@ -89,7 +68,6 @@ const Navbar = () => {
         dispatch(addNotification(notif));
       }
     };
-
 
     socket.on("newNotification", handler);
     return () => {
@@ -119,20 +97,6 @@ const Navbar = () => {
     setShowLogoutModal(false);
   };
 
-  const handleMarkAsRead = async (notificationId: string) => {
-    await dispatch(markNotificationRead(notificationId));
-  };
-
-  const handleMarkAllAsRead = async () => {
-    if (user) {
-      await dispatch(markAllNotificationsRead({ userId: user.id, role: "user" }));
-    }
-  };
-
-  const unreadNotificationCount = useMemo(() => {
-    const count = notifications.filter((n: NotificationItem) => !n.isRead).length;
-    return count;
-  }, [notifications]);
 
   return (
     <motion.header
@@ -161,6 +125,7 @@ const Navbar = () => {
         />
         <nav className="ml-auto gap-6 hidden items-center md:flex">
           <div className="flex items-center gap-2">
+            {/* Change location button moved next to Become a Provider */}
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -169,19 +134,45 @@ const Navbar = () => {
               {theme === "light" ? <Moon className="h-5 w-5 text-gray-700 dark:text-white" /> : <Sun className="h-5 w-5 text-yellow-400" />}
             </button>
             {accessToken && (
-              <button
-                onClick={() => setIsNotificationPanelOpen(true)}
-                className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
-              >
-                <Bell className="h-5 w-5" />
-                {unreadNotificationCount > 0 && (
-                  <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
-                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-                  </span>
-                )}
-              </button>
+              <>
+                {/* Message Icon */}
+                <button
+                  onClick={() => setIsMessagePanelOpen(true)}
+                  className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                  {messageNotifications.unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-blue-500 rounded-full">
+                      {messageNotifications.unreadCount > 9 ? "9+" : messageNotifications.unreadCount}
+                    </span>
+                  )}
+                </button>
+                
+                {/* Notification Bell Icon */}
+                <button
+                  onClick={() => setIsNotificationPanelOpen(true)}
+                  className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
+                >
+                  <Bell className="h-5 w-5" />
+                  {nonMessageNotifications.unreadCount > 0 && (
+                    <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
+                      {nonMessageNotifications.unreadCount > 9 ? "9+" : nonMessageNotifications.unreadCount}
+                    </span>
+                  )}
+                </button>
+              </>
             )}
           </div>
+          {accessToken && (
+            <button
+              onClick={() => setIsChangeLocationOpen(true)}
+              className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-1 text-sm"
+              title="Change location"
+            >
+              <MapPin className="h-5 w-5 text-[#032b44] dark:text-gray-300" />
+              <PencilLine className="h-5 w-5 text-[#032b44] dark:text-gray-300" />
+            </button>
+          )}
           <button
             onClick={() => navigate("/become-pro")}
             className="bg-[#032b44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
@@ -244,22 +235,48 @@ const Navbar = () => {
             </button>
           )}
         </nav>
-        <div className="md:hidden ml-auto flex items-center gap-4">
+        <div className="md:hidden ml-auto flex items-center gap-3">
+          {accessToken && (
+            <button
+              onClick={() => setIsChangeLocationOpen(true)}
+              className="py-2 px-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1"
+              aria-label="Change location"
+            >
+              <MapPin className="h-5 w-5 text-[#032b44] dark:text-gray-300" />
+              <PencilLine className="h-5 w-5 text-[#032b44] dark:text-gray-300" />
+            </button>
+          )}
           <button onClick={toggleTheme} className="p-2">
             {theme === "light" ? <Moon className="h-5 w-5 text-gray-700 dark:text-white" /> : <Sun className="h-5 w-5 text-yellow-400" />}
           </button>
           {accessToken && (
-            <button
-              onClick={() => setIsNotificationPanelOpen(true)}
-              className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
-            >
-              <Bell className="h-5 w-5" />
-              {unreadNotificationCount > 0 && (
-                <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
-                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-                </span>
-              )}
-            </button>
+            <>
+              {/* Message Icon */}
+              <button
+                onClick={() => setIsMessagePanelOpen(true)}
+                className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
+              >
+                <MessageCircle className="h-5 w-5" />
+                {messageNotifications.unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-blue-500 rounded-full">
+                    {messageNotifications.unreadCount > 9 ? "9+" : messageNotifications.unreadCount}
+                  </span>
+                )}
+              </button>
+              
+              {/* Notification Bell Icon */}
+              <button
+                onClick={() => setIsNotificationPanelOpen(true)}
+                className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
+              >
+                <Bell className="h-5 w-5" />
+                {nonMessageNotifications.unreadCount > 0 && (
+                  <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
+                    {nonMessageNotifications.unreadCount > 9 ? "9+" : nonMessageNotifications.unreadCount}
+                  </span>
+                )}
+              </button>
+            </>
           )}
           <button onClick={() => setIsMenuOpen(!isMenuOpen)}>
             <motion.svg
@@ -294,12 +311,25 @@ const Navbar = () => {
             className="fixed top-[60px] left-0 w-full bg-white shadow-md md:hidden pb-4 px-4 py-2 z-50 dark:bg-gray-900 dark:border-gray-700"
           >
             <nav className="flex flex-col space-y-3">
-              <Link
-                to="/become-pro"
-                className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
-              >
-                Become a Provider
-              </Link>
+              <div className="flex items-center gap-2">
+                {accessToken && (
+                  <button
+                    onClick={() => setIsChangeLocationOpen(true)}
+                    className="py-1.5 px-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1"
+                    aria-label="Change location"
+                    title="Change location"
+                  >
+                    <MapPin className="h-5 w-5 text-[#032b44] dark:text-gray-300" />
+                    <PencilLine className="h-5 w-5 text-[#032b44] dark:text-gray-300" />
+                  </button>
+                )}
+                <Link
+                  to="/become-pro"
+                  className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
+                >
+                  Become a Provider
+                </Link>
+              </div>
               {accessToken ? (
                 <>
                   <Link
@@ -324,18 +354,35 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Non-Message Notifications Panel */}
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
         onClose={() => setIsNotificationPanelOpen(false)}
-        notifications={notifications}
-        onMarkAsRead={handleMarkAsRead}
-        onMarkAllAsRead={handleMarkAllAsRead}
-        loading={loading}
-        filter={filter}
-        onToggleFilter={handleToggleFilter}
-        onLoadMore={handleLoadMore}
-        hasMore={hasMore}
+        notifications={nonMessageNotifications.notifications}
+        onMarkAsRead={nonMessageNotifications.markAsRead}
+        onMarkAllAsRead={nonMessageNotifications.markAllAsRead}
+        loading={nonMessageNotifications.loading}
+        filter={nonMessageNotifications.filter}
+        onToggleFilter={nonMessageNotifications.toggleFilter}
+        onLoadMore={nonMessageNotifications.loadMore}
+        hasMore={nonMessageNotifications.hasMore}
       />
+      
+      {/* Message Notifications Panel */}
+      <MessagePanel
+        isOpen={isMessagePanelOpen}
+        onClose={() => setIsMessagePanelOpen(false)}
+        notifications={messageNotifications.notifications}
+        onMarkAsRead={messageNotifications.markAsRead}
+        onMarkAllAsRead={messageNotifications.markAllAsRead}
+        loading={messageNotifications.loading}
+        filter={messageNotifications.filter}
+        onToggleFilter={messageNotifications.toggleFilter}
+        onLoadMore={messageNotifications.loadMore}
+        hasMore={messageNotifications.hasMore}
+      />
+      
+      <ChangeLocationModal isOpen={isChangeLocationOpen} onClose={() => setIsChangeLocationOpen(false)} />
       <ConfirmationModal
         isOpen={showLogoutModal}
         onConfirm={handleLogoutConfirm}

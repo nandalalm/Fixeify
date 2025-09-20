@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
-import { useSelector } from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
 import { motion } from "framer-motion";
 import { LocateFixed, ArrowLeft } from "lucide-react";
-import { getUserProfile } from "../../api/userApi";
+import { getUserProfile, updateUserProfile } from "../../api/userApi";
 import { RootState } from "../../store/store";
+import { updateUser } from "../../store/authSlice";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
 import { ILocation } from "../../interfaces/adminInterface";
@@ -16,6 +17,7 @@ const UserLocation = () => {
   const categoryId = queryParams.get("categoryId") || "";
   const { user } = useSelector((state: RootState) => state.auth);
   const userId = user?.id || "";
+  const dispatch = useDispatch();
   const [selectedLocation, setSelectedLocation] = useState<ILocation | null>(null);
   const [savedLocation, setSavedLocation] = useState<ILocation | null>(null);
   const [errors, setErrors] = useState<{ location?: string }>({});
@@ -25,7 +27,6 @@ const UserLocation = () => {
   const locationInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    // Fetch user's saved location
     const fetchUserProfile = async () => {
       if (!userId) {
         setErrors({ location: "User not authenticated. Please log in." });
@@ -50,7 +51,7 @@ const UserLocation = () => {
   }, [userId]);
 
   useEffect(() => {
-    if (isLoadingProfile) return; // Wait until profile is loaded and input is rendered
+    if (isLoadingProfile) return; 
 
     const loadGoogleMapsScript = () => {
       if (window.google && window.google.maps) {
@@ -203,10 +204,8 @@ const UserLocation = () => {
     const { value } = e.target;
     setSelectedLocation(null);
     if (!value.trim()) {
-      // Clear any existing location errors when field is empty
       setErrors({});
     } else {
-      // Show error only when user types but doesn't select from suggestions
       setErrors({ location: "Please select a location from the suggestions or use current location" });
     }
   };
@@ -224,7 +223,21 @@ const UserLocation = () => {
       setErrors({ location: "Please select a valid location." });
       return;
     }
-    navigate(`/nearby-pros?categoryId=${categoryId}`, { state: { location: selectedLocation } });
+    const persistAndNavigate = async () => {
+      try {
+        if (userId) {
+          await updateUserProfile(userId, { address: selectedLocation as any });
+          if (user) {
+            dispatch(updateUser({ ...user, address: selectedLocation as any } as any));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to save user location, proceeding anyway:", err);
+      } finally {
+        navigate(`/nearby-pros?categoryId=${categoryId}`, { state: { location: selectedLocation } });
+      }
+    };
+    persistAndNavigate();
   };
 
   return (

@@ -62,6 +62,23 @@ export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implemen
     return quota ? this.mapToQuotaResponse(quota) : null;
   }
 
+  async markPaymentCompletedIfPending(quotaId: string): Promise<QuotaResponse | null> {
+    const quota = await this._model
+      .findOneAndUpdate(
+        { _id: new Types.ObjectId(quotaId), paymentStatus: "pending" },
+        { $set: { paymentStatus: "completed" } },
+        { new: true }
+      )
+      .populate([
+        { path: "userId", select: "name email" },
+        { path: "proId", select: "firstName lastName" },
+        { path: "categoryId", select: "name image" },
+      ])
+      .exec() as PopulatedQuotaDocument | null;
+
+    return quota ? this.mapToQuotaResponse(quota) : null;
+  }
+
   private mapToQuotaResponse(quota: PopulatedQuotaDocument): QuotaResponse {
     return new QuotaResponse({
       id: quota._id.toString(),
@@ -86,6 +103,7 @@ export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implemen
       additionalCharges: quota.additionalCharges,
       totalCost: quota.totalCost,
       paymentStatus: quota.paymentStatus,
+      paymentIntentId: (quota as any).paymentIntentId,
       createdAt: quota.createdAt,
       updatedAt: quota.updatedAt,
     });

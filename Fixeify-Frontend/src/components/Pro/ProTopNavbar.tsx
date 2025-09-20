@@ -1,19 +1,17 @@
-import { FC, useState, useEffect, useMemo } from "react";
+import { FC, useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
-import { Menu, Bell, X } from "lucide-react";
+import { Menu, Bell, MessageCircle, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
+import MessagePanel from "../Messaging/MessagePanel";
 import { NotificationItem } from "../../interfaces/messagesInterface";
-import {
-  fetchAllNotifications,
-  markNotificationRead,
-  markAllNotificationsRead,
-  addNotification,
-} from "../../store/chatSlice";
+import { addNotification } from "../../store/chatSlice";
 import { getSocket } from "../../services/socket";
+import { useMessageNotifications } from "../../hooks/useMessageNotifications";
+import { useNonMessageNotifications } from "../../hooks/useNonMessageNotifications";
 
 interface ProTopNavbarProps {
   toggleSidebar: () => void;
@@ -23,51 +21,23 @@ interface ProTopNavbarProps {
 
 const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = true, sidebarOpen = false }) => {
   const { user, accessToken } = useSelector((state: RootState) => state.auth);
-  const notifications = useSelector((state: RootState) => state.chat.notifications);
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-
-  const [page, setPage] = useState(1);
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [loading, setLoading] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [isMessagePanelOpen, setIsMessagePanelOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const unreadNotificationCount = useMemo(
-    () => notifications.filter((n) => !n.isRead).length,
-    [notifications]
-  );
+  // NEW: Separate hooks for message and non-message notifications
+  const messageNotifications = useMessageNotifications({
+    userId: user?.id || '',
+    role: 'pro'
+  });
 
-  useEffect(() => {
-    if (!user || !accessToken) return;
-    dispatch(fetchAllNotifications({ userId: user.id, role: "pro", page: 1, limit: 10, filter }));
-  }, [user, accessToken, filter, dispatch]);
+  const nonMessageNotifications = useNonMessageNotifications({
+    userId: user?.id || '',
+    role: 'pro'
+  });
 
-  const handleLoadMore = async () => {
-    if (loading || !hasMore || !user) return;
-    setLoading(true);
-    await new Promise(res => setTimeout(res, 1000));
-    try {
-      const nextPage = page + 1;
-      const result = await dispatch(
-        fetchAllNotifications({ userId: user.id, role: "pro", page: nextPage, limit: 10, filter })
-      ).unwrap();
-      setPage(nextPage);
-      setHasMore(result.length === 10);
-    } catch {
-      setHasMore(false);
-    }
-    setLoading(false);
-  };
-
-  const handleToggleFilter = (newFilter: 'all' | 'unread') => {
-    if (filter !== newFilter) {
-      setFilter(newFilter);
-      setPage(1);
-      setHasMore(true);
-    }
-  };
 
   useEffect(() => {
     if (!user || !accessToken) return;
@@ -88,7 +58,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
     return () => {
       socket.off("newNotification", handler);
     };
-  }, [user, accessToken, filter, dispatch, isNotificationPanelOpen]);
+  }, [user, accessToken, dispatch]);
 
   const handleLogout = () => {
     // Navigate away from protected pro routes first to avoid ProPrivateRoute redirect to /login
@@ -106,16 +76,6 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
 
   const handleLogoutCancel = () => {
     setShowLogoutModal(false);
-  };
-
-  const handleMarkAsRead = async (notificationId: string) => {
-    await dispatch(markNotificationRead(notificationId));
-  };
-
-  const handleMarkAllAsRead = async () => {
-    if (user) {
-      await dispatch(markAllNotificationsRead({ userId: user.id, role: "pro" }));
-    }
   };
 
   if (!user) return null;
@@ -153,34 +113,64 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
         </div>
 
         <div className="flex items-center gap-4">
+          {/* Message Icon */}
+          <button
+            onClick={() => setIsMessagePanelOpen(true)}
+            className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            <MessageCircle className="h-5 w-5" />
+            {messageNotifications.unreadCount > 0 && (
+              <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-blue-500 rounded-full">
+                {messageNotifications.unreadCount > 9 ? "9+" : messageNotifications.unreadCount}
+              </span>
+            )}
+          </button>
+          
+          {/* Notification Bell Icon */}
           <button
             onClick={() => setIsNotificationPanelOpen(true)}
             className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             <Bell className="h-5 w-5" />
-            {unreadNotificationCount > 0 && (
+            {nonMessageNotifications.unreadCount > 0 && (
               <span className="absolute top-0 right-0 flex items-center justify-center w-4 h-4 text-xs text-white bg-red-500 rounded-full">
-                {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                {nonMessageNotifications.unreadCount > 9 ? "9+" : nonMessageNotifications.unreadCount}
               </span>
             )}
           </button>
+          
           <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
             {user.name}
           </span>
         </div>
       </div>
 
+      {/* Non-Message Notifications Panel */}
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
         onClose={() => setIsNotificationPanelOpen(false)}
-        notifications={notifications}
-        onMarkAsRead={handleMarkAsRead}
-        onMarkAllAsRead={handleMarkAllAsRead}
-        loading={loading}
-        filter={filter}
-        onToggleFilter={handleToggleFilter}
-        onLoadMore={handleLoadMore}
-        hasMore={hasMore}
+        notifications={nonMessageNotifications.notifications}
+        onMarkAsRead={nonMessageNotifications.markAsRead}
+        onMarkAllAsRead={nonMessageNotifications.markAllAsRead}
+        loading={nonMessageNotifications.loading}
+        filter={nonMessageNotifications.filter}
+        onToggleFilter={nonMessageNotifications.toggleFilter}
+        onLoadMore={nonMessageNotifications.loadMore}
+        hasMore={nonMessageNotifications.hasMore}
+      />
+      
+      {/* Message Notifications Panel */}
+      <MessagePanel
+        isOpen={isMessagePanelOpen}
+        onClose={() => setIsMessagePanelOpen(false)}
+        notifications={messageNotifications.notifications}
+        onMarkAsRead={messageNotifications.markAsRead}
+        onMarkAllAsRead={messageNotifications.markAllAsRead}
+        loading={messageNotifications.loading}
+        filter={messageNotifications.filter}
+        onToggleFilter={messageNotifications.toggleFilter}
+        onLoadMore={messageNotifications.loadMore}
+        hasMore={messageNotifications.hasMore}
       />
 
       <ConfirmationModal

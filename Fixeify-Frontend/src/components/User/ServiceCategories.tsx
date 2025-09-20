@@ -1,5 +1,8 @@
 import { useRef, useEffect, useState } from "react";
 import api from "../../api/axios";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
+import { useNavigate } from "react-router-dom";
 
 interface Category {
   id: string;
@@ -8,8 +11,18 @@ interface Category {
 }
 
 const ServiceCard = ({ id, name, image }: Category) => {
+  const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.auth.user);
+  const handleClick = () => {
+    const savedLocation = user?.address;
+    if (savedLocation && savedLocation.coordinates?.coordinates) {
+      navigate(`/nearby-pros?categoryId=${id}`, { state: { location: savedLocation } });
+    } else {
+      navigate(`/location?categoryId=${id}`);
+    }
+  };
   return (
-    <a href={`/location?categoryId=${id}`} className="group">
+    <button onClick={handleClick} className="group text-left">
       <div className="rounded-lg aspect-square mb-2 overflow-hidden relative">
         <img
           src={image || "/placeholder.svg"}
@@ -18,7 +31,7 @@ const ServiceCard = ({ id, name, image }: Category) => {
         />
       </div>
       <h3 className="text-center font-medium dark:text-white">{name}</h3>
-    </a>
+    </button>
   );
 };
 

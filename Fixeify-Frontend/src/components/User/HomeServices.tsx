@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/axios";
 import { fetchPopularCategories } from "@/api/proApi";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
 
 interface HomeServiceProps {
   title: string;
@@ -34,8 +36,7 @@ const HomeServiceCard = ({ title, description, image, onBook }: HomeServiceProps
       </div>
     </div>
   );
-}
-;
+};
 
 interface Category {
   id: string;
@@ -49,6 +50,7 @@ interface Category {
 
 const HomeServices = () => {
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.auth.user);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +145,14 @@ const HomeServices = () => {
               title={c.name}
               description={c.description || `Explore top-rated ${c.name} services near you.`}
               image={c.image || c.imageUrl || "/placeholder.svg"}
-              onBook={() => navigate(`/location?categoryId=${encodeURIComponent(c.id)}`)}
+              onBook={() => {
+                const savedLocation = user?.address as any;
+                if (savedLocation && savedLocation.coordinates?.coordinates) {
+                  navigate(`/nearby-pros?categoryId=${encodeURIComponent(c.id)}`, { state: { location: savedLocation } });
+                } else {
+                  navigate(`/location?categoryId=${encodeURIComponent(c.id)}`);
+                }
+              }}
             />
           ))}
         </div>

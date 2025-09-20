@@ -18,6 +18,13 @@ export interface INotificationRepository {
   findNotificationsByUser(userId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
   findNotificationsByPro(proId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
   findNotificationsByAdmin(adminId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findMessageNotificationsByUser(userId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findMessageNotificationsByPro(proId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findMessageNotificationsByAdmin(adminId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findNonMessageNotificationsByUser(userId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findNonMessageNotificationsByPro(proId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
+  findNonMessageNotificationsByAdmin(adminId: string, page: number, limit: number, filter?: 'all' | 'unread'): Promise<{ notifications: NotificationResponse[]; total: number }>;
   markNotificationAsRead(notificationId: string): Promise<void>;
   markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void>;
+  markAllMessageNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void>;
 }

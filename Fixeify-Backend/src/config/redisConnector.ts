@@ -22,8 +22,14 @@ export class RedisConnector {
     }
 
     try {
+      const url = process.env.REDIS_URL;
+      if (!url) {
+        console.warn("REDIS_URL not set. Skipping Redis connection (features depending on Redis will be disabled).\nSet REDIS_URL in Fixeify-Backend/.env to enable Redis.");
+        return; 
+      }
+
       this._client = createClient({
-        url: process.env.REDIS_URL,
+        url,
         socket: {
           keepAlive: 10000,
           reconnectStrategy: (retries) => Math.min(retries * 50, 1000),

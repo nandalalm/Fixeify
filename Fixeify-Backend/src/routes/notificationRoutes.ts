@@ -9,8 +9,11 @@ export default function createNotificationRoutes(container: Container): Router {
   const notificationController = container.get<NotificationController>(TYPES.NotificationController);
 
   router.get("/:role/:participantId", authenticateToken, notificationController.getNotifications.bind(notificationController));
+  router.get("/messages/:role/:participantId", authenticateToken, notificationController.getMessageNotifications.bind(notificationController));
+  router.get("/non-messages/:role/:participantId", authenticateToken, notificationController.getNonMessageNotifications.bind(notificationController));
   router.put("/read/:notificationId", authenticateToken, notificationController.markNotificationAsRead.bind(notificationController));
   router.put("/read-all/:role/:participantId", authenticateToken, notificationController.markAllNotificationsAsRead.bind(notificationController));
+  router.put("/read-all-messages/:role/:participantId", authenticateToken, notificationController.markAllMessageNotificationsAsRead.bind(notificationController));
 
   return router;
 }

@@ -5,6 +5,8 @@ import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
 import { ArrowLeft, Star, Filter } from "lucide-react";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
+import { useSelector } from "react-redux";
+import { RootState } from "../../store/store";
 
 const ProCard = ({ pro }: { pro: IApprovedPro }) => {
 
@@ -73,7 +75,9 @@ const NearbyPros = () => {
   const navigate = useNavigate();
   const queryParams = new URLSearchParams(location.search);
   const categoryId = queryParams.get("categoryId") || "";
-  const selectedLocation = location.state?.location as ILocation | undefined;
+  const stateLocation = location.state?.location as ILocation | undefined;
+  const savedLocation = useSelector((state: RootState) => state.auth.user?.address || undefined) as ILocation | undefined;
+  const selectedLocation: ILocation | undefined = stateLocation || savedLocation;
   const [pros, setPros] = useState<IApprovedPro[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -205,8 +209,6 @@ const NearbyPros = () => {
     return count;
   };
 
-
-
   useEffect(() => {
     if (selectedLocation) {
       fetchNearbyPros(1, false);
@@ -215,7 +217,7 @@ const NearbyPros = () => {
       setLoading(false);
       navigate(`/location?categoryId=${categoryId}`);
     }
-  }, [categoryId, selectedLocation, navigate, sortBy, availabilityFilter]);
+  }, [categoryId, stateLocation, savedLocation, navigate, sortBy, availabilityFilter]);
 
   return (
     <div className="flex flex-col min-h-screen dark:bg-gray-900">

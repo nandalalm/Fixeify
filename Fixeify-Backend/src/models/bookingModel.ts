@@ -56,6 +56,8 @@ export interface IBooking {
   hasComplaintRaisedByUser?: boolean;
   adminRevenue?: number;
   proRevenue?: number;
+  slotReleaseJobId?: string | null;
+  slotReleaseAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -99,6 +101,8 @@ const bookingSchema = new Schema<BookingDocument>(
     hasComplaintRaisedByUser: { type: Boolean, default: false },
     adminRevenue: { type: Number },
     proRevenue: { type: Number },
+    slotReleaseJobId: { type: String, default: null },
+    slotReleaseAt: { type: Date, default: null },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
   },

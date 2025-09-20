@@ -24,6 +24,7 @@ import { IAdminRepository } from "../repositories/IAdminRepository";
 import { WalletResponseDTO } from "../dtos/response/walletDtos";
 import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
 import { INotificationService } from "./INotificationService";
+import { scheduleSlotRelease, cancelSlotRelease } from "./queue/SlotReleaseQueue";
 
 @injectable()
 export class ProService implements IProService {
@@ -284,6 +285,21 @@ export class ProService implements IProService {
         preferredTime: updatedSlots.map((slot) => ({ ...slot })),
       });
 
+      const toMinutes = (t: string) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m;
+      };
+      const lastEndMinutes = booking.preferredTime
+        .map(s => toMinutes(s.endTime))
+        .reduce((max, cur) => (cur > max ? cur : max), 0);
+      const endH = Math.floor(lastEndMinutes / 60);
+      const endM = lastEndMinutes % 60;
+      const preferredDateIST2 = new Date(preferredDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      preferredDateIST2.setHours(endH, endM, 0, 0);
+      const runAt = new Date(preferredDateIST2.toISOString());
+      await scheduleSlotRelease(bookingId, runAt);
+      await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: bookingId, slotReleaseAt: runAt } as any);
+
       try {
         await this._notificationService.createNotification({
           type: "booking",
@@ -332,6 +348,9 @@ export class ProService implements IProService {
       rejectedReason: reason,
       preferredTime: updatedSlots.map((slot) => ({ ...slot })),
     });
+
+    try { await cancelSlotRelease(bookingId); } catch {}
+    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null } as any);
 
     try {
       await this._notificationService.createNotification({

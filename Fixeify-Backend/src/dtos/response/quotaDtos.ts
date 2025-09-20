@@ -2,6 +2,7 @@ import { ILocation, ITimeSlot } from "../../models/bookingModel";
 
 export class QuotaResponse {
   id: string;
+
   user: {
     id: string;
     name: string;
@@ -23,6 +24,7 @@ export class QuotaResponse {
   additionalCharges: number;
   totalCost: number;
   paymentStatus: "pending" | "completed" | "failed";
+  paymentIntentId?: string;
   createdAt: Date;
   updatedAt: Date;
 
@@ -37,6 +39,7 @@ export class QuotaResponse {
     additionalCharges: number;
     totalCost: number;
     paymentStatus: "pending" | "completed" | "failed";
+    paymentIntentId?: string;
     createdAt: Date;
     updatedAt: Date;
   }) {
@@ -50,6 +53,7 @@ export class QuotaResponse {
     this.additionalCharges = data.additionalCharges;
     this.totalCost = data.totalCost;
     this.paymentStatus = data.paymentStatus;
+    this.paymentIntentId = data.paymentIntentId;
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
   }

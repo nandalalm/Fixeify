@@ -46,7 +46,7 @@ export class NotificationService implements INotificationService {
           receiverId: recipientId,
           receiverModel
         });
-      }
+      } 
     }
 
     return response;
@@ -70,6 +70,42 @@ export class NotificationService implements INotificationService {
     }
   }
 
+  async getMessageNotifications(
+    participantId: string,
+    participantModel: "User" | "ApprovedPro" | "Admin",
+    page: number,
+    limit: number,
+    filter: 'all' | 'unread' = 'all'
+  ): Promise<{ notifications: NotificationResponse[]; total: number }> {
+    if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
+    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
+    if (participantModel === "User") {
+      return this._notificationRepository.findMessageNotificationsByUser(participantId, page, limit, filter);
+    } else if (participantModel === "ApprovedPro") {
+      return this._notificationRepository.findMessageNotificationsByPro(participantId, page, limit, filter);
+    } else {
+      return this._notificationRepository.findMessageNotificationsByAdmin(participantId, page, limit, filter);
+    }
+  }
+
+  async getNonMessageNotifications(
+    participantId: string,
+    participantModel: "User" | "ApprovedPro" | "Admin",
+    page: number,
+    limit: number,
+    filter: 'all' | 'unread' = 'all'
+  ): Promise<{ notifications: NotificationResponse[]; total: number }> {
+    if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
+    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
+    if (participantModel === "User") {
+      return this._notificationRepository.findNonMessageNotificationsByUser(participantId, page, limit, filter);
+    } else if (participantModel === "ApprovedPro") {
+      return this._notificationRepository.findNonMessageNotificationsByPro(participantId, page, limit, filter);
+    } else {
+      return this._notificationRepository.findNonMessageNotificationsByAdmin(participantId, page, limit, filter);
+    }
+  }
+
   async markNotificationAsRead(notificationId: string): Promise<void> {
     if (!notificationId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.NOTIFICATIONID_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(notificationId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
@@ -80,5 +116,11 @@ export class NotificationService implements INotificationService {
     if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     await this._notificationRepository.markAllNotificationsAsRead(participantId, participantModel);
+  }
+
+  async markAllMessageNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void> {
+    if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
+    if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
+    await this._notificationRepository.markAllMessageNotificationsAsRead(participantId, participantModel);
   }
 }

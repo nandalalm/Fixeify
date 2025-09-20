@@ -40,4 +40,5 @@ export interface IQuotaRepository {
   createQuota(quotaData: Partial<QuotaDocument>): Promise<QuotaResponse>;
   findQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null>;
   updateQuota(quotaId: string, data: Partial<QuotaDocument>): Promise<QuotaResponse | null>;
+  markPaymentCompletedIfPending(quotaId: string): Promise<QuotaResponse | null>;
 }

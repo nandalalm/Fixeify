@@ -20,10 +20,11 @@ import { HttpStatus } from "../enums/httpStatus";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import Stripe from "stripe";
-import { ApprovedProDocument } from "../models/approvedProModel";
 import { IAdminRepository } from "../repositories/IAdminRepository";
 import { INotificationService } from "./INotificationService";
+import RedisConnector from "../config/redisConnector";
 import { ITransactionRepository } from "../repositories/ITransactionRepository";
+import { cancelSlotRelease } from "./queue/SlotReleaseQueue";
 
 @injectable()
 export class UserService implements IUserService {
@@ -324,6 +325,23 @@ export class UserService implements IUserService {
   }
   
   async createPaymentIntent(bookingId: string, amount: number): Promise<{ clientSecret: string }> {
+    const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
+    if (!quota) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.QUOTA_NOT_FOUND);
+    if (quota.paymentStatus === "completed") {
+      throw new HttpError(HttpStatus.BAD_REQUEST, "Payment already completed for this booking");
+    }
+
+    if (quota.paymentIntentId) {
+      try {
+        const existing = await this._stripe.paymentIntents.retrieve(quota.paymentIntentId);
+        if (existing && existing.client_secret) {
+          if (existing.status && !["succeeded", "canceled"].includes(existing.status)) {
+            return { clientSecret: existing.client_secret };
+          }
+        }
+      } catch {}
+    }
+
     const paymentIntent = await this._stripe.paymentIntents.create({
       amount,
       currency: "inr",
@@ -333,18 +351,39 @@ export class UserService implements IUserService {
     if (!paymentIntent.client_secret) {
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_CREATE_PAYMENT_INTENT);
     }
+    await this._quotaRepository.updateQuota(quota.id, { paymentIntentId: paymentIntent.id } as any);
     return { clientSecret: paymentIntent.client_secret };
   }
 
   async completeBookingPayment(bookingId: string): Promise<void> {
+    try { 
+      const stack = new Error().stack?.split('\n').slice(2, 6).join(' | ') || 'no-stack';
+    } catch {}
+    const redis = new RedisConnector();
+    let lockKey: string | null = null;
+    let locked = false;
+    try {
+      if (redis.isConnected()) {
+        const client = redis.getClient();
+        lockKey = `lock:booking:${bookingId}:payment`;
+        const ok = await client.set(lockKey, "1", { NX: true, PX: 5 * 60 * 1000 } as any);
+        if (!ok) {
+          return;
+        }
+        locked = true;
+      }
+    } catch {}
+
     const booking = await this._bookingRepository.findBookingById(bookingId);
     if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
 
-    const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
-    if (!quota) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.QUOTA_NOT_FOUND);
+    const quotaExisting = await this._quotaRepository.findQuotaByBookingId(bookingId);
+    if (!quotaExisting) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.QUOTA_NOT_FOUND);
 
-    await this._quotaRepository.updateQuota(quota.id, { paymentStatus: "completed" });
-
+    const quota = await this._quotaRepository.markPaymentCompletedIfPending(quotaExisting.id);
+    if (!quota) {
+      return;
+    }
     const proAmount = Math.round(quota.totalCost * 0.7);
     let wallet = await this._walletRepository.findWalletByProId(booking.proId.toString());
     if (!wallet) {
@@ -354,7 +393,6 @@ export class UserService implements IUserService {
       } as any);
     }
 
-   
     const updatedWallet = await this._walletRepository.updateWallet(wallet.id, {
       balance: wallet.balance + proAmount,
     } as Partial<WalletDocument>);
@@ -362,18 +400,27 @@ export class UserService implements IUserService {
     if (!updatedWallet) {
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_UPDATE_PRO_WALLET);
     }
-
-   
-    await this._transactionRepository.createTransaction({
-      proId: new mongoose.Types.ObjectId(booking.proId),
-      walletId: new mongoose.Types.ObjectId(updatedWallet.id),
-      amount: proAmount,
+    const existingProTx = await this._transactionRepository.findOneByKeys({
+      bookingId: booking.id,
       type: "credit",
-      date: new Date(),
-      quotaId: new mongoose.Types.ObjectId(quota.id),
-      bookingId: new mongoose.Types.ObjectId(booking.id),
-      description: `Payment for booking #${booking.id.slice(-6)}`,
-    } as any);
+      proId: booking.proId.toString(),
+      amount: proAmount,
+    });
+    if (!existingProTx) {
+      try {
+        await this._transactionRepository.createTransaction({
+          proId: new mongoose.Types.ObjectId(booking.proId),
+          walletId: new mongoose.Types.ObjectId(updatedWallet.id),
+          amount: proAmount,
+          type: "credit",
+          date: new Date(),
+          quotaId: new mongoose.Types.ObjectId(quota.id),
+          bookingId: new mongoose.Types.ObjectId(booking.id),
+          description: `Payment for booking #${booking.id.slice(-6)}`,
+        } as any);
+      } catch (e) {
+      }
+    }
 
     const adminRevenue = Math.round(quota.totalCost * 0.3);
 
@@ -386,47 +433,39 @@ export class UserService implements IUserService {
     try {
       const admin = await this._adminRepository.find();
       if (admin) {
-        await this._transactionRepository.createTransaction({
-          proId: new mongoose.Types.ObjectId(booking.proId),
-          walletId: new mongoose.Types.ObjectId(updatedWallet.id),
-          amount: adminRevenue,
+        const existingAdminTx = await this._transactionRepository.findOneByKeys({
+          bookingId: booking.id,
           type: "credit",
-          date: new Date(),
-          quotaId: new mongoose.Types.ObjectId(quota.id),
-          bookingId: new mongoose.Types.ObjectId(booking.id),
-          adminId: new mongoose.Types.ObjectId((admin as any)._id),
-          description: `Admin revenue for booking #${booking.id.slice(-6)}`,
-        } as any);
+          proId: booking.proId.toString(),
+          amount: adminRevenue,
+          adminId: (admin as any)._id.toString(),
+        });
+        if (!existingAdminTx) {
+          try {
+            await this._transactionRepository.createTransaction({
+              proId: new mongoose.Types.ObjectId(booking.proId),
+              walletId: new mongoose.Types.ObjectId(updatedWallet.id),
+              amount: adminRevenue,
+              type: "credit",
+              date: new Date(),
+              quotaId: new mongoose.Types.ObjectId(quota.id),
+              bookingId: new mongoose.Types.ObjectId(booking.id),
+              adminId: new mongoose.Types.ObjectId((admin as any)._id),
+              description: `Admin revenue for booking #${booking.id.slice(-6)}`,
+            } as any);
+          } catch (e) {
+          }
+        } 
       }
     } catch (e) {
       console.error(MESSAGES.FAILED_RECORD_ADMIN_REVENUE_TRANSACTION + ":", e);
     }
 
-    const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
-    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
-
-    const preferredDate = new Date(booking.preferredDate);
-    const dayOfWeek = preferredDate.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
-
-    const updatedSlots = booking.preferredTime.map((slot) => ({
-      startTime: slot.startTime,
-      endTime: slot.endTime,
-      booked: false,
-    }));
-
-    const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
-    if (!availabilityUpdate) {
-      console.error(MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY + ":", await this._proRepository.findApprovedProById(pro.id));
-      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
-    }
-
     await this._bookingRepository.updateBooking(bookingId, {
       status: "completed",
-      preferredTime: updatedSlots.map((slot) => ({ ...slot })),
     });
 
     try {
-    
       await this._notificationService.createNotification({
         type: "wallet",
         title: "Payment Successful! ",
@@ -447,6 +486,12 @@ export class UserService implements IUserService {
     } catch (error) {
       console.error(MESSAGES.FAILED_SEND_PAYMENT_COMPLETION_NOTIFICATIONS + ":", error);
     }
+    
+    try {
+      if (locked && lockKey && redis.isConnected()) {
+        await redis.getClient().del(lockKey);
+      }
+    } catch {}
   }
 
  async cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }> {
@@ -455,7 +500,6 @@ export class UserService implements IUserService {
     if (booking.userId.toString() !== userId) throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.UNAUTHORIZED_CANCEL_BOOKING);
     if (booking.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ONLY_PENDING_CAN_BE_CANCELLED);
 
-   
     const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
     if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
@@ -479,6 +523,9 @@ export class UserService implements IUserService {
       preferredTime: updatedSlots.map((slot) => ({ ...slot })),
     });
 
+    try { await cancelSlotRelease(bookingId); } catch {}
+    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null } as any);
+
 
     try {
       await this._notificationService.createNotification({
@@ -492,7 +539,6 @@ export class UserService implements IUserService {
       console.error(MESSAGES.FAILED_SEND_BOOKING_CANCELLATION_TO_USER + ":", error);
     }
 
- 
     try {
       await this._notificationService.createNotification({
         type: "booking",
@@ -523,7 +569,17 @@ export class UserService implements IUserService {
       case "payment_intent.succeeded":
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         if (paymentIntent.metadata?.bookingId) {
-          await this.completeBookingPayment(paymentIntent.metadata.bookingId);
+          const bookingId = paymentIntent.metadata.bookingId;
+          const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
+          if (!quota) {
+            console.error("[payment] succeeded for booking without quota", { bookingId, paymentIntentId: paymentIntent.id });
+            return;
+          }
+          if (quota.paymentIntentId && quota.paymentIntentId !== paymentIntent.id) {
+            try { console.warn('[payment] ignoring mismatched PI', { bookingId, quotaPI: quota.paymentIntentId, eventPI: paymentIntent.id }); } catch {}
+            return; 
+          }
+          await this.completeBookingPayment(bookingId);
         }
         break;
       case "payment_intent.payment_failed":

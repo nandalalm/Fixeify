@@ -8,7 +8,7 @@ import { getSocket, isSocketConnected, reconnectSocket } from "../../services/so
 import { fetchConversations, addMessage, fetchAllNotifications, markMessagesRead } from "../../store/chatSlice";
 import { refreshToken } from "../../store/authSlice";
 import { User, Message } from "../../interfaces/messagesInterface";
-import { useLocation } from "react-router-dom";
+import { useLocation, useSearchParams } from "react-router-dom";
 
 interface MessagingAppProps {
   role: "user" | "pro";
@@ -22,9 +22,11 @@ export default function MessagingApp({ role }: MessagingAppProps) {
   const isConnected = isSocketConnected();
   const dispatch = useDispatch<AppDispatch>();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [selectedConversationId, setSelectedConversationId] = useState<string>("");
   const [showMessageBox, setShowMessageBox] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  
 
   const currentUser: User = {
     id: user?.id || "",
@@ -40,26 +42,40 @@ export default function MessagingApp({ role }: MessagingAppProps) {
   }, [user, role, dispatch]);
 
   useEffect(() => {
-    if (conversations.length > 0 && location.pathname.includes('/chat/')) {
-      const proIdMatch = location.pathname.match(/\/chat\/([^\/]+)/);
-      if (proIdMatch) {
-        const proId = proIdMatch[1];
-        const targetConversation = conversations.find(conv => 
-          conv.participants.proId === proId || conv.participants.userId === proId
-        );
+    if (conversations.length > 0) {
+      // Check for chatId query parameter (for pro messages from notifications)
+      const chatIdFromQuery = searchParams.get('chatId');
+      if (chatIdFromQuery) {
+        const targetConversation = conversations.find(conv => conv.id === chatIdFromQuery);
         if (targetConversation) {
           setSelectedConversationId(targetConversation.id);
           setShowMessageBox(true);
-        } else {
-          const mostRecentConversation = conversations[0];
-          if (mostRecentConversation) {
-            setSelectedConversationId(mostRecentConversation.id);
+          return;
+        }
+      }
+      
+      // Check for proId in URL path (for user chat routes)
+      if (location.pathname.includes('/chat/')) {
+        const proIdMatch = location.pathname.match(/\/chat\/([^\/]+)/);
+        if (proIdMatch) {
+          const proId = proIdMatch[1];
+          const targetConversation = conversations.find(conv => 
+            conv.participants.proId === proId || conv.participants.userId === proId
+          );
+          if (targetConversation) {
+            setSelectedConversationId(targetConversation.id);
             setShowMessageBox(true);
+          } else {
+            const mostRecentConversation = conversations[0];
+            if (mostRecentConversation) {
+              setSelectedConversationId(mostRecentConversation.id);
+              setShowMessageBox(true);
+            }
           }
         }
       }
     }
-  }, [conversations, location.pathname]);
+  }, [conversations, location.pathname, searchParams]);
 
   useEffect(() => {
     if (!socket || !isConnected) {
@@ -155,10 +171,11 @@ export default function MessagingApp({ role }: MessagingAppProps) {
   };
 
   return (
-   <div className={`h-[calc(100vh-5rem)] flex flex-col overflow-x-hidden ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
+   <div className={`h-full flex flex-col overflow-x-hidden ${theme === "dark" ? "bg-gray-900" : "bg-gray-100"}`}>
       <div className="flex flex-1 overflow-hidden">
+        {/* Sidebar - Chat List */}
         <div
-          className={`w-full md:w-1/3 border-r min-w-0 ${
+          className={`w-full md:w-80 lg:w-72 xl:w-80 border-r min-w-0 flex-shrink-0 ${
             theme === "dark" ? "border-gray-700" : "border-gray-200"
           } ${showMessageBox ? "hidden md:block" : "block"}`}
         >
@@ -167,6 +184,8 @@ export default function MessagingApp({ role }: MessagingAppProps) {
             selectedConversationId={selectedConversationId}
           />
         </div>
+        
+        {/* Message Area */}
         <div className={`flex-1 flex flex-col min-w-0 ${showMessageBox ? "flex" : "hidden md:flex"}`}>
           {selectedConversationId ? (
             <MessageBox

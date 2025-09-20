@@ -253,6 +253,89 @@ export const markAllNotificationsAsRead = async (userId: string, role: "user" | 
   await api.put(`${NotifBase}/read-all/${role}/${userId}`, {}, { withCredentials: true });
 };
 
+export const fetchMessageNotifications = async (
+  userId: string,
+  role: "user" | "pro" | "admin",
+  page: number = 1,
+  limit: number = 10,
+  filter: 'all' | 'unread' = 'all'
+): Promise<{ notifications: NotificationItem[]; total: number }> => {
+  if (!userId || !["user", "pro", "admin"].includes(role)) {
+    throw new Error("Invalid userId or role");
+  }
+  const response = await api.get(`${NotifBase}/messages/${role}/${userId}`, {
+    params: { page, limit, filter },
+    withCredentials: true,
+  });
+  if (!response.data?.notifications) {
+    throw new Error("No message notifications found in response");
+  }
+  return {
+    notifications: response.data.notifications.map((notif: any) => ({
+      id: notif.id,
+      title: notif.title,
+      description: notif.description,
+      timestamp: new Date(notif.timestamp).toISOString(),
+      isRead: notif.isRead,
+      type: notif.type,
+      userId: notif.userId,
+      proId: notif.proId,
+      adminId: notif.adminId,
+      chatId: notif.chatId,
+      bookingId: notif.bookingId,
+      quotaId: notif.quotaId,
+      walletId: notif.walletId,
+      messageId: notif.messageId,
+    })),
+    total: response.data.total || 0,
+  };
+};
+
+export const fetchNonMessageNotifications = async (
+  userId: string,
+  role: "user" | "pro" | "admin",
+  page: number = 1,
+  limit: number = 10,
+  filter: 'all' | 'unread' = 'all'
+): Promise<{ notifications: NotificationItem[]; total: number }> => {
+  if (!userId || !["user", "pro", "admin"].includes(role)) {
+    throw new Error("Invalid userId or role");
+  }
+  const response = await api.get(`${NotifBase}/non-messages/${role}/${userId}`, {
+    params: { page, limit, filter },
+    withCredentials: true,
+  });
+  if (!response.data?.notifications) {
+    throw new Error("No non-message notifications found in response");
+  }
+  return {
+    notifications: response.data.notifications.map((notif: any) => ({
+      id: notif.id,
+      title: notif.title,
+      description: notif.description,
+      timestamp: new Date(notif.timestamp).toISOString(),
+      isRead: notif.isRead,
+      type: notif.type,
+      userId: notif.userId,
+      proId: notif.proId,
+      adminId: notif.adminId,
+      chatId: notif.chatId,
+      bookingId: notif.bookingId,
+      quotaId: notif.quotaId,
+      walletId: notif.walletId,
+      messageId: notif.messageId,
+    })),
+    total: response.data.total || 0,
+  };
+};
+
+export const markAllMessageNotificationsAsRead = async (userId: string, role: "user" | "pro" | "admin"): Promise<void> => {
+  if (!userId || !["user", "pro", "admin"].includes(role)) {
+    throw new Error("Invalid userId or role");
+  }
+  await api.put(`${NotifBase}/read-all-messages/${role}/${userId}`, {}, { withCredentials: true });
+};
+
 export interface User {
   id: string;
   name: string;

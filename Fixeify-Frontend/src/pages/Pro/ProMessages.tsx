@@ -75,9 +75,9 @@ const ProMessages = () => {
       <div className="flex flex-1 overflow-hidden">
         <ProNavbar isOpen={sidebarOpen} />
         <main
-          className={`flex-1 w-full overflow-y-auto p-2 sm:p-4 lg:p-6 transition-all duration-300`}
+          className={`flex-1 w-full overflow-hidden p-1 sm:p-2 lg:p-3 transition-all duration-300`}
         >
-          <div className="max-w-full lg:max-w-7xl mx-auto h-full">
+          <div className="w-full flex flex-col" style={{ height: 'calc(100vh - 85px)' }}>
             <MessagingApp role="pro" />
           </div>
         </main>

@@ -19,6 +19,7 @@ import createNotificationRoutes from "./routes/notificationRoutes";
 import createRatingReviewRoutes from "./routes/ratingReviewRoutes";
 import createTicketRoutes from "./routes/ticketRoutes";
 import { Container } from "inversify";
+import TransactionModel from "./models/transactionModel";
 import { TYPES } from "./types";
 import { AuthController } from "./controllers/authController";
 import { AdminController } from "./controllers/adminController";
@@ -69,6 +70,7 @@ import { errorMiddleware } from "./middleware/errorMiddleware";
 import "./models/notificationModel";
 import "./models/chatModel";
 import "./models/messageModel";
+import { initSlotReleaseWorker, resyncSlotReleaseJobs } from "./services/queue/SlotReleaseQueue";
 
 dotenv.config();
 
@@ -157,6 +159,49 @@ const connectServices = async (): Promise<void> => {
   try {
     await dbConnector.connect();
     await redisConnector.connect();
+    
+    try {
+      const pipeline = [
+        {
+          $match: { bookingId: { $exists: true } }
+        },
+        {
+          $group: {
+            _id: {
+              bookingId: "$bookingId",
+              type: "$type", 
+              proId: "$proId",
+              amount: "$amount",
+              adminId: "$adminId"
+            },
+            docs: { $push: "$$ROOT" },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $match: { count: { $gt: 1 } }
+        }
+      ];
+      
+      const duplicates = await TransactionModel.aggregate(pipeline);
+      let removedCount = 0;
+      
+      for (const duplicate of duplicates) {
+        const docsToRemove = duplicate.docs.slice(1);
+        for (const doc of docsToRemove) {
+          await TransactionModel.deleteOne({ _id: doc._id });
+          removedCount++;
+        }
+      }
+    
+      
+      await TransactionModel.syncIndexes();
+    } catch (err) {
+      console.error("Failed to sync transaction indexes:", err);
+    }
+    
+    await initSlotReleaseWorker();
+    await resyncSlotReleaseJobs();
     
     server.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);

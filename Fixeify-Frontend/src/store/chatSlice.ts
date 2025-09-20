@@ -9,6 +9,9 @@ import {
   fetchUserNotifications,
   markSingleNotificationAsRead,
   markAllNotificationsAsRead,
+  fetchMessageNotifications,
+  fetchNonMessageNotifications,
+  markAllMessageNotificationsAsRead,
   getExistingChat,
 } from "../api/chatApi";
 
@@ -16,6 +19,8 @@ interface ChatState {
   conversations: Conversation[];
   messages: { [chatId: string]: Message[] };
   notifications: NotificationItem[];
+  messageNotifications: NotificationItem[];
+  nonMessageNotifications: NotificationItem[];
   onlineUsers: { [userId: string]: boolean };
   status: "idle" | "loading" | "succeeded" | "failed";
   error: string | null;
@@ -25,6 +30,8 @@ const initialState: ChatState = {
   conversations: [],
   messages: {},
   notifications: [],
+  messageNotifications: [],
+  nonMessageNotifications: [],
   onlineUsers: {},
   status: "idle",
   error: null,
@@ -180,6 +187,53 @@ export const markAllNotificationsRead = createAsyncThunk<
   }
 );
 
+// NEW: Fetch message notifications only
+export const fetchAllMessageNotifications = createAsyncThunk<
+  NotificationItem[],
+  { userId: string; role: "user" | "pro" | "admin"; page: number; limit: number; filter: 'all' | 'unread' },
+  { rejectValue: string }
+>(
+  "chat/fetchAllMessageNotifications",
+  async ({ userId, role, page, limit, filter }, { rejectWithValue }) => {
+    try {
+      const { notifications } = await fetchMessageNotifications(userId, role, page, limit, filter);
+      return notifications;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch message notifications");
+    }
+  }
+);
+
+export const fetchAllNonMessageNotifications = createAsyncThunk<
+  NotificationItem[],
+  { userId: string; role: "user" | "pro" | "admin"; page: number; limit: number; filter: 'all' | 'unread' },
+  { rejectValue: string }
+>(
+  "chat/fetchAllNonMessageNotifications",
+  async ({ userId, role, page, limit, filter }, { rejectWithValue }) => {
+    try {
+      const { notifications } = await fetchNonMessageNotifications(userId, role, page, limit, filter);
+      return notifications;
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Failed to fetch non-message notifications");
+    }
+  }
+);
+export const markAllMessageNotificationsRead = createAsyncThunk<
+  void,
+  { userId: string; role: "user" | "pro" | "admin" },
+  { rejectValue: string }
+>(
+  "chat/markAllMessageNotificationsRead",
+  async ({ userId, role }, { rejectWithValue }) => {
+    try {
+      await markAllMessageNotificationsAsRead(userId, role);
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Failed to mark all message notifications as read");
+    }
+  }
+);
+
 const chatSlice = createSlice({
   name: "chat",
   initialState,
@@ -295,6 +349,17 @@ const chatSlice = createSlice({
     },
     addNotification: (state, action: PayloadAction<NotificationItem>) => {
       state.notifications.unshift(action.payload);
+      if (action.payload.type === "message") {
+        state.messageNotifications.unshift(action.payload);
+      } else {
+        state.nonMessageNotifications.unshift(action.payload);
+      }
+    },
+    addMessageNotification: (state, action: PayloadAction<NotificationItem>) => {
+      state.messageNotifications.unshift(action.payload);
+    },
+    addNonMessageNotification: (state, action: PayloadAction<NotificationItem>) => {
+      state.nonMessageNotifications.unshift(action.payload);
     },
     updateOnlineStatus: (state, action: PayloadAction<{ userId: string; isOnline: boolean }>) => {
       state.onlineUsers[action.payload.userId] = action.payload.isOnline;
@@ -478,6 +543,15 @@ const chatSlice = createSlice({
         if (notification) {
           notification.isRead = true;
         }
+        // Also update in specific arrays
+        const messageNotification = state.messageNotifications.find((n) => n.id === notificationId);
+        if (messageNotification) {
+          messageNotification.isRead = true;
+        }
+        const nonMessageNotification = state.nonMessageNotifications.find((n) => n.id === notificationId);
+        if (nonMessageNotification) {
+          nonMessageNotification.isRead = true;
+        }
         state.status = "succeeded";
       })
       .addCase(markNotificationRead.rejected, (state, action) => {
@@ -494,6 +568,53 @@ const chatSlice = createSlice({
       .addCase(markAllNotificationsRead.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload as string;
+      })
+      .addCase(fetchAllMessageNotifications.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(fetchAllMessageNotifications.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        const page = action.meta.arg.page;
+        if (page === 1) {
+          state.messageNotifications = action.payload;
+        } else {
+          const existingIds = new Set(state.messageNotifications.map(n => n.id));
+          const newNotifs = action.payload.filter(n => !existingIds.has(n.id));
+          state.messageNotifications = [...state.messageNotifications, ...newNotifs];
+        }
+      })
+      .addCase(fetchAllMessageNotifications.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload as string;
+      })
+      .addCase(fetchAllNonMessageNotifications.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(fetchAllNonMessageNotifications.fulfilled, (state, action) => {
+        state.status = "succeeded";
+        const page = action.meta.arg.page;
+        if (page === 1) {
+          state.nonMessageNotifications = action.payload;
+        } else {
+          const existingIds = new Set(state.nonMessageNotifications.map(n => n.id));
+          const newNotifs = action.payload.filter(n => !existingIds.has(n.id));
+          state.nonMessageNotifications = [...state.nonMessageNotifications, ...newNotifs];
+        }
+      })
+      .addCase(fetchAllNonMessageNotifications.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload as string;
+      })
+      .addCase(markAllMessageNotificationsRead.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(markAllMessageNotificationsRead.fulfilled, (state) => {
+        state.messageNotifications = state.messageNotifications.map((n) => ({ ...n, isRead: true }));
+        state.status = "succeeded";
+      })
+      .addCase(markAllMessageNotificationsRead.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload as string;
       });
   },
 });
@@ -502,6 +623,8 @@ export const {
   addMessage,
   addIncomingMessage,
   addNotification,
+  addMessageNotification,
+  addNonMessageNotification,
   updateOnlineStatus,
   clearChatError,
   updateMessageStatus,

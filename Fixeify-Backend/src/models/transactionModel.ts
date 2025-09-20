@@ -26,7 +26,6 @@ const transactionSchema = new Schema<TransactionDocument>(
       required: true,
       unique: true,
       default: function () {
-        // TRX-<yyyyMMddHHmmss>-<4 alphanum>
         const now = new Date();
         const pad = (n: number) => n.toString().padStart(2, "0");
         const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -52,6 +51,10 @@ const transactionSchema = new Schema<TransactionDocument>(
 );
 
 transactionSchema.index({ proId: 1, createdAt: -1 });
+transactionSchema.index(
+  { bookingId: 1, type: 1, proId: 1, amount: 1, adminId: 1 },
+  { unique: true, partialFilterExpression: { bookingId: { $exists: true } } }
+);
 
 const TransactionModel: Model<TransactionDocument> = mongoose.model<TransactionDocument>("Transaction", transactionSchema);
 

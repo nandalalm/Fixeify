@@ -7,6 +7,7 @@ import { MESSAGES } from "../constants/messages";
 import { AuthRequest } from "../middleware/authMiddleware";
 import Stripe from "stripe";
 import { HttpStatus } from "../enums/httpStatus";
+import PaymentEventModel from "../models/paymentEventModel";
 
 @injectable()
 export class UserController {
@@ -215,6 +216,21 @@ export class UserController {
         const error = err as Error;
         console.error(`${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
         throw new HttpError(HttpStatus.BAD_REQUEST, `${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
+      }
+
+      if (event.type === "payment_intent.succeeded") {
+        const paymentIntent = event.data.object as Stripe.PaymentIntent;
+        const pid = paymentIntent.id;
+        const bookingId = paymentIntent.metadata?.bookingId;
+        try {
+          await PaymentEventModel.create({ paymentIntentId: pid });
+        } catch (e: any) {
+          if (e && e.code === 11000) {
+            res.status(HttpStatus.OK).json({ received: true, duplicate: true });
+            return;
+          }
+          throw e;
+        }
       }
 
       await this._userService.handleWebhookEvent(event);

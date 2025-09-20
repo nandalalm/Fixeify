@@ -4,12 +4,10 @@ import { QuotaResponse } from '../interfaces/quotaInterface';
 
 const formatCurrency = (amount: number | undefined): string => {
   if (!amount) return '0';
-  // Convert to number and round to remove any decimal places
   const num = Math.round(Number(amount));
   return num.toLocaleString('en-IN');
 };
 
-// Convert HH:MM to 12h format, e.g., 14:30 -> 2:30 PM
 const to12h = (time?: string): string => {
   if (!time) return '-';
   const [hStr, mStr] = time.split(':');
@@ -31,29 +29,24 @@ export const generateInvoice = (data: InvoiceData): void => {
   const { booking, quota } = data;
   const pdf = new jsPDF();
   
-  // Set up colors
   const primaryColor = '#032b44';
   const lightGray = '#f5f5f5';
   const darkGray = '#333333';
   
-  // Page dimensions
   const pageWidth = pdf.internal.pageSize.width;
   const margin = 20;
   const contentWidth = pageWidth - (margin * 2);
   
   let yPosition = 20;
   
-  // Helper function to add text with automatic line breaks
   const addText = (text: string, x: number, y: number, options?: any) => {
     pdf.text(text, x, y, options);
   };
   
-  // Helper function to draw a line
   const drawLine = (x1: number, y1: number, x2: number, y2: number) => {
     pdf.line(x1, y1, x2, y2);
   };
   
-  // Helper function to draw a rectangle
   const drawRect = (x: number, y: number, width: number, height: number, fill?: boolean) => {
     if (fill) {
       pdf.rect(x, y, width, height, 'F');
@@ -61,30 +54,25 @@ export const generateInvoice = (data: InvoiceData): void => {
       pdf.rect(x, y, width, height);
     }
   };
-  
-  // Header Section
+
   pdf.setFillColor(primaryColor);
   drawRect(0, 0, pageWidth, 40, true);
   
-  // Company Logo/Name
   pdf.setTextColor(255, 255, 255);
   pdf.setFontSize(24);
   pdf.setFont('helvetica', 'bold');
   addText('FIXEIFY', margin, 25);
   
-  // Invoice Title
   pdf.setFontSize(16);
   pdf.setFont('helvetica', 'normal');
   addText('SERVICE INVOICE', pageWidth - margin - 60, 25);
   
   yPosition = 60;
   
-  // Invoice Details Header
   pdf.setTextColor(darkGray);
   pdf.setFontSize(12);
   pdf.setFont('helvetica', 'bold');
   
-  // Invoice Info Box
   pdf.setFillColor(lightGray);
   drawRect(margin, yPosition, contentWidth, 30, true);
   
@@ -95,24 +83,21 @@ export const generateInvoice = (data: InvoiceData): void => {
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
   
-  // Invoice details
-  const invoiceNumber = `INV-${booking.id?.substring(0, 8).toUpperCase()}`;
+  const bookingNumber = booking.bookingId || booking.id || '';
   const invoiceDate = new Date().toLocaleDateString('en-IN');
   const serviceDate = new Date(booking.preferredDate).toLocaleDateString('en-IN');
   
-  addText(`Invoice Number: ${invoiceNumber}`, margin + 5, yPosition + 5);
+  addText(`Booking Number: ${bookingNumber}`, margin + 5, yPosition + 5);
   addText(`Invoice Date: ${invoiceDate}`, margin + 5, yPosition + 15);
   addText(`Service Date: ${serviceDate}`, pageWidth - margin - 80, yPosition + 5);
   addText(`Status: ${booking.status.toUpperCase()}`, pageWidth - margin - 80, yPosition + 15);
   
   yPosition += 40;
   
-  // Customer and Professional Details
   pdf.setFillColor(lightGray);
   drawRect(margin, yPosition, contentWidth / 2 - 5, 60, true);
   drawRect(margin + contentWidth / 2 + 5, yPosition, contentWidth / 2 - 5, 60, true);
-  
-  // Customer Details
+
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   addText('CUSTOMER DETAILS', margin + 5, yPosition + 12);
@@ -123,7 +108,6 @@ export const generateInvoice = (data: InvoiceData): void => {
   addText(`Email: ${booking.user?.email || 'N/A'}`, margin + 5, yPosition + 32);
   addText(`Phone: ${booking.phoneNumber}`, margin + 5, yPosition + 42);
   
-  // Professional Details
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   addText('SERVICE PROVIDER', margin + contentWidth / 2 + 10, yPosition + 12);
@@ -137,7 +121,6 @@ export const generateInvoice = (data: InvoiceData): void => {
   
   yPosition += 80;
   
-  // Service Details
   pdf.setFillColor(lightGray);
   drawRect(margin, yPosition, contentWidth, 25, true);
   
@@ -147,29 +130,36 @@ export const generateInvoice = (data: InvoiceData): void => {
   
   yPosition += 35;
   
+  const labelX = margin + 5;
+  const valueX = margin + 120;
+  const maxValueWidth = pageWidth - valueX - margin;
+  
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
-  addText(`Service Category: ${booking.category?.name || 'N/A'}`, margin, yPosition);
+  addText('Service Category:', labelX, yPosition);
+  addText(`${booking.category?.name || 'N/A'}`, valueX, yPosition);
   yPosition += 12;
   
-  addText('Issue Description:', margin, yPosition);
-  yPosition += 10;
-  
-  // Handle long issue description
-  const issueLines = pdf.splitTextToSize(booking.issueDescription, contentWidth - 20);
+  addText('Issue Description:', labelX, yPosition);
+  const issueLines = pdf.splitTextToSize(booking.issueDescription || 'N/A', maxValueWidth);
   pdf.setFontSize(9);
-  addText(issueLines, margin + 10, yPosition);
-  yPosition += (issueLines.length * 5) + 10;
-  
+  addText(issueLines, valueX, yPosition);
+  yPosition += (issueLines.length * 5) + 8;
   pdf.setFontSize(10);
-  addText(`Service Location: ${booking.location?.address || 'N/A'}`, margin, yPosition);
-  yPosition += 12;
+
+  addText('Service Location:', labelX, yPosition);
+  const locationText = booking.location?.address || 'N/A';
+  const locLines = pdf.splitTextToSize(locationText, maxValueWidth);
+  pdf.setFontSize(9);
+  addText(locLines, valueX, yPosition);
+  yPosition += (locLines.length * 5) + 8;
+  pdf.setFontSize(10);
   
   const timeSlots = booking.preferredTime?.map(t => `${to12h(t.startTime)} - ${to12h(t.endTime)}`).join(', ') || 'N/A';
-  addText(`Time Slots: ${timeSlots}`, margin, yPosition);
+  addText('Time Slots:', labelX, yPosition);
+  addText(timeSlots, valueX, yPosition);
   yPosition += 20;
   
-  // Cost Breakdown Table
   pdf.setFillColor(primaryColor);
   drawRect(margin, yPosition, contentWidth, 15, true);
   
@@ -180,7 +170,6 @@ export const generateInvoice = (data: InvoiceData): void => {
   
   yPosition += 25;
   
-  // Table Headers
   pdf.setTextColor(0, 0, 0);
   pdf.setFillColor(lightGray);
   drawRect(margin, yPosition, contentWidth, 12, true);
@@ -192,17 +181,14 @@ export const generateInvoice = (data: InvoiceData): void => {
   
   yPosition += 20;
   
-  // Table Rows
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(10);
   
-  // Labor Cost
   drawLine(margin, yPosition - 5, pageWidth - margin, yPosition - 5);
   addText('Labor Cost', margin + 5, yPosition + 5);
   addText(formatCurrency(quota.laborCost), pageWidth - margin - 40, yPosition + 5);
   yPosition += 15;
   
-  // Material Cost (if applicable)
   if (quota.materialCost && quota.materialCost > 0) {
     drawLine(margin, yPosition - 5, pageWidth - margin, yPosition - 5);
     addText('Material Cost', margin + 5, yPosition + 5);
@@ -210,7 +196,6 @@ export const generateInvoice = (data: InvoiceData): void => {
     yPosition += 15;
   }
   
-  // Additional Charges (if applicable)
   if (quota.additionalCharges && quota.additionalCharges > 0) {
     drawLine(margin, yPosition - 5, pageWidth - margin, yPosition - 5);
     addText('Additional Charges', margin + 5, yPosition + 5);
@@ -218,7 +203,6 @@ export const generateInvoice = (data: InvoiceData): void => {
     yPosition += 15;
   }
   
-  // Total
   pdf.setFillColor(primaryColor);
   drawRect(margin, yPosition, contentWidth, 15, true);
   
@@ -230,19 +214,17 @@ export const generateInvoice = (data: InvoiceData): void => {
   
   yPosition += 25;
   
-  // Payment Status
   pdf.setTextColor(0, 0, 0);
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(11);
   addText('Payment Status:', margin, yPosition + 10);
   
-  // Set color based on payment status
   if (quota.paymentStatus === 'completed') {
-    pdf.setTextColor(0, 128, 0); // Green
+    pdf.setTextColor(0, 128, 0); 
   } else if (quota.paymentStatus === 'failed') {
-    pdf.setTextColor(255, 0, 0); // Red
+    pdf.setTextColor(255, 0, 0); 
   } else {
-    pdf.setTextColor(255, 165, 0); // Orange
+    pdf.setTextColor(255, 165, 0); 
   }
   
   pdf.setFont('helvetica', 'bold');
@@ -250,19 +232,14 @@ export const generateInvoice = (data: InvoiceData): void => {
   
   yPosition += 30;
   
-  // Footer
   pdf.setTextColor(128, 128, 128);
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(8);
   
   const footerY = pdf.internal.pageSize.height - 30;
   drawLine(margin, footerY - 10, pageWidth - margin, footerY - 10);
-  
-  addText('Thank you for choosing Fixeify!', margin, footerY);
-  addText('For support, contact us at support@fixeify.com', margin, footerY + 8);
-  
-  // Save the PDF
-  const fileName = `Fixeify_Invoice_${invoiceNumber}_${invoiceDate.replace(/\//g, '-')}.pdf`;
+ 
+  const fileName = `Fixeify_Invoice_${(bookingNumber || 'BOOKING')}_${invoiceDate.replace(/\//g, '-')}.pdf`;
   pdf.save(fileName);
 };
 

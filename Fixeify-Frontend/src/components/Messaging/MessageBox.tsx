@@ -116,6 +116,8 @@ const MessageBox: FC<MessageBoxProps> = ({
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageErrorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -137,6 +139,21 @@ const MessageBox: FC<MessageBoxProps> = ({
   // Get online status from Redux state
   const isOtherUserOnline = onlineUsers[initialOtherUser.id] || false;
 
+  // Helper function to set image error with auto-dismiss
+  const setImageErrorWithTimeout = (errorMessage: string) => {
+    // Clear any existing timeout
+    if (imageErrorTimeoutRef.current) {
+      clearTimeout(imageErrorTimeoutRef.current);
+    }
+    
+    setImageError(errorMessage);
+    
+    // Auto-dismiss after 5 seconds
+    imageErrorTimeoutRef.current = setTimeout(() => {
+      setImageError(null);
+    }, 5000);
+  };
+
   // S3 Upload function
   const uploadToS3 = async (file: File, folder: string): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -152,25 +169,76 @@ const MessageBox: FC<MessageBoxProps> = ({
     return `https://${params.Bucket}.s3.${import.meta.env.VITE_AWS_REGION}.amazonaws.com/${params.Key}`;
   };
 
-  // Handle image selection
+  // Handle image selection with better validation
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        setError('Only image files are allowed');
+      // Clear previous errors
+      setImageError(null);
+      
+      // Validate file type - only allow common image formats
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!allowedTypes.includes(file.type.toLowerCase())) {
+        setImageErrorWithTimeout('Only JPEG, PNG, GIF, and WebP images are allowed');
+        // Clear the file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
         return;
       }
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        setError('Image size must be less than 5MB');
+      
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setImageErrorWithTimeout('Image size must be less than 5MB');
+        // Clear the file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
         return;
       }
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
+      
+      // Validate image dimensions and content
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        
+        // Check if image dimensions are reasonable (not too small or too large)
+        if (img.width < 10 || img.height < 10) {
+          setImageErrorWithTimeout('Image is too small. Minimum size is 10x10 pixels');
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+        
+        if (img.width > 4000 || img.height > 4000) {
+          setImageErrorWithTimeout('Image is too large. Maximum size is 4000x4000 pixels');
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+          return;
+        }
+        
+        // Image is valid, proceed with selection
+        setSelectedImage(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setImagePreview(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
       };
-      reader.readAsDataURL(file);
-      setError(null);
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        setImageErrorWithTimeout('Invalid or corrupted image file');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      };
+      
+      img.src = objectUrl;
     }
   };
 
@@ -178,6 +246,7 @@ const MessageBox: FC<MessageBoxProps> = ({
   const clearSelectedImage = () => {
     setSelectedImage(null);
     setImagePreview(null);
+    setImageError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -419,6 +488,15 @@ const MessageBox: FC<MessageBoxProps> = ({
       };
     }
   }, [socket, conversationId, currentUser.id, dispatch]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (imageErrorTimeoutRef.current) {
+        clearTimeout(imageErrorTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleScroll = useCallback(() => {
     if (containerRef.current) {
@@ -753,12 +831,31 @@ const MessageBox: FC<MessageBoxProps> = ({
             </div>
           )}
           
+          {/* Image Error Banner */}
+          {imageError && (
+            <div className="mx-4 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <X className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-sm text-red-700 dark:text-red-300">{imageError}</span>
+              </div>
+              <button
+                onClick={() => setImageError(null)}
+                className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
+                title="Dismiss error"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          
           <div className="flex items-center space-x-2 p-4">
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
               onChange={handleImageSelect}
               className="hidden"
             />

@@ -106,7 +106,7 @@ const Hero = () => {
         <h1 className="text-3xl text-white font-bold lg:text-5xl mb-8 md:text-4xl dark:!text-white">
           Find Your Professional Near You!
         </h1>
-        <div ref={boxRef} className="w-full max-w-md mx-2 sm:mx-0">
+        <div ref={boxRef} className="relative w-full max-w-md mx-2 sm:mx-0">
           <div className="flex items-center bg-white/95 backdrop-blur rounded-full border border-white/60 shadow-lg focus-within:ring-2 focus-within:ring-white/70 dark:bg-gray-800 dark:border-gray-700">
             <Search className="h-5 w-5 text-gray-400 mx-3 dark:text-gray-300" />
             <input
@@ -122,9 +122,9 @@ const Hero = () => {
               aria-label="Search services"
             />
           </div>
-          {/* Dropdown */}
+          {/* Dropdown (overlay) */}
           {open && (query || suggestions.length > 0) && (
-            <div className="mt-2 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+            <div className="absolute left-0 right-0 top-full mt-2 z-20 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
               {loading ? (
                 <div className="p-3">
                   <div className="h-9 bg-gray-100 animate-pulse rounded" />

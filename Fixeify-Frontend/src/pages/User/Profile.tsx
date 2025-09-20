@@ -13,7 +13,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
 import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const Profile = () => {
   const [activeTab, setActiveTab] = useState("Profile Info");
@@ -27,6 +27,7 @@ const Profile = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { user } = useSelector((state: RootState) => state.auth);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const handleResize = () => {
@@ -57,6 +58,19 @@ const Profile = () => {
     localStorage.setItem("isSidebarShrunk", JSON.stringify(isSidebarShrunk));
     sessionStorage.setItem("isEditing", isEditing.toString());
   }, [isSidebarShrunk, isEditing]);
+
+  // Handle query parameters for navigation from message notifications
+  useEffect(() => {
+    const tabFromQuery = searchParams.get('tab');
+    const chatIdFromQuery = searchParams.get('chatId');
+    
+    console.log('Profile query params:', { tab: tabFromQuery, chatId: chatIdFromQuery });
+    
+    if (tabFromQuery === 'Messages') {
+      setActiveTab('Messages');
+      // The MessagingApp will handle the chatId parameter automatically
+    }
+  }, [searchParams]);
 
   const toggleSidebarVisibility = () => {
     setIsSidebarVisible(!isSidebarVisible);
@@ -190,7 +204,7 @@ const Profile = () => {
           )}
         </div>
 
-        <div className={`flex-1 transition-all duration-300 ${isExtraSmallScreen ? "pt-0" : ""}`}>
+        <div className={`flex-1 transition-all duration-300 ${isExtraSmallScreen ? "pt-0" : ""} ${activeTab === "Messages" ? "p-0 overflow-hidden" : ""}`} style={activeTab === "Messages" ? { height: 'calc(100vh - 90px)' } : {}}>
           {activeTab === "Profile Info" && (
             <div>
               {isEditing ? (
@@ -207,7 +221,11 @@ const Profile = () => {
           )}
           {activeTab === "Ongoing Request" && <OngoingRequest />}
           {activeTab === "Booking History" && <BookingHistory />}
-          {activeTab === "Messages" && <MessagingApp role="user" />}
+          {activeTab === "Messages" && (
+            <div className="w-full h-full flex flex-col">
+              <MessagingApp role="user" />
+            </div>
+          )}
           {activeTab === "Conflicts" && <UserConflicts />}
         </div>
       </div>

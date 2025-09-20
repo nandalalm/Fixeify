@@ -10,6 +10,7 @@ export interface IQuota {
   additionalCharges: number;
   totalCost: number;
   paymentStatus: "pending" | "completed" | "failed";
+  paymentIntentId?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +30,7 @@ const quotaSchema = new Schema<QuotaDocument>(
     additionalCharges: { type: Number, default: 0, min: 0 },
     totalCost: { type: Number, required: true, min: 0 },
     paymentStatus: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
+    paymentIntentId: { type: String, required: false },
   },
   { timestamps: true }
 );
