@@ -41,15 +41,20 @@ const Register = () => {
     try {
       const { email } = baseRegisterSchema.pick({ email: true }).parse({ email: formData.email });
       setIsSendingOtp(true);
-      await sendOtp(email);
+      await sendOtp(email, "user");
       setOtpSent(true);
       setTimeLeft(60);
     } catch (error) {
       if (error instanceof z.ZodError) {
         setErrors({ email: error.errors[0].message });
       } else if (error instanceof Error) {
-        if (error.message.includes("already registered")) {
+        const err = error as any;
+        const errorMessage = err.response?.data?.message || err.message || "";
+        
+        if (errorMessage.includes("already registered") || errorMessage.includes("Email already registered")) {
           setServerError("This email is already registered. Please use a different email or login.");
+        } else if (err.response?.status === 400 && errorMessage) {
+          setServerError(errorMessage);
         } else {
           setServerError("Failed to send OTP. Please try again.");
         }
@@ -153,6 +158,25 @@ const Register = () => {
     }
   };
 
+  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData('text').trim();
+    
+    // Extract only digits from pasted data
+    const digitsOnly = pastedData.replace(/\D/g, '');
+    
+    // Check if we have exactly 6 digits
+    if (digitsOnly.length === 6) {
+      setFormData((prev) => ({ ...prev, otp: digitsOnly }));
+      setErrors((prev) => ({ ...prev, otp: "" }));
+      
+      // Focus the last input after pasting
+      setTimeout(() => {
+        document.getElementById(`otp-5`)?.focus();
+      }, 0);
+    }
+  };
+
   return (
     <div className="flex min-h-screen dark:bg-gray-900">
       <div className="hidden md:block md:w-1/2 bg-gray-100 relative dark:bg-gray-800">
@@ -221,6 +245,7 @@ const Register = () => {
                         value={formData.otp[index] || ""}
                         onChange={(e) => handleOtpChange(e, index)}
                         onKeyDown={(e) => handleOtpKeyDown(e, index)}
+                        onPaste={handleOtpPaste}
                         className="w-12 h-12 text-center text-xl border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         required
                       />

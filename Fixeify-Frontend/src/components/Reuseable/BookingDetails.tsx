@@ -22,6 +22,7 @@ interface BookingDetailsProps {
   refreshKey?: number;
   showQuotaSection?: boolean;
   onReady?: () => void;
+  onBookingUpdate?: (booking: BookingCompleteResponse) => void;
 }
 
 const LabelValue: React.FC<{ label: React.ReactNode; value?: React.ReactNode }>=({ label, value }) => (
@@ -31,7 +32,6 @@ const LabelValue: React.FC<{ label: React.ReactNode; value?: React.ReactNode }>=
   </div>
 );
 
-// Avatar component: prevents flicker by showing placeholder until real image loads
 const Avatar: React.FC<{
   src: string;
   placeholder: string;
@@ -42,7 +42,6 @@ const Avatar: React.FC<{
   const [displayedSrc, setDisplayedSrc] = useState<string>(placeholder);
 
   useEffect(() => {
-    // If src equals placeholder, just show placeholder
     if (!src || src === placeholder) {
       setDisplayedSrc(placeholder);
       onSrcChange && onSrcChange(placeholder);
@@ -62,7 +61,6 @@ const Avatar: React.FC<{
         if (cancelled) return;
         if (!retried) {
           retried = true;
-          // Retry once; some transient network hiccups resolve on retry
           tryLoad(targetSrc);
         } else {
           setDisplayedSrc(placeholder);
@@ -70,7 +68,6 @@ const Avatar: React.FC<{
         }
       };
       img.src = targetSrc;
-      // Handle browser cached images where onload may not fire reliably
       if (img.complete && img.naturalWidth > 0) {
         img.onload?.(new Event('load'));
       }
@@ -79,7 +76,6 @@ const Avatar: React.FC<{
     return () => { cancelled = true; };
   }, [src, placeholder, onSrcChange]);
 
-  // If we're in placeholder state (no src or src equals placeholder), render a polished icon avatar instead of an image
   const isTrulyPlaceholder = !src || src === placeholder;
 
   if (displayedSrc === placeholder && isTrulyPlaceholder) {
@@ -161,7 +157,7 @@ const formatDateDDMMYYYY = (d: Date | string | number) => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
-const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, onBack, onRate, onRaiseComplaint, onAccept, onReject, onGenerateQuota, refreshKey = 0, showQuotaSection = true, onReady }) => {
+const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, onBack, onRate, onRaiseComplaint, onAccept, onReject, onGenerateQuota, refreshKey = 0, showQuotaSection = true, onReady, onBookingUpdate }) => {
   const [booking, setBooking] = useState<BookingCompleteResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -171,7 +167,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
   const [proDisplaySrc, setProDisplaySrc] = useState<string>("/placeholder.jpg");
   const [bannerError, setBannerError] = useState<string | null>(null);
 
-  // Precompute image sources to avoid flicker when image is missing
   const userImageSrc = useMemo(() => {
     const src = booking?.user?.photo?.trim();
     return src ? src : "/placeholder-user.jpg";
@@ -188,26 +183,26 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
       setLoading(true);
       try {
         const b = await fetchUserBookingById(bookingId);
-        if (mounted) setBooking(b);
-        // Only attempt to fetch quota if status is not pending/rejected/cancelled and quota section is enabled
+        if (mounted) {
+          setBooking(b);
+          if (onBookingUpdate && b) {
+            onBookingUpdate(b);
+          }
+        }
         if (mounted && b && !["pending", "rejected", "cancelled"].includes(b.status) && showQuotaSection) {
           try {
             const q = await fetchUserQuotaByBookingId(bookingId);
             if (mounted) setQuota(q);
           } catch (e: any) {
-            // Try pro quota as fallback
             try {
               const q2 = await fetchProQuotaByBookingId(bookingId);
               if (mounted) setQuota(q2 as any);
             } catch (e2: any) {
-              // No quota available or backend error; surface backend error message if present
               const msg = e2?.response?.data?.message || e?.response?.data?.message;
               if (mounted && msg) setBannerError(msg);
-              // Keep quota as null
             }
           }
         } else {
-          // Pending/Rejected/Cancelled bookings won't have quota
           if (mounted) setQuota(null);
         }
       } catch (e: any) {
@@ -219,7 +214,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
       }
       if (mounted) {
         setLoading(false);
-        // Notify parent that details view finished its internal loading
         try { onReady && onReady(); } catch {}
       }
     };
@@ -227,7 +221,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
     return () => { mounted = false; };
   }, [bookingId, refreshKey, showQuotaSection]);
 
-  // Auto-dismiss error banner after a short delay
   useEffect(() => {
     if (!bannerError) return;
     const t = setTimeout(() => setBannerError(null), 3000);
@@ -365,7 +358,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         </Section>
       </div>
 
-      {/* Booking */}
       <Section title="Booking Details">
         <LabelValue label="Booking ID" value={booking.bookingId} />
         <LabelValue label="Issue Description" value={booking.issueDescription} />
@@ -389,7 +381,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         )}
       </Section>
 
-      {/* Quota / Payment - show only if present and not hidden by parent */}
       {showQuotaSection && quota && (
         <Section title="Quota / Payment Details">
           <div className="space-y-1">
@@ -409,7 +400,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         </Section>
       )}
 
-      {/* Admin revenue section above map */}
       {viewerRole === "admin" && booking.status === "completed" && (
         <Section title="Revenue">
           <LabelValue label="Admin Revenue" value={typeof (booking as any).adminRevenue === 'number' ? `₹${(booking as any).adminRevenue}` : "-"} />
@@ -417,7 +407,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         </Section>
       )}
 
-      {/* Location */}
       <Section title="Service Location">
         <LabelValue label="Address" value={booking.location ? `${booking.location.address}, ${booking.location.city}, ${booking.location.state}` : "-"} />
         {booking.location && (
@@ -427,7 +416,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         )}
       </Section>
 
-      {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
         {canDownloadInvoice && (
           <button
@@ -448,7 +436,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
             Raise Complaint
           </button>
         )}
-        {/* Pro actions based on status */}
         {viewerRole === "pro" && booking && booking.status === "pending" && onAccept && onReject && (
           <div className="flex flex-1 gap-3">
             <button
@@ -470,7 +457,6 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         )}
       </div>
 
-      {/* Image Lightbox */}
       {imagePreview && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-[2px] flex items-center justify-center z-50" onClick={() => setImagePreview(null)}>
           <div className="relative" onClick={(e) => e.stopPropagation()}>

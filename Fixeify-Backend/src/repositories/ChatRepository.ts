@@ -231,7 +231,7 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
       .findByIdAndUpdate(
         chatId,
         {
-          $set: { "unreadCount.$[elem].count": 0 },
+          $set: { "unreadCount.$[elem].count": 0, updatedAt: new Date() },
         },
         {
           arrayFilters: [{ "elem.participantId": new mongoose.Types.ObjectId(participantId), "elem.participantModel": participantModel }],

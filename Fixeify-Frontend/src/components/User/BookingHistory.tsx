@@ -1,4 +1,3 @@
-// components/BookingHistory.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch } from "../../store/store";
@@ -14,9 +13,6 @@ import { RotateCcw } from "lucide-react";
 import { fetchReviewsByUser } from "../../store/ratingReviewSlice";
 import { createTicket } from "../../store/ticketSlice";
 import { TicketPriority } from "../../interfaces/ticketInterface";
-
-
-
 
 export const formatDate = (date: Date): string => {
   return date.toLocaleDateString("en-GB", {
@@ -39,7 +35,6 @@ const BookingHistory: React.FC = () => {
   const [detailsRefreshKey, setDetailsRefreshKey] = useState<number>(0);
   const [complaintBookingId, setComplaintBookingId] = useState<string | null>(null);
   const [complaintOpen, setComplaintOpen] = useState(false);
-  // rating modal state
   const [ratingOpen, setRatingOpen] = useState(false);
   const [ratingContext, setRatingContext] = useState<{
     proId: string;
@@ -48,10 +43,8 @@ const BookingHistory: React.FC = () => {
     quotaId?: string;
   } | null>(null);
   
-  // rating modal state will be handled inside the details view flow if needed
 
   const dispatch = useDispatch<AppDispatch>();
-  // User's submitted reviews to determine if a booking is already rated
   useSelector((state: RootState) => state.ratingReview);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "">("latest");
@@ -60,7 +53,6 @@ const BookingHistory: React.FC = () => {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Build server-side query params from UI state
   const serverParams = useMemo(() => {
     const isStatus = ["completed", "rejected", "cancelled"].includes(sortOption);
     const status = isStatus ? (sortOption as "completed" | "rejected" | "cancelled") : undefined;

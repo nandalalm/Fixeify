@@ -71,10 +71,11 @@ export const useNonMessageNotifications = ({ userId, role }: UseNonMessageNotifi
     
     try {
       await dispatch(markAllNotificationsRead({ userId, role })).unwrap();
+      await fetchNotifications(1, filter);
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
     }
-  }, [dispatch, userId, role]);
+  }, [dispatch, userId, role, fetchNotifications, filter]);
 
   const toggleFilter = useCallback((newFilter: 'all' | 'unread') => {
     setFilter(newFilter);

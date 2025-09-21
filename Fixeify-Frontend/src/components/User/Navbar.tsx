@@ -35,9 +35,6 @@ const Navbar = () => {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
-  // Legacy notification state - keeping for compatibility but using hooks instead
-
-  // NEW: Separate hooks for message and non-message notifications
   const messageNotifications = useMessageNotifications({
     userId: user?.id || '',
     role: user?.role || 'user'
@@ -109,14 +106,12 @@ const Navbar = () => {
       style={{ top: 0, margin: 0, padding: 0, transform: "translateY(0)" }}
     >
       <div className="w-full flex justify-between items-center px-3 md:px-4 lg:px-6 py-3" style={{ margin: 0 }}>
-        {/* Mobile logo */}
         <img
           src="/logo2.png"
           alt="Fixeify Logo"
           className="block md:hidden h-10 w-auto dark:filter dark:invert cursor-pointer"
           onClick={() => navigate("/home")}
         />
-        {/* Desktop/Tablet logo */}
         <img
           src="/logo.png"
           alt="Fixeify Logo"
@@ -125,7 +120,6 @@ const Navbar = () => {
         />
         <nav className="ml-auto gap-6 hidden items-center md:flex">
           <div className="flex items-center gap-2">
-            {/* Change location button moved next to Become a Provider */}
             <button
               onClick={toggleTheme}
               className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
@@ -135,7 +129,6 @@ const Navbar = () => {
             </button>
             {accessToken && (
               <>
-                {/* Message Icon */}
                 <button
                   onClick={() => setIsMessagePanelOpen(true)}
                   className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
@@ -148,7 +141,6 @@ const Navbar = () => {
                   )}
                 </button>
                 
-                {/* Notification Bell Icon */}
                 <button
                   onClick={() => setIsNotificationPanelOpen(true)}
                   className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
@@ -251,7 +243,6 @@ const Navbar = () => {
           </button>
           {accessToken && (
             <>
-              {/* Message Icon */}
               <button
                 onClick={() => setIsMessagePanelOpen(true)}
                 className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
@@ -264,7 +255,6 @@ const Navbar = () => {
                 )}
               </button>
               
-              {/* Notification Bell Icon */}
               <button
                 onClick={() => setIsNotificationPanelOpen(true)}
                 className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
@@ -311,25 +301,12 @@ const Navbar = () => {
             className="fixed top-[60px] left-0 w-full bg-white shadow-md md:hidden pb-4 px-4 py-2 z-50 dark:bg-gray-900 dark:border-gray-700"
           >
             <nav className="flex flex-col space-y-3">
-              <div className="flex items-center gap-2">
-                {accessToken && (
-                  <button
-                    onClick={() => setIsChangeLocationOpen(true)}
-                    className="py-1.5 px-1.5 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-1"
-                    aria-label="Change location"
-                    title="Change location"
-                  >
-                    <MapPin className="h-5 w-5 text-[#032b44] dark:text-gray-300" />
-                    <PencilLine className="h-5 w-5 text-[#032b44] dark:text-gray-300" />
-                  </button>
-                )}
-                <Link
-                  to="/become-pro"
-                  className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
-                >
-                  Become a Provider
-                </Link>
-              </div>
+              <Link
+                to="/become-pro"
+                className="text-sm hover:text-primary dark:text-gray-300 dark:hover:text-white"
+              >
+                Become a Provider
+              </Link>
               {accessToken ? (
                 <>
                   <Link
@@ -354,7 +331,6 @@ const Navbar = () => {
           </motion.div>
         )}
       </AnimatePresence>
-      {/* Non-Message Notifications Panel */}
       <NotificationPanel
         isOpen={isNotificationPanelOpen}
         onClose={() => setIsNotificationPanelOpen(false)}
@@ -368,7 +344,6 @@ const Navbar = () => {
         hasMore={nonMessageNotifications.hasMore}
       />
       
-      {/* Message Notifications Panel */}
       <MessagePanel
         isOpen={isMessagePanelOpen}
         onClose={() => setIsMessagePanelOpen(false)}

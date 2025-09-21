@@ -47,13 +47,24 @@ export class AuthService implements IAuthService {
     this._redisConnector = redisConnector;
   }
 
-  async sendOtp(email: string): Promise<void> {
-    const existingUser = await this._userRepository.findUserByEmail(email);
-    if (existingUser) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
-    const existingAdmin = await this._adminRepository.findAdminByEmail(email);
-    if (existingAdmin) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
-    const existingPro = await this._proRepository.findApprovedProByEmail(email);
-    if (existingPro) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
+  async sendOtp(email: string, role?: UserRole): Promise<void> {
+    if (role === UserRole.USER) {
+      const existingUser = await this._userRepository.findUserByEmail(email);
+      if (existingUser) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
+    } else if (role === UserRole.PRO) {
+      const existingPro = await this._proRepository.findApprovedProByEmail(email);
+      if (existingPro) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
+    } else if (role === UserRole.ADMIN) {
+      const existingAdmin = await this._adminRepository.findAdminByEmail(email);
+      if (existingAdmin) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
+    } else {
+      const existingUser = await this._userRepository.findUserByEmail(email);
+      if (existingUser) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
+      const existingAdmin = await this._adminRepository.findAdminByEmail(email);
+      if (existingAdmin) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
+      const existingPro = await this._proRepository.findApprovedProByEmail(email);
+      if (existingPro) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_ALREADY_REGISTERED);
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     await this._redisConnector.getClient().setEx(`otp:${email}`, 60, otp);

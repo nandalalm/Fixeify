@@ -28,8 +28,12 @@ const OngoingRequest = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [customCancelReason, setCustomCancelReason] = useState("");
   const [isCancelling, setIsCancelling] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [showCancelButton, setShowCancelButton] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
@@ -39,11 +43,48 @@ const OngoingRequest = () => {
   const limit = 5;
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // Debounce search input
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 300);
     return () => clearTimeout(id);
   }, [searchTerm]);
+
+  useEffect(() => {
+    if (selectedBooking && bookings.length > 0) {
+      const updatedBooking = bookings.find(booking => booking.id === selectedBooking.id);
+      if (updatedBooking) {
+        const arrayUpdatedAt = new Date(updatedBooking.updatedAt || 0).getTime();
+        const selectedUpdatedAt = new Date(selectedBooking.updatedAt || 0).getTime();
+        
+        if (arrayUpdatedAt > selectedUpdatedAt) {
+          setSelectedBooking(updatedBooking);
+        }
+      }
+    }
+  }, [bookings, selectedBooking]);
+
+  useEffect(() => {
+    if (!selectedBooking || detailsLoading) {
+      setShowCancelButton(false);
+      return;
+    }
+    
+    const currentBookingInArray = bookings.find(b => b.id === selectedBooking.id);
+    
+    let currentStatus = selectedBooking.status;
+    
+    if (currentBookingInArray) {
+      const arrayUpdatedAt = new Date(currentBookingInArray.updatedAt || 0).getTime();
+      const selectedUpdatedAt = new Date(selectedBooking.updatedAt || 0).getTime();
+      
+    
+      if (arrayUpdatedAt > selectedUpdatedAt) {
+        currentStatus = currentBookingInArray.status;
+      }
+    }
+    
+    setShowCancelButton(currentStatus === "pending");
+  }, [selectedBooking?.status, detailsLoading, bookings, selectedBooking?.id]);
+
 
 
   useEffect(() => {
@@ -98,16 +139,27 @@ const OngoingRequest = () => {
   };
 
   const requestCancelBooking = () => {
-    setShowCancelModal(true);
+    setIsReasonModalOpen(true);
+  };
+
+  const handleReasonConfirm = async () => {
+    if (cancelReason || customCancelReason) {
+      setIsReasonModalOpen(false);
+      setShowCancelModal(true);
+    } else {
+      alert("Please select a cancellation reason.");
+    }
   };
 
   const confirmCancelBooking = async () => {
     if (!selectedBooking) return;
     try {
       setIsCancelling(true);
-      await cancelBooking(userId, selectedBooking.id, "User cancelled");
+      await cancelBooking(userId, selectedBooking.id, cancelReason || customCancelReason);
       setShowCancelModal(false);
       setIsCancelling(false);
+      setCancelReason("");
+      setCustomCancelReason("");
       handleBack();
     } catch (e) {
       setIsCancelling(false);
@@ -119,10 +171,8 @@ const OngoingRequest = () => {
     setCurrentPage(page);
   };
 
-  // Server-side filtered/sorted results
   const filteredAndSortedBookings = bookings;
 
-  // Whether any filter or sort (other than default latest) is active
   const isFiltered = (debouncedSearch && debouncedSearch.length > 0) || sortOption !== "latest";
 
   const handleClearFilter = () => {
@@ -131,7 +181,6 @@ const OngoingRequest = () => {
     setCurrentPage(1);
   };
 
-  // Load quota and Stripe key when a booking is selected
   useEffect(() => {
     const loadDetails = async () => {
       if (!selectedBooking) return;
@@ -139,7 +188,6 @@ const OngoingRequest = () => {
         const q = await fetchQuotaByBookingId(selectedBooking.id);
         if (q) setQuota(q);
       } catch (e) {
-        // ignore if no quota yet
       }
     };
     loadDetails();
@@ -148,17 +196,15 @@ const OngoingRequest = () => {
     if (stripeKey) setStripePromise(loadStripe(stripeKey));
   }, [selectedBooking]);
 
-  // Sync local payment status with latest quota when it changes, without overriding immediate failure state
   useEffect(() => {
     if (!quota) return;
     const s = String(quota.paymentStatus);
     setLocalPaymentStatus((prev) => {
-      if (prev === null) return s; // initialize once
-      if (s === "completed") return "completed"; // always accept completion
-      if (s === "failed") return "failed"; // accept backend failed
-      // Don't downgrade from immediate failed to pending
+      if (prev === null) return s; 
+      if (s === "completed") return "completed"; 
+      if (s === "failed") return "failed"; 
       if (prev === "failed" && s === "pending") return prev;
-      return prev; // keep local state
+      return prev;
     });
   }, [quota]);
 
@@ -176,15 +222,12 @@ const OngoingRequest = () => {
     setLocalPaymentStatus("pending");
   };
 
-  // Payment actions are now available regardless of preferred time/day
 
   const onPaymentSuccess = () => {
     if (!selectedBooking || !quota) return;
-    // Cast to any to accommodate broader status values like 'completed'
     setQuota({ ...quota, paymentStatus: "completed" as any });
     setLocalPaymentStatus("completed");
     setClientSecret(null);
-    // store success data and navigate like BookingHistory payment flow
     dispatch(
       setPaymentSuccessData({
         bookingDetails: {
@@ -200,7 +243,6 @@ const OngoingRequest = () => {
         totalCost: quota.totalCost,
       })
     );
-    // Also navigate to Payment Success with state so the component always has data immediately
     navigate("/payment-success", {
       state: {
         bookingDetails: {
@@ -214,7 +256,6 @@ const OngoingRequest = () => {
         totalCost: quota.totalCost,
       },
     });
-    // Refresh list silently on success
     const isStatusMode = sortOption === "pending" || sortOption === "accepted";
     const statusParam2 = isStatusMode ? sortOption : "pending,accepted";
     const sortByParam2 = isStatusMode ? "latest" : (sortOption as "latest" | "oldest");
@@ -225,31 +266,41 @@ const OngoingRequest = () => {
   };
 
   const onPaymentFailure = async () => {
-    // reflect failure immediately in UI
     setClientSecret(null);
     setQuota((prev) => (prev ? { ...prev, paymentStatus: "failed" as any } : prev));
     setLocalPaymentStatus("failed");
-    // Do not immediately fetch from backend on failure; backend might still show 'pending'.
-    // We rely on local state to show Retry UI instantly. A later manual action will refresh.
   };
 
-  // Local checkout form mirroring behavior from UserBookingDetails
   const CheckoutForm = ({ totalCost }: { totalCost: number }) => {
     const stripe = useStripe();
     const elements = useElements();
     const [message, setMessage] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [elementsReady, setElementsReady] = useState(false);
 
     const submit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!stripe || !elements || !clientSecret) return;
+      
+      const { error: validationError } = await elements.submit();
+      if (validationError) {
+        if (validationError.code === 'card_incomplete' && validationError.type === 'validation_error') {
+          setMessage("Please enter your card details to proceed with the payment.");
+        } else {
+          setMessage(validationError.message || "Please check your card details and try again.");
+        }
+        setIsLoading(false);
+        return;
+      }
+      
       setIsLoading(true);
+      setMessage(null); 
+      
       try {
         const { error: submitError } = await elements.submit();
         if (submitError) {
-          setMessage(submitError.message || "Failed to validate payment details.");
+          setMessage(submitError.message || "Failed to validate payment details. Please check your information and try again.");
           setIsLoading(false);
-          await onPaymentFailure();
           return;
         }
         const result = await stripe.confirmPayment({ elements, clientSecret, confirmParams: {}, redirect: "if_required" });
@@ -280,25 +331,36 @@ const OngoingRequest = () => {
           }
         }
       } catch (err) {
-        setMessage("Something went wrong.");
+        console.error('Payment error:', err);
+        setMessage("An unexpected error occurred. Please try again or contact support if the problem persists.");
         setIsLoading(false);
         await onPaymentFailure();
       }
     };
     return (
       <form onSubmit={submit} className="mt-4">
-        <PaymentElement onChange={(e) => { if (e.complete && message) setMessage(null); }} />
-        <div className="flex gap-3 mt-4">
-          <button disabled={isLoading || !stripe || !elements} className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white">
-            {isLoading ? "Processing..." : `Pay ₹${totalCost}`}
-          </button>
-        </div>
+        <PaymentElement 
+          onChange={(e) => { 
+            if (e.complete && message) setMessage(null); 
+            setElementsReady(e.complete);
+          }} 
+          onReady={() => setElementsReady(true)}
+        />
+        {elementsReady && (
+          <div className="flex gap-3 mt-4">
+            <button 
+              disabled={isLoading || !stripe || !elements} 
+              className="bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+            >
+              {isLoading ? "Processing..." : `Pay ₹${totalCost}`}
+            </button>
+          </div>
+        )}
         {message && <div className="mt-2 text-sm text-red-500 dark:text-red-400">{message}</div>}
       </form>
     );
   };
 
-  // Do not early-return on loading; keep controls mounted to preserve input focus
 
   if (error) {
     return <p className="text-red-500 text-center py-8">{error}</p>;
@@ -314,9 +376,14 @@ const OngoingRequest = () => {
           showQuotaSection={false}
           onBack={handleBack}
           onReady={() => setDetailsLoading(false)}
+          onBookingUpdate={(updatedBooking) => {
+            if (updatedBooking.status !== selectedBooking.status) {
+              setSelectedBooking(updatedBooking);
+            }
+          }}
         />
-        {/* Cancel pending booking - shown only after details side-effects finish */}
-        {!detailsLoading && selectedBooking.status === "pending" && (
+        {/* Cancel pending booking - controlled by showCancelButton state */}
+        {showCancelButton && (
           <div className="w-full">
             <button
               onClick={requestCancelBooking}
@@ -326,7 +393,23 @@ const OngoingRequest = () => {
             </button>
           </div>
         )}
-        {/* Confirmation Modal mounted in details view too */}
+        {/* Reason Selection Modal in details view */}
+        {!detailsLoading && (
+          <ConfirmationModal
+            isOpen={isReasonModalOpen}
+            onConfirm={handleReasonConfirm}
+            onCancel={() => setIsReasonModalOpen(false)}
+            action="cancel"
+            entityType="booking"
+            reason={cancelReason}
+            setReason={setCancelReason}
+            customReason={customCancelReason}
+            setCustomReason={setCustomCancelReason}
+            customTitle="Select Cancellation Reason"
+            isProcessing={isCancelling}
+          />
+        )}
+        {/* Final Confirmation Modal in details view */}
         {!detailsLoading && (
           <ConfirmationModal
             isOpen={showCancelModal}
@@ -542,16 +625,6 @@ const OngoingRequest = () => {
         );
       })()}
 
-      {/* Confirmation Modal for cancelling booking */}
-      <ConfirmationModal
-        isOpen={showCancelModal}
-        onConfirm={confirmCancelBooking}
-        onCancel={() => setShowCancelModal(false)}
-        action="cancel"
-        entityType="booking"
-        customTitle="Confirm Cancellation"
-        isProcessing={isCancelling}
-      />
     </div>
   );
 }

@@ -137,7 +137,6 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
         <div className="text-sm text-gray-600 dark:text-gray-400">Ticket ID: {ticket.ticketId}</div>
       </div>
 
-      {/* Ticket Details */}
       <Section title="Ticket Details">
         <div className="space-y-2 text-sm">
           <div className="text-base font-semibold text-gray-800 dark:text-gray-100">{ticket.subject}</div>
@@ -149,10 +148,8 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
         </div>
       </Section>
 
-      {/* Ticket Timeline */}
       <Section title="Ticket Timeline">
         <div className="space-y-6 text-sm">
-          {/* Created */}
           <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 p-3">
             <div className="font-semibold text-gray-900 dark:text-gray-100">Ticket Created</div>
             <div className="mt-1 text-gray-800 dark:text-gray-200">ID: {ticket.ticketId}</div>
@@ -160,7 +157,6 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
             <div className="mt-1 text-gray-600 dark:text-gray-400">Created on {new Date(ticket.createdAt).toLocaleString()}</div>
           </div>
 
-          {/* Under Review */}
           {(ticket.status === "under_review" || ticket.status === "resolved") && (
             <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 p-3">
               <div className="font-semibold text-gray-900 dark:text-gray-100">Ticket Under Review</div>
@@ -169,7 +165,6 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
             </div>
           )}
 
-          {/* Resolved */}
           {ticket.status === "resolved" && (
             <div className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 p-3">
               <div className="font-semibold text-gray-900 dark:text-gray-100">Ticket Resolved</div>

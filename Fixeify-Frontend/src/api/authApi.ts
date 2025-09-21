@@ -7,8 +7,8 @@ interface AuthResponse {
   user: User;
 }
 
-export const sendOtp = async (email: string): Promise<{ message: string }> => {
-  const response = await api.post(`${AuthBase}/send-otp`, { email });
+export const sendOtp = async (email: string, role?: string): Promise<{ message: string }> => {
+  const response = await api.post(`${AuthBase}/send-otp`, { email, role });
   return response.data;
 };
 

@@ -48,25 +48,21 @@ const MessagePanel: FC<MessagePanelProps> = ({
 
   useEffect(() => {
     if (isOpen && listRef.current) {
-      // On first open, start at top
       if (!isInitialOpenRef.current) {
         listRef.current.scrollTop = 0;
         isInitialOpenRef.current = true;
       } else {
-        // Only auto-scroll when a new item is PREPENDED at the top (first ID changes)
         const firstId = notifications[0]?.id;
         const firstChanged = firstId && firstId !== prevFirstIdRef.current;
         const grew = notifications.length > prevNotifCountRef.current;
         const topIsUnread = notifications[0]?.isRead === false;
 
         if (!loadingMoreRef.current && grew && firstChanged && topIsUnread) {
-          // A truly new unread notification arrived at the top
           listRef.current.scrollTop = 0;
         }
       }
     }
 
-    // Reset when panel closes
     if (!isOpen) {
       isInitialOpenRef.current = false;
     }
@@ -75,7 +71,6 @@ const MessagePanel: FC<MessagePanelProps> = ({
     prevFirstIdRef.current = notifications[0]?.id;
   }, [isOpen, notifications]);
 
-  // When loading completes (after load-more), clear the flag so future top-prepends can scroll to top
   useEffect(() => {
     if (!loading) {
       loadingMoreRef.current = false;
@@ -92,46 +87,28 @@ const MessagePanel: FC<MessagePanelProps> = ({
   };
 
   const handleMessageClick = (notification: NotificationItem) => {
-    console.log('Message notification clicked:', {
-      notification,
-      currentUser: currentUser?.role,
-      chatId: notification.chatId,
-      proId: notification.proId,
-      userId: notification.userId
-    });
 
-    // Mark as read if unread
     if (!notification.isRead) {
       onMarkAsRead(notification.id);
     }
 
-    // Navigate to appropriate chat route based on user role and notification data
     if (notification.chatId && currentUser) {
       let navigationPath = '';
       
       if (currentUser.role === 'user') {
-        // For users, navigate to profile with Messages tab and chatId as query param
         navigationPath = `/profile?tab=Messages&chatId=${notification.chatId}`;
-        console.log('User navigation path:', navigationPath);
       } else if (currentUser.role === 'pro') {
-        // For pros, navigate to /pro/messages with chatId as query param
         navigationPath = `/pro/messages?chatId=${notification.chatId}`;
-        console.log('Pro navigation path:', navigationPath);
       } else {
-        // For admin or other roles, handle appropriately
-        console.warn('Unsupported user role for message navigation:', currentUser.role);
-        alert('Message navigation not supported for your user role');
         return;
       }
       
       if (navigationPath) {
-        console.log('Navigating to:', navigationPath);
         navigate(navigationPath);
         onClose();
       }
     } else {
       console.error('Missing chatId or currentUser:', { chatId: notification.chatId, currentUser });
-      alert('Unable to navigate to chat: Missing required information');
     }
   };
 
@@ -228,7 +205,6 @@ const MessagePanel: FC<MessagePanelProps> = ({
                 <div className="flex items-start">
                   {(() => {
                     const iconClass = "w-4 h-4 text-gray-600 dark:text-gray-300 mr-2 mt-1";
-                    // For message panel, always show MessageCircle icon since all notifications are message type
                     return <MessageCircle className={iconClass} />;
                   })()}
                   <div className="flex-1">

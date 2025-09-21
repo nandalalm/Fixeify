@@ -18,9 +18,9 @@ export class AuthController {
 
   async sendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { email } = req.body;
+      const { email, role } = req.body;
       if (!email) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.EMAIL_REQUIRED);
-      await this._authService.sendOtp(email);
+      await this._authService.sendOtp(email, role);
       res.status(HttpStatus.OK).json({ message: MESSAGES.OTP_SENT });
     } catch (error) {
       next(error);

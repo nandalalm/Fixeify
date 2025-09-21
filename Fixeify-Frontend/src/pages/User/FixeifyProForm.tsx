@@ -656,7 +656,7 @@ const FixeifyProForm = () => {
     }
     setErrors({});
     try {
-      const response = await api.post("/pro/apply", {
+      await api.post("/pro/apply", {
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
@@ -671,7 +671,6 @@ const FixeifyProForm = () => {
         bankName: formData.bankName,
         availability: formData.availability,
       });
-      console.log("Application submitted:", response.status);
       navigate("/success");
     } catch (error) {
       console.error("Submission error:", error);

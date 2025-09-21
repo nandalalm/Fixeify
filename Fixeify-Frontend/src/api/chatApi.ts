@@ -336,6 +336,13 @@ export const markAllMessageNotificationsAsRead = async (userId: string, role: "u
   await api.put(`${NotifBase}/read-all-messages/${role}/${userId}`, {}, { withCredentials: true });
 };
 
+export const markChatMessageNotificationsAsRead = async (userId: string, role: "user" | "pro" | "admin", chatId: string): Promise<void> => {
+  if (!userId || !["user", "pro", "admin"].includes(role) || !chatId) {
+    throw new Error("Invalid userId, role, or chatId");
+  }
+  await api.put(`${NotifBase}/read-chat-messages/${role}/${userId}/${chatId}`, {}, { withCredentials: true });
+};
+
 export interface User {
   id: string;
   name: string;

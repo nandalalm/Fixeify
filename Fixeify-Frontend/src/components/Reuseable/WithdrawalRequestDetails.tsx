@@ -92,7 +92,6 @@ const WithdrawalRequestDetails: React.FC<WithdrawalRequestDetailsProps> = ({ wit
         </button>
       </div>
 
-      {/* Pro Details */}
       {showProDetails && (
         <Section
           title="Professional Details"

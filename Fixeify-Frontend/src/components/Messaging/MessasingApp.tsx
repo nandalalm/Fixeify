@@ -5,9 +5,9 @@ import ChatInbox from "./ChatInbox";
 import MessageBox from "./MessageBox";
 import { useTheme } from "../../context/ThemeContext";
 import { getSocket, isSocketConnected, reconnectSocket } from "../../services/socket";
-import { fetchConversations, addMessage, fetchAllNotifications, markMessagesRead } from "../../store/chatSlice";
+import { fetchConversations, fetchAllNotifications, markMessagesRead, updateOnlineStatus, markChatMessageNotificationsRead } from "../../store/chatSlice";
 import { refreshToken } from "../../store/authSlice";
-import { User, Message } from "../../interfaces/messagesInterface";
+import { User } from "../../interfaces/messagesInterface";
 import { useLocation, useSearchParams } from "react-router-dom";
 
 interface MessagingAppProps {
@@ -42,7 +42,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
   }, [user, role, dispatch]);
 
   useEffect(() => {
-    if (conversations.length > 0) {
+    if (conversations.length > 0 && !selectedConversationId) {
       // Check for chatId query parameter (for pro messages from notifications)
       const chatIdFromQuery = searchParams.get('chatId');
       if (chatIdFromQuery) {
@@ -50,6 +50,10 @@ export default function MessagingApp({ role }: MessagingAppProps) {
         if (targetConversation) {
           setSelectedConversationId(targetConversation.id);
           setShowMessageBox(true);
+          // Mark message notifications as read for this chat when opened via notification
+          if (user) {
+            dispatch(markChatMessageNotificationsRead({ userId: user.id, role, chatId: chatIdFromQuery }));
+          }
           return;
         }
       }
@@ -65,6 +69,10 @@ export default function MessagingApp({ role }: MessagingAppProps) {
           if (targetConversation) {
             setSelectedConversationId(targetConversation.id);
             setShowMessageBox(true);
+            // Mark message notifications as read for this chat
+            if (user) {
+              dispatch(markChatMessageNotificationsRead({ userId: user.id, role, chatId: targetConversation.id }));
+            }
           } else {
             const mostRecentConversation = conversations[0];
             if (mostRecentConversation) {
@@ -75,7 +83,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
         }
       }
     }
-  }, [conversations, location.pathname, searchParams]);
+  }, [conversations, location.pathname, searchParams, selectedConversationId]);
 
   useEffect(() => {
     if (!socket || !isConnected) {
@@ -85,22 +93,22 @@ export default function MessagingApp({ role }: MessagingAppProps) {
 
     setConnectionError(null);
 
-    const handleNewMessage = (message: Message) => {
-      dispatch(addMessage(message));
-      dispatch(fetchConversations({ userId: user?.id || "", role }));
-    };
+    // Removed handleNewMessage - ChatInbox handles conversation creation
 
     const handleNewNotification = () => {
       dispatch(fetchAllNotifications({ userId: user?.id || "", role, page: 1, limit: 10, filter: "all" }));
     };
 
+    const handleOnlineStatus = ({ userId, isOnline }: { userId: string; isOnline: boolean }) => {
+      dispatch(updateOnlineStatus({ userId, isOnline }));
+    };
 
-    socket.on("newMessage", handleNewMessage);
     socket.on("newNotification", handleNewNotification);
+    socket.on("onlineStatus", handleOnlineStatus);
 
     return () => {
-      socket.off("newMessage", handleNewMessage);
       socket.off("newNotification", handleNewNotification);
+      socket.off("onlineStatus", handleOnlineStatus);
     };
   }, [socket, isConnected, user?.id, dispatch, role]);
 
@@ -140,6 +148,8 @@ export default function MessagingApp({ role }: MessagingAppProps) {
         participantModel: role === "pro" ? "ApprovedPro" : "User",
       });
       dispatch(markMessagesRead({ chatId: conversationId, userId: user.id, role }));
+      // Mark message notifications as read for this chat
+      dispatch(markChatMessageNotificationsRead({ userId: user.id, role, chatId: conversationId }));
     }
   };
 

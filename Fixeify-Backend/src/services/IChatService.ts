@@ -37,4 +37,5 @@ export interface IChatService {
   markMessagesAsRead(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;
   markMessagesAsDelivered(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;
   findById(chatId: string): Promise<ChatResponse | null>;
+  getChatForParticipant(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<ChatResponse | null>;
 }

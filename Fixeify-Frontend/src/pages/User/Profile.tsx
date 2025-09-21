@@ -59,16 +59,11 @@ const Profile = () => {
     sessionStorage.setItem("isEditing", isEditing.toString());
   }, [isSidebarShrunk, isEditing]);
 
-  // Handle query parameters for navigation from message notifications
   useEffect(() => {
     const tabFromQuery = searchParams.get('tab');
-    const chatIdFromQuery = searchParams.get('chatId');
-    
-    console.log('Profile query params:', { tab: tabFromQuery, chatId: chatIdFromQuery });
     
     if (tabFromQuery === 'Messages') {
       setActiveTab('Messages');
-      // The MessagingApp will handle the chatId parameter automatically
     }
   }, [searchParams]);
 
@@ -164,7 +159,6 @@ const Profile = () => {
                           setIsChangingPassword(false);
                         }
                       }
-                      // Auto-close sidebar on mobile view after selection
                       if (isExtraSmallScreen) {
                         setIsSidebarVisible(false);
                         setIsToggleActive(false);

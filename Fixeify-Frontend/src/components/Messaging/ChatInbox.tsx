@@ -1,4 +1,4 @@
-import { FC, useEffect, useState } from "react";
+import { useState, useEffect, FC, useCallback, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { format } from "date-fns";
@@ -21,6 +21,15 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
   const isConnected = isSocketConnected();
   const role = user?.role as "user" | "pro";
   const [searchQuery, setSearchQuery] = useState("");
+  const lastFetchRef = useRef<number>(0);
+
+  const handleNewNotification = useCallback((notification: any) => {
+    const now = Date.now();
+    if (notification.receiverId === user?.id && user && now - lastFetchRef.current > 1000) {
+      lastFetchRef.current = now;
+      dispatch(fetchConversations({ userId: user.id, role }));
+    }
+  }, [user, role, dispatch]);
 
   useEffect(() => {
     if (!user) return;
@@ -29,9 +38,13 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
 
 
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    if (!socket || !isConnected) {
+      console.warn("Socket not connected, real-time features may not work");
+      return;
+    }
 
     const handleNewMessage = (raw: any) => {
+      
       const message = {
         id: raw.id || raw._id || raw.messageId,
         chatId: raw.chatId,
@@ -44,6 +57,7 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
         attachments: raw.attachments,
         type: raw.type,
       } as any;
+      
       if (user) {
         dispatch(addIncomingMessage({ message, currentUserId: user.id, activeChatId: selectedConversationId }));
       }
@@ -52,7 +66,6 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     const handleMessageRead = ({ chatId, messageId, messageIds }: { chatId: string; messageId?: string; messageIds?: string[] }) => {
       dispatch(updateConversationReadStatus({ chatId }));
       dispatch(setConversationLastMessageStatus({ chatId, status: 'read' }));
-      // If server specifies messages, mark them read locally too
       const ids = messageIds || (messageId ? [messageId] : []);
       ids.forEach(id => dispatch(updateMessageStatus({ chatId, messageId: id, status: 'read' })));
     };
@@ -68,7 +81,6 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     };
 
     const handleConversationUpdated = (updatedConversation: any) => {
-      // Update the conversation in the list with fresh data from backend
       dispatch(updateConversation(updatedConversation));
     };
 
@@ -77,6 +89,7 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     socket.on("messagesRead", handleMessagesRead);
     socket.on("onlineStatus", handleOnlineStatus);
     socket.on("conversationUpdated", handleConversationUpdated);
+    socket.on("newNotification", handleNewNotification);
 
     return () => {
       socket.off("newMessage", handleNewMessage);
@@ -84,10 +97,10 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
       socket.off("messagesRead", handleMessagesRead);
       socket.off("onlineStatus", handleOnlineStatus);
       socket.off("conversationUpdated", handleConversationUpdated);
+      socket.off("newNotification", handleNewNotification);
     };
-  }, [socket, isConnected, user?.id, role, dispatch, selectedConversationId]);
+  }, [socket, isConnected, user?.id, role, dispatch, selectedConversationId, handleNewNotification]);
 
-  // Local Avatar component: preload actual image; fallback to icon placeholder
   const Avatar: React.FC<{ src?: string | null; alt: string; className?: string }> = ({ src, alt, className }) => {
     const placeholder = "/placeholder-user.jpg";
     const [displayedSrc, setDisplayedSrc] = useState<string>(placeholder);

@@ -12,6 +12,7 @@ import {
   fetchMessageNotifications,
   fetchNonMessageNotifications,
   markAllMessageNotificationsAsRead,
+  markChatMessageNotificationsAsRead as markChatMessageNotificationsAsReadAPI,
   getExistingChat,
 } from "../api/chatApi";
 
@@ -187,7 +188,6 @@ export const markAllNotificationsRead = createAsyncThunk<
   }
 );
 
-// NEW: Fetch message notifications only
 export const fetchAllMessageNotifications = createAsyncThunk<
   NotificationItem[],
   { userId: string; role: "user" | "pro" | "admin"; page: number; limit: number; filter: 'all' | 'unread' },
@@ -234,6 +234,34 @@ export const markAllMessageNotificationsRead = createAsyncThunk<
   }
 );
 
+export const markChatMessageNotificationsRead = createAsyncThunk<
+  void,
+  { userId: string; role: "user" | "pro" | "admin"; chatId: string },
+  { rejectValue: string }
+>(
+  "chat/markChatMessageNotificationsRead",
+  async ({ userId, role, chatId }, { rejectWithValue, getState }) => {
+    try {
+      try {
+        await markChatMessageNotificationsAsReadAPI(userId, role, chatId);
+        return;
+      } catch (apiError) {
+      }
+      
+      const state = getState() as any;
+      const chatMessageNotifications = state.chat.messageNotifications.filter(
+        (notification: any) => notification.chatId === chatId && !notification.isRead
+      );
+      
+      for (const notification of chatMessageNotifications) {
+        await markSingleNotificationAsRead(notification.id);
+      }
+    } catch (err: any) {
+      return rejectWithValue(err.response?.data?.message || "Failed to mark chat message notifications as read");
+    }
+  }
+);
+
 const chatSlice = createSlice({
   name: "chat",
   initialState,
@@ -275,6 +303,11 @@ const chatSlice = createSlice({
         
         conversation.updatedAt = new Date().toISOString();
         
+        state.conversations.sort((a, b) => {
+          const aTimestamp = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+          const bTimestamp = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+          return bTimestamp - aTimestamp;
+        });
       }
     },
   
@@ -296,8 +329,40 @@ const chatSlice = createSlice({
         state.messages[message.chatId][existingIndex] = message;
       }
 
-      const conversation = state.conversations.find((c) => c.id === message.chatId);
-      if (conversation) {
+      let conversation = state.conversations.find((c) => c.id === message.chatId);
+      
+      if (!conversation) {
+        const isFromOther = message.senderId !== currentUserId;
+        const senderId = message.senderId;
+        const receiverId = (message as any).receiverId || currentUserId;
+        const senderModel = message.senderModel;
+        
+        const newConversation = {
+          id: message.chatId,
+          participants: {
+            userId: senderModel === "User" ? senderId : receiverId,
+            userName: senderModel === "User" ? "Loading..." : "Loading...",
+            userPhoto: null,
+            proId: senderModel === "ApprovedPro" ? senderId : receiverId,
+            proName: senderModel === "ApprovedPro" ? "Loading..." : "Loading...",
+            proPhoto: null
+          },
+          lastMessage: {
+            id: message.id,
+            content: message.content,
+            senderId: message.senderId,
+            senderModel: message.senderModel,
+            timestamp: message.timestamp,
+            status: message.status,
+          },
+          unreadCount: isFromOther ? 1 : 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        
+        state.conversations.unshift(newConversation);
+        conversation = state.conversations[0];
+      } else {
         conversation.lastMessage = {
           id: message.id,
           content: message.content,
@@ -307,17 +372,13 @@ const chatSlice = createSlice({
           status: message.status,
         };
 
-      
         const isFromOther = message.senderId !== currentUserId;
         const isActiveChat = activeChatId === message.chatId;
         
         if (isFromOther && !isActiveChat) {
-        
           conversation.unreadCount = (conversation.unreadCount || 0) + 1;
         } else if (isFromOther && isActiveChat) {
-        
           conversation.unreadCount = 0;
-        
           if (state.messages[message.chatId]) {
             const messageIndex = state.messages[message.chatId].findIndex(m => m.id === message.id);
             if (messageIndex !== -1) {
@@ -329,6 +390,12 @@ const chatSlice = createSlice({
 
         conversation.updatedAt = new Date().toISOString();
       }
+      
+      state.conversations.sort((a, b) => {
+        const aTimestamp = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+        const bTimestamp = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+        return bTimestamp - aTimestamp;
+      });
     },
     setConversationLastMessageStatus: (
       state,
@@ -345,6 +412,11 @@ const chatSlice = createSlice({
       const index = state.conversations.findIndex((c) => c.id === updatedConversation.id);
       if (index !== -1) {
         state.conversations[index] = updatedConversation;
+        state.conversations.sort((a, b) => {
+          const aTimestamp = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+          const bTimestamp = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+          return bTimestamp - aTimestamp;
+        });
       }
     },
     addNotification: (state, action: PayloadAction<NotificationItem>) => {
@@ -406,7 +478,25 @@ const chatSlice = createSlice({
       })
       .addCase(fetchConversations.fulfilled, (state, action) => {
         state.status = "succeeded";
-        state.conversations = action.payload;
+        const fetchedConversations = action.payload;
+        
+        fetchedConversations.forEach(fetchedConv => {
+          const existingIndex = state.conversations.findIndex(c => c.id === fetchedConv.id);
+          if (existingIndex !== -1) {
+            if (state.conversations[existingIndex].participants.userName === "Loading..." || 
+                state.conversations[existingIndex].participants.proName === "Loading...") {
+              state.conversations[existingIndex] = fetchedConv;
+            }
+          } else {
+            state.conversations.push(fetchedConv);
+          }
+        });
+        
+        state.conversations.sort((a, b) => {
+          const aTimestamp = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+          const bTimestamp = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+          return bTimestamp - aTimestamp;
+        });
       })
       .addCase(fetchConversations.rejected, (state, action) => {
         state.status = "failed";
@@ -524,7 +614,6 @@ const chatSlice = createSlice({
         if (page === 1) {
           state.notifications = action.payload;
         } else {
-          // Append new notifications, avoiding duplicates
           const existingIds = new Set(state.notifications.map(n => n.id));
           const newNotifs = action.payload.filter(n => !existingIds.has(n.id));
           state.notifications = [...state.notifications, ...newNotifs];
@@ -543,7 +632,6 @@ const chatSlice = createSlice({
         if (notification) {
           notification.isRead = true;
         }
-        // Also update in specific arrays
         const messageNotification = state.messageNotifications.find((n) => n.id === notificationId);
         if (messageNotification) {
           messageNotification.isRead = true;
@@ -613,6 +701,20 @@ const chatSlice = createSlice({
         state.status = "succeeded";
       })
       .addCase(markAllMessageNotificationsRead.rejected, (state, action) => {
+        state.status = "failed";
+        state.error = action.payload as string;
+      })
+      .addCase(markChatMessageNotificationsRead.pending, (state) => {
+        state.status = "loading";
+      })
+      .addCase(markChatMessageNotificationsRead.fulfilled, (state, action) => {
+        const { chatId } = action.meta.arg;
+        state.messageNotifications = state.messageNotifications.map(notification => 
+          notification.chatId === chatId ? { ...notification, isRead: true } : notification
+        );
+        state.status = "succeeded";
+      })
+      .addCase(markChatMessageNotificationsRead.rejected, (state, action) => {
         state.status = "failed";
         state.error = action.payload as string;
       });

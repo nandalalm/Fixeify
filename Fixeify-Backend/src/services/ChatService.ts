@@ -281,6 +281,24 @@ export class ChatService implements IChatService {
     });
   }
 
+  async getChatForParticipant(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<ChatResponse | null> {
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
+    }
+    const chat = await this._chatRepository.findById(chatId);
+    if (!chat) {
+      return null;
+    }
+    const user = await mongoose.model("User").findById(chat.participants.userId._id, "name photo").exec();
+    const pro = await mongoose.model("ApprovedPro").findById(chat.participants.proId._id, "firstName lastName profilePhoto").exec();
+    return this.mapToChatResponse(chat, participantId, participantModel, {
+      userName: user?.name || "Unknown User",
+      userPhoto: user?.photo || null,
+      proName: pro ? `${pro.firstName} ${pro.lastName || ""}`.trim() : "Unknown Pro",
+      proPhoto: pro?.profilePhoto || null,
+    });
+  }
+
   private mapToChatResponse(
     chat: PopulatedChat,
     participantId: string,

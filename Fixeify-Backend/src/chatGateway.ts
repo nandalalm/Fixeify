@@ -102,14 +102,12 @@ export class ChatGateway {
         });
         (global as any).connectedUsers = this._connectedUsers;
 
-
         const onlineUserIds = Array.from(this._connectedUsers.keys());
         for (const userId of onlineUserIds) {
           socket.emit("onlineStatus", { userId, isOnline: true });
         }
 
-
-        socket.broadcast.emit("onlineStatus", { userId: socket.userId, isOnline: true });
+        this._io.emit("onlineStatus", { userId: socket.userId, isOnline: true });
       }
 
       socket.on("joinChat", async ({ chatId, participantId, participantModel }: { chatId: string; participantId: string; participantModel: "User" | "ApprovedPro" }) => {
@@ -134,9 +132,7 @@ export class ChatGateway {
 
           socket.join(chatId);
 
-
           await this.chatService.markMessagesAsDelivered(chatId, participantId, participantModel);
-
 
           this._io.to(chatId).emit("messagesDelivered", {
             chatId,
@@ -150,6 +146,10 @@ export class ChatGateway {
             participantModel,
             timestamp: new Date().toISOString()
           });
+
+          const otherParticipantId = chat.participants.userId === participantId ? chat.participants.proId : chat.participants.userId;
+          const isOtherOnline = this._connectedUsers.has(otherParticipantId);
+          socket.emit("onlineStatus", { userId: otherParticipantId, isOnline: isOtherOnline });
 
         } catch (error) {
           socket.emit("error", { message: "Failed to join chat", error: (error as Error).message });
@@ -204,6 +204,22 @@ export class ChatGateway {
 
           this._io.to(data.chatId).emit("newMessage", message);
 
+          const chat = await this.chatService.findById(data.chatId);
+          if (chat) {
+            const userChat = await this.chatService.getChatForParticipant(data.chatId, chat.participants.userId, "User");
+            const proChat = await this.chatService.getChatForParticipant(data.chatId, chat.participants.proId, "ApprovedPro");
+            
+            const userConnection = this._connectedUsers.get(chat.participants.userId);
+            const proConnection = this._connectedUsers.get(chat.participants.proId);
+            
+            if (userConnection && userChat) {
+              this._io.to(userConnection.socketId).emit("conversationUpdated", userChat);
+            }
+            if (proConnection && proChat) {
+              this._io.to(proConnection.socketId).emit("conversationUpdated", proChat);
+            }
+          }
+
         } catch (error) {
           socket.emit("error", { message: "Failed to send message", error: (error as Error).message });
         }
@@ -227,10 +243,20 @@ export class ChatGateway {
             messageId
           });
 
-
           const chat = await this.chatService.findById(chatId);
           if (chat) {
-            this._io.to(chatId).emit("conversationUpdated", chat);
+            const userChat = await this.chatService.getChatForParticipant(chatId, chat.participants.userId, "User");
+            const proChat = await this.chatService.getChatForParticipant(chatId, chat.participants.proId, "ApprovedPro");
+            
+            const userConnection = this._connectedUsers.get(chat.participants.userId);
+            const proConnection = this._connectedUsers.get(chat.participants.proId);
+            
+            if (userConnection && userChat) {
+              this._io.to(userConnection.socketId).emit("conversationUpdated", userChat);
+            }
+            if (proConnection && proChat) {
+              this._io.to(proConnection.socketId).emit("conversationUpdated", proChat);
+            }
           }
 
         } catch (error) {

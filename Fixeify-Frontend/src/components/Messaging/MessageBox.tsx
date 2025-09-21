@@ -8,7 +8,6 @@ import { fetchConversationMessages, updateOnlineStatus, updateMessageStatus, add
 import { sendNewMessage } from "../../api/chatApi";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-// S3 Client configuration
 const s3Client = new S3Client({
   region: import.meta.env.VITE_AWS_REGION,
   credentials: {
@@ -17,7 +16,6 @@ const s3Client = new S3Client({
   },
 });
 
-// Define Role enum locally
 enum Role {
   USER = "user",
   PRO = "pro",
@@ -37,7 +35,6 @@ const MessageBox: FC<MessageBoxProps> = ({
   otherUser: initialOtherUser,
   onBack,
 }) => {
-  // Local Avatar component with preload + placeholder (no flicker)
   const Avatar: FC<{ src?: string | null; alt?: string; size?: number; className?: string }> = ({ src, alt = "", size = 40, className = "" }) => {
     const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
     const [errored, setErrored] = useState(false);
@@ -86,13 +83,11 @@ const MessageBox: FC<MessageBoxProps> = ({
         aria-label={alt}
         role="img"
       >
-        {/* Try placeholder image if available; otherwise show icon */}
         <img
           src="/placeholder-user.jpg"
           alt="placeholder"
           className="w-full h-full object-cover hidden"
           onError={(e) => {
-            // If placeholder missing, show icon visually
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
           onLoad={(e) => {
@@ -104,7 +99,6 @@ const MessageBox: FC<MessageBoxProps> = ({
     );
   };
 
-  // Apply mobile-specific tweaks only for Pro side
   const isPro = currentUser.role === "pro";
 
   const [newMessage, setNewMessage] = useState("");
@@ -136,12 +130,9 @@ const MessageBox: FC<MessageBoxProps> = ({
   const onlineUsers = useSelector((state: RootState) => state.chat.onlineUsers);
   const socket = getSocket();
 
-  // Get online status from Redux state
   const isOtherUserOnline = onlineUsers[initialOtherUser.id] || false;
 
-  // Helper function to set image error with auto-dismiss
   const setImageErrorWithTimeout = (errorMessage: string) => {
-    // Clear any existing timeout
     if (imageErrorTimeoutRef.current) {
       clearTimeout(imageErrorTimeoutRef.current);
     }

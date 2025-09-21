@@ -29,7 +29,6 @@ const LoginPage = () => {
     dispatch({ type: "auth/logoutUserSync" });
   }, [location, dispatch]);
 
-  // Compute a valid pixel width for Google button based on container width
   useEffect(() => {
     const updateWidth = () => {
       const containerWidth = gsiContainerRef.current?.clientWidth ?? 400;
@@ -37,7 +36,7 @@ const LoginPage = () => {
       setGsiWidth(clamped);
     };
 
-    updateWidth();
+    const timeoutId = setTimeout(updateWidth, 100);
 
     let ro: ResizeObserver | null = null;
     if (typeof window !== 'undefined' && 'ResizeObserver' in window && gsiContainerRef.current) {
@@ -48,10 +47,11 @@ const LoginPage = () => {
     }
 
     return () => {
+      clearTimeout(timeoutId);
       if (ro && gsiContainerRef.current) ro.unobserve(gsiContainerRef.current);
       if (typeof window !== 'undefined') window.removeEventListener('resize', updateWidth);
     };
-  }, []);
+  }, [userRole]); // Re-run when userRole changes
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -182,33 +182,35 @@ const LoginPage = () => {
             </>
           ) : (
             <>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2 dark:text-white">Login</h1>
-              <p className="text-gray-600 mb-4 dark:text-gray-300">
-                Access your account to manage your home services.
-              </p>
+              <div className="w-full max-w-[400px] mx-auto">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2 dark:text-white">Login</h1>
+                <p className="text-gray-600 mb-4 dark:text-gray-300">
+                  Access your account to manage your home services.
+                </p>
+              </div>
 
-              <Tabs
-                defaultValue="user"
-                onValueChange={(value) => {
-                  setUserRole(value as "user" | "pro");
-                  // Clear any previous errors when switching tabs to avoid leakage across roles
-                  setErrors({});
-                  setServerError("");
-                  setFormData({ email: "", password: "" });
-                }}
-                className="mb-4"
-              >
-                <TabsList className="grid w-full grid-cols-2 bg-gray-200 dark:bg-gray-700">
+              <div className="w-full max-w-[400px] mx-auto">
+                <Tabs
+                  defaultValue="user"
+                  onValueChange={(value) => {
+                    setUserRole(value as "user" | "pro");
+                    setErrors({});
+                    setServerError("");
+                    setFormData({ email: "", password: "" });
+                  }}
+                  className="mb-4"
+                >
+                  <TabsList className="grid w-full grid-cols-2 bg-gray-200 dark:bg-gray-700">
                   <TabsTrigger value="user" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-600">
                     User
                   </TabsTrigger>
                   <TabsTrigger value="pro" className="dark:text-gray-300 dark:data-[state=active]:bg-gray-600">
                     Provider
                   </TabsTrigger>
-                </TabsList>
-              </Tabs>
+                  </TabsList>
+                </Tabs>
 
-              <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit}>
                 {serverError && <p className="text-red-500 text-sm mb-4">{serverError}</p>}
                 <div className="mb-4">
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1 dark:text-gray-300">
@@ -270,53 +272,79 @@ const LoginPage = () => {
                 >
                   Login
                 </button>
-              </form>
+                </form>
 
-              {userRole === "user" && (
-                <div className="mt-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                {/* Fixed height container for dynamic content */}
+                <div className="mt-4" style={{ minHeight: '140px' }}>
+                  {userRole === "user" ? (
+                    <>
+                      <div className="relative mb-4">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                          <span className="px-2 bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-300">Or</span>
+                        </div>
+                      </div>
+                      <div className="mb-4">
+                        <div ref={gsiContainerRef} className="w-full">
+                          <GoogleLogin
+                            key={`google-login-${userRole}`}
+                            onSuccess={handleGoogleLoginSuccess}
+                            onError={() => {
+                              setServerError("Google login failed. Please try again.");
+                            }}
+                            theme="outline"
+                            size="large"
+                            width={String(gsiWidth)}
+                          />
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm text-gray-600 dark:text-gray-300">
+                          Don't Have An Account?{" "}
+                          <Link
+                            to="/register"
+                            className="text-blue-600 hover:underline dark:text-blue-400"
+                          >
+                            Sign Up Now
+                          </Link>
+                        </p>
+                        <div className="mt-2 flex justify-center">
+                          <Link
+                            to="/home"
+                            className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-[#032B44] transition-colors dark:text-gray-300 dark:hover:text-white"
+                            aria-label="Back Home"
+                          >
+                            <ArrowLeftIcon className="h-4 w-4" />
+                            Back Home
+                          </Link>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center pt-4">
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Don't Have An Account?{" "}
+                        <Link
+                          to="/become-pro"
+                          className="text-blue-600 hover:underline dark:text-blue-400"
+                        >
+                          Sign Up Now
+                        </Link>
+                      </p>
+                      <div className="mt-2 flex justify-center">
+                        <Link
+                          to="/home"
+                          className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-[#032B44] transition-colors dark:text-gray-300 dark:hover:text-white"
+                          aria-label="Back Home"
+                        >
+                          <ArrowLeftIcon className="h-4 w-4" />
+                          Back Home
+                        </Link>
+                      </div>
                     </div>
-                    <div className="relative flex justify-center text-sm">
-                      <span className="px-2 bg-white text-gray-500 dark:bg-gray-900 dark:text-gray-300">Or</span>
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <div ref={gsiContainerRef} className="w-full max-w-[400px] mx-auto">
-                      <GoogleLogin
-                        onSuccess={handleGoogleLoginSuccess}
-                        onError={() => {
-                          setServerError("Google login failed. Please try again.");
-                        }}
-                        theme="outline"
-                        size="large"
-                        width={String(gsiWidth)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-2 text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  Don't Have An Account?{" "}
-                  <Link
-                    to={userRole === "pro" ? "/become-pro" : "/register"}
-                    className="text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    Sign Up Now
-                  </Link>
-                </p>
-                <div className="mt-2 flex justify-center">
-                  <Link
-                    to="/home"
-                    className="inline-flex items-center gap-1 text-sm text-gray-600 hover:text-[#032B44] transition-colors dark:text-gray-300 dark:hover:text-white"
-                    aria-label="Back Home"
-                  >
-                    <ArrowLeftIcon className="h-4 w-4" />
-                    Back Home
-                  </Link>
+                  )}
                 </div>
               </div>
             </>

@@ -27,7 +27,6 @@ const Section: React.FC<{ title: string; rightSlot?: React.ReactNode; children: 
   </div>
 );
 
-// Avatar component: show placeholder icon until real image is confirmed loaded
 const Avatar: React.FC<{
   src: string;
   placeholder: string;
@@ -213,7 +212,6 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* People */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Section title="User Details">
               <div className="flex items-center gap-3 py-1">
@@ -285,7 +283,6 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
             </Section>
           </div>
 
-          {/* Review */}
           <Section title="Review">
             <div className="py-1">
               <span className="w-44 inline-block text-sm font-medium text-gray-600 dark:text-gray-300 align-middle">Rating</span>
@@ -299,7 +296,6 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
             <LabelValue label="Created" value={formatDateDDMMYYYY(review.createdAt)} />
           </Section>
 
-          {/* Booking */}
           <Section title="Booking Details">
             {booking ? (
               <>
@@ -329,7 +325,6 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
             )}
           </Section>
 
-          {/* Quota / Payment */}
           <Section title="Quota / Payment Details">
             {quota ? (
               <div className="space-y-1">
@@ -353,7 +348,6 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
             )}
           </Section>
 
-          {/* Image Lightbox */}
           {imagePreview && (
             <div className="fixed inset-0 bg-black/70 backdrop-blur-[2px] flex items-center justify-center z-50" onClick={() => setImagePreview(null)}>
               <div className="relative" onClick={(e) => e.stopPropagation()}>

@@ -169,7 +169,6 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, on
         </div>
       )}
 
-      {/* Revenue split for admin context */}
       {!loading && showRevenueSplit && quota && (
         <div className="mt-4">
           <Section title="Revenue Details">
