@@ -1,7 +1,6 @@
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
 import { IUserRepository } from "../repositories/IUserRepository";
-import { IAdminRepository } from "../repositories/IAdminRepository";
 import { IProRepository } from "../repositories/IProRepository";
 import { ICategoryRepository } from "../repositories/ICategoryRepository";
 import { IBookingRepository } from "../repositories/IBookingRepository";
@@ -34,7 +33,6 @@ export class AdminService implements IAdminService {
 
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
-    @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository,
     @inject(TYPES.IProRepository) private _proRepository: IProRepository,
     @inject(TYPES.ICategoryRepository) private _categoryRepository: ICategoryRepository,
     @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository,
