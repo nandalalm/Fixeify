@@ -31,7 +31,7 @@ const ForgotPassword = () => {
       if (error instanceof z.ZodError) {
         setError(error.errors[0].message);
       } else if (error instanceof Error) {
-        const err = error as any;
+        const err = error as { response?: { status?: number; data?: { message?: string } }; status?: number; message?: string };
         if (err.response?.status || err.status) {
           const status = err.response?.status || err.status;
           const message = err.response?.data?.message || err.message || "Request failed";

@@ -35,8 +35,8 @@ const RaiseComplaintModal: React.FC<Props> = ({ open, onClose, onSubmit, booking
       setSubmitting(true);
       await onSubmit({ subject: subject.trim(), description: description.trim(), priority });
       onClose();
-    } catch (err: any) {
-      setError(err?.message || "Failed to submit complaint");
+    } catch (err: unknown) {
+      setError((err as Error)?.message || "Failed to submit complaint");
     } finally {
       setSubmitting(false);
     }

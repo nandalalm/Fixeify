@@ -1,5 +1,6 @@
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
+import logger from "../config/logger";
 import { IProRepository } from "../repositories/IProRepository";
 import { ICategoryRepository } from "../repositories/ICategoryRepository";
 import { IBookingRepository } from "../repositories/IBookingRepository";
@@ -67,7 +68,6 @@ export class ProService implements IProService {
       pendingPro = await this._proRepository.createPendingPro(proData);
     }
 
-    // Notify admin about new/re-submitted pro application
     try {
       const admin = await this._adminRepository.find();
       if (admin) {
@@ -79,7 +79,7 @@ export class ProService implements IProService {
         });
       }
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_PRO_APPLICATION_NOTIFICATION, { proData: { firstName: proData.firstName, lastName: proData.lastName, email: proData.email }, error });
     }
 
     return { message: MESSAGES.APPLICATION_SUBMITTED_SUCCESSFULLY, pendingPro };
@@ -112,12 +112,12 @@ export class ProService implements IProService {
     try {
       await this._notificationService.createNotification({
         type: "general",
-        title: "Profile Updated Successfully",
+        title: "Profile Updated",
         description: "Your professional profile has been updated successfully. Your changes are now visible to customers.",
         proId: proId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_PRO_PROFILE_UPDATE_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_PRO_PROFILE_UPDATE_NOTIFICATION, { proId, error });
     }
 
     return profile;
@@ -147,12 +147,12 @@ export class ProService implements IProService {
     try {
       await this._notificationService.createNotification({
         type: "general",
-        title: "Password Changed Successfully",
+        title: "Password Changed",
         description: "Your password has been changed successfully. If you didn't make this change, please contact support immediately.",
         proId: proId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_PRO_PASSWORD_CHANGE_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_PRO_PASSWORD_CHANGE_NOTIFICATION, { proId, error });
     }
 
     return this.mapToUserResponse(updatedPro);
@@ -170,7 +170,7 @@ export class ProService implements IProService {
 
     if (data.isUnavailable) {
       const hasBookedSlots = Object.values(data.availability).some(
-        (slots: any[] | undefined) => slots?.some((slot: any) => slot.booked)
+        (slots: { startTime: string; endTime: string; booked: boolean }[] | undefined) => slots?.some((slot) => slot.booked)
       );
       if (hasBookedSlots) {
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CANNOT_MARK_UNAVAILABLE_WITH_BOOKED_SLOTS);
@@ -298,18 +298,18 @@ export class ProService implements IProService {
       preferredDateIST2.setHours(endH, endM, 0, 0);
       const runAt = new Date(preferredDateIST2.toISOString());
       await scheduleSlotRelease(bookingId, runAt);
-      await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: bookingId, slotReleaseAt: runAt } as any);
+      await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: bookingId, slotReleaseAt: runAt });
 
       try {
         await this._notificationService.createNotification({
           type: "booking",
-          title: "Booking Accepted! ",
-          description: `Great news! ${pro.firstName} ${pro.lastName} has accepted your booking request. You'll receive a quote soon.`,
+          title: "Booking Accepted",
+          description: `Great news! Your booking has been accepted by the professional. They will contact you soon to discuss the details.`,
           userId: booking.userId.toString(),
           bookingId: bookingId
         });
       } catch (error) {
-        console.error(MESSAGES.FAILED_SEND_BOOKING_ACCEPTANCE_NOTIFICATION + ":", error);
+        logger.error(MESSAGES.FAILED_CREATE_BOOKING_ACCEPTANCE_NOTIFICATION, { bookingId, userId: booking.userId.toString(), error });
       }
 
       await session.commitTransaction();
@@ -349,8 +349,10 @@ export class ProService implements IProService {
       preferredTime: updatedSlots.map((slot) => ({ ...slot })),
     });
 
-    try { await cancelSlotRelease(bookingId); } catch {}
-    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null } as any);
+    try { await cancelSlotRelease(bookingId); } catch (error) {
+      logger.error(MESSAGES.FAILED_CANCEL_SLOT_RELEASE, { bookingId, error });
+    }
+    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null });
 
     try {
       await this._notificationService.createNotification({
@@ -361,7 +363,7 @@ export class ProService implements IProService {
         bookingId: bookingId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_BOOKING_REJECTION_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_BOOKING_REJECTION_NOTIFICATION, { bookingId, userId: booking.userId.toString(), reason, error });
     }
 
     return { message: MESSAGES.BOOKING_REJECTED_SUCCESSFULLY };
@@ -388,15 +390,15 @@ export class ProService implements IProService {
 
     try {
       await this._notificationService.createNotification({
-        type: "quota",
-        title: "Quote Ready! 💰",
-        description: `Your quote is ready! Total cost: ₹${quotaData.totalCost}. Please review and proceed with payment to confirm your booking.`,
+        type: "booking",
+        title: "Quota Generated",
+        description: `A quota has been generated for your booking. Please review and proceed with payment to confirm your service.`,
         userId: booking.userId.toString(),
         quotaId: quota.id,
         bookingId: bookingId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_QUOTA_GENERATION_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_QUOTA_GENERATION_NOTIFICATION, { bookingId, quotaId: quota.id, userId: booking.userId.toString(), error });
     }
 
     return quota;
@@ -436,7 +438,9 @@ export class ProService implements IProService {
       try {
         const quota = await this._quotaRepository.findQuotaByBookingId(data.bookingId);
         if (quota?.id) quotaObjectId = new mongoose.Types.ObjectId(quota.id);
-      } catch { }
+      } catch (error) {
+        logger.error(MESSAGES.FAILED_LOOKUP_QUOTA_FOR_WITHDRAWAL, { bookingId: data.bookingId, error });
+      }
     }
 
     const withdrawalRequest = await this._withdrawalRequestRepository.createWithdrawalRequest({
@@ -463,7 +467,7 @@ export class ProService implements IProService {
         proId: proId,
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_WITHDRAWAL_SUBMISSION_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_WITHDRAWAL_SUBMISSION_NOTIFICATION, { proId, amount: data.amount, error });
     }
 
     try {
@@ -477,7 +481,7 @@ export class ProService implements IProService {
         });
       }
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_WITHDRAWAL_SUBMISSION_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_ADMIN_WITHDRAWAL_NOTIFICATION, { proId, amount: data.amount, paymentMode: data.paymentMode, error });
     }
 
     return withdrawalRequest;
@@ -496,7 +500,6 @@ export class ProService implements IProService {
   ): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number }> {
     const skip = (page - 1) * limit;
     const withdrawals = await this._withdrawalRequestRepository.findWithdrawalRequestsByProIdPaginated(proId, skip, limit, sortBy, status);
-    // If status filter applied, total should reflect it; otherwise count all by proId
     const total = status
       ? (await this._withdrawalRequestRepository.getAllWithdrawalRequests(0, 0, sortBy, status)).filter(w => w.proId === proId).length
       : await this._withdrawalRequestRepository.getTotalWithdrawalRequestsCountByProId(proId);
@@ -612,7 +615,7 @@ export class ProService implements IProService {
   ): Promise<Array<{ id: string; name: string; image?: string; bookingCount: number }>> {
     const top = await this._bookingRepository.getTopCategoriesByCompleted(limit);
     return top.map((t) => ({
-      id: (t as any).categoryId?.toString?.() ?? String(t.categoryId),
+      id: (t as { categoryId: unknown }).categoryId?.toString?.() ?? String((t as { categoryId: unknown }).categoryId),
       name: t.name,
       image: t.image,
       bookingCount: t.bookingCount,

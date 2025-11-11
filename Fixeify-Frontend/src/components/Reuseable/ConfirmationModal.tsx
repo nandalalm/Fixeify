@@ -48,6 +48,8 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
   error,
   isProcessing,
 }) => {
+  const [selectValue, setSelectValue] = useState("");
+
   if (!isOpen) return null;
 
   const reasons = ["Incomplete documentation", "Insufficient skills", "Background check failed", "Other"];
@@ -70,8 +72,6 @@ export const ConfirmationModal: FC<ConfirmationModalProps> = ({
     "Suspicious Activity",
     "Other",
   ];
-
-  const [selectValue, setSelectValue] = useState("");
 
   return (
     <div

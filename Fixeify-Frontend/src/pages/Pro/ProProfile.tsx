@@ -38,10 +38,11 @@ const ProProfilePage = () => {
           dispatch(logoutUserSync());
           navigate("/login");
         }
-      } catch (err: any) {
-        console.error("Fetch pro profile error:", err.response?.data);
-        setError(err.response?.data?.message || "Failed to load profile");
-        if (err.response?.status === 401) {
+      } catch (err: unknown) {
+        const errorResponse = err as { response?: { data?: { message?: string }; status?: number } };
+        console.error("Fetch pro profile error:", errorResponse.response?.data);
+        setError(errorResponse.response?.data?.message || "Failed to load profile");
+        if (errorResponse.response?.status === 401) {
           dispatch(logoutUserSync());
           navigate("/login");
         }

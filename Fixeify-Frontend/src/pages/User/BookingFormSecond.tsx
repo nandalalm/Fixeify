@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { ITimeSlot } from "../../interfaces/adminInterface";
+import React, { useState, useEffect, useMemo } from "react";
+import { ITimeSlot, ILocation } from "../../interfaces/adminInterface";
 import { getProAvailability } from "../../api/proApi";
 
 interface BookingFormSecondProps {
@@ -10,7 +10,7 @@ interface BookingFormSecondProps {
   setFormData: React.Dispatch<
     React.SetStateAction<{
       issueDescription: string;
-      location: any;
+      location: ILocation | null;
       phoneNumber: string;
       preferredDate: string;
       preferredTime: ITimeSlot[];
@@ -27,13 +27,17 @@ const BookingFormSecond = ({ formData, setFormData, proId, setErrors, handleTime
   const [availableTimeSlots, setAvailableTimeSlots] = useState<ITimeSlot[]>([]);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(true);
 
-  const today = new Date();
-  
-  const oneWeekMinusOneDay = new Date(today);
-  oneWeekMinusOneDay.setDate(today.getDate() + 6); 
-
-  const todayFormatted = today.toISOString().split("T")[0];
-  const oneWeekMinusOneDayFormatted = oneWeekMinusOneDay.toISOString().split("T")[0];
+  const { today, todayFormatted, oneWeekMinusOneDayFormatted } = useMemo(() => {
+    const today = new Date();
+    const oneWeekMinusOneDay = new Date(today);
+    oneWeekMinusOneDay.setDate(today.getDate() + 6); 
+    
+    return {
+      today,
+      todayFormatted: today.toISOString().split("T")[0],
+      oneWeekMinusOneDayFormatted: oneWeekMinusOneDay.toISOString().split("T")[0]
+    };
+  }, []);
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -69,7 +73,7 @@ const BookingFormSecond = ({ formData, setFormData, proId, setErrors, handleTime
       }
     };
     fetchAvailability();
-  }, [proId, formData.preferredDate, setErrors]);
+  }, [proId, formData.preferredDate, setErrors, today]);
 
   // Re-filter slots when component mounts or time changes
   useEffect(() => {

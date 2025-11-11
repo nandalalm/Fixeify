@@ -97,13 +97,12 @@ export class AuthService implements IAuthService {
     return verified === "true";
   }
 
-  async register(name: string, email: string, password: string, role: UserRole): Promise<IUser | IAdmin> {
+  async register(name: string, email: string, password: string, role: UserRole): Promise<UserResponse> {
     const hashedPassword = await bcrypt.hash(password, 10);
     const userData = mapUserDtoToModel({ name, email, password: hashedPassword });
-    let newUser: IUser | IAdmin;
 
     if (role === UserRole.USER) {
-      newUser = await this._userRepository.createUser(userData);
+      const newUser = await this._userRepository.createUser(userData);
       try {
         await this._notificationService.createNotification({
           type: "general",
@@ -115,9 +114,28 @@ export class AuthService implements IAuthService {
         logger.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
       }
 
-      return newUser;
+      return new UserResponse({
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: UserRole.USER,
+        phoneNo: newUser.phoneNo || null,
+        address: newUser.address || null,
+        photo: newUser.photo || null,
+        isBanned: newUser.isBanned || false,
+      });
     } else if (role === UserRole.ADMIN) {
-      return this._adminRepository.createAdmin(userData);
+      const newAdmin = await this._adminRepository.createAdmin(userData);
+      return new UserResponse({
+        id: newAdmin.id,
+        name: newAdmin.name,
+        email: newAdmin.email,
+        role: UserRole.ADMIN,
+        phoneNo: null,
+        address: null,
+        photo: null,
+        isBanned: false,
+      });
     } else {
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ACCESS_DENIED);
     }
@@ -240,7 +258,6 @@ export class AuthService implements IAuthService {
     }
 
     let user = await this._userRepository.findUserByEmail(payload.email);
-    let created = false;
 
     if (!user) {
       const userData = mapUserDtoToModel({
@@ -249,7 +266,6 @@ export class AuthService implements IAuthService {
         password: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10),
       });
       user = await this._userRepository.createUser(userData);
-      created = true;
 
       try {
         await this._notificationService.createNotification({
@@ -299,7 +315,7 @@ export class AuthService implements IAuthService {
     };
   }
 
-  async refreshAccessToken(req: Request, res: Response): Promise<string> {
+  async refreshAccessToken(req: Request): Promise<string> {
     const secret = process.env.REFRESH_TOKEN_SECRET;
     if (!secret) throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.SERVER_ERROR);
 
@@ -310,7 +326,7 @@ export class AuthService implements IAuthService {
     try {
       decoded = jwt.verify(refreshToken, secret) as { userId: string };
     } catch (err) {
-      console.error(MESSAGES.TOKEN_VERIFICATION_FAILED + ":", err);
+      logger.error(MESSAGES.TOKEN_VERIFICATION_FAILED + ":", err);
       throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.INVALID_TOKEN);
     }
 
@@ -388,7 +404,7 @@ export class AuthService implements IAuthService {
     let decoded;
     try {
       decoded = jwt.verify(refreshToken, secret) as { userId: string };
-    } catch (err) {
+    } catch {
       throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.INVALID_TOKEN);
     }
 
@@ -429,10 +445,8 @@ export class AuthService implements IAuthService {
 
   async requestPasswordReset(email: string): Promise<void> {
     let user: IUser | ApprovedProDocument | null = await this._userRepository.findUserByEmail(email);
-    let role = UserRole.USER;
     if (!user) {
       user = await this._proRepository.findApprovedProByEmail(email);
-      role = UserRole.PRO;
     }
     if (!user) {
       throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.EMAIL_NOT_REGISTERED);

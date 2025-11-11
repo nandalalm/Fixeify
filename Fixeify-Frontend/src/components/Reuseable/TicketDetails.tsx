@@ -35,13 +35,13 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
     const byTicket = (ticket.againstName || "").trim();
     if (byTicket) return byTicket;
     if (ticket.againstType === "user") {
-      const n = (against as UserProfile | null)?.name || (booking as any)?.user?.name;
+      const n = (against as UserProfile | null)?.name || (booking as { user?: { name?: string } })?.user?.name;
       return (n && String(n).trim()) || "-";
     }
     if (ticket.againstType === "pro") {
       const p = (against as ProProfile | null);
-      const fn = p?.firstName || (booking as any)?.pro?.firstName || "";
-      const ln = p?.lastName || (booking as any)?.pro?.lastName || "";
+      const fn = p?.firstName || (booking as { pro?: { firstName?: string } })?.pro?.firstName || "";
+      const ln = p?.lastName || (booking as { pro?: { lastName?: string } })?.pro?.lastName || "";
       const full = `${fn} ${ln}`.trim();
       return full || "-";
     }
@@ -97,7 +97,9 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
       try {
         const b = await fetchUserBookingById(ticket.bookingId);
         if (mounted) setBooking(b);
-      } catch {}
+      } catch (error) {
+        console.error('Failed to fetch booking:', error);
+      }
 
       try {
         const q = await fetchUserQuotaByBookingId(ticket.bookingId);
@@ -105,8 +107,10 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
       } catch {
         try {
           const q2 = await fetchProQuotaByBookingId(ticket.bookingId);
-          if (mounted) setQuota(q2 as any);
-        } catch {}
+          if (mounted) setQuota(q2);
+        } catch (error) {
+          console.error('Failed to fetch pro quota:', error);
+        }
       }
 
       try {
@@ -117,7 +121,9 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
           const p = await getProProfile(ticket.againstId);
           if (mounted) setAgainst(p);
         }
-      } catch {}
+      } catch (error) {
+        console.error('Failed to fetch user/pro profile:', error);
+      }
     };
     load();
     return () => { mounted = false; };

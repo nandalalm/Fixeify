@@ -74,5 +74,5 @@ export interface IUserService {
   handlePaymentFailure(bookingId: string): Promise<void>;
   handleWebhookEvent(event: Stripe.Event): Promise<void>;
   getBookingById(bookingId: string): Promise<BookingCompleteResponse | null>;
-  getQuotaByBookingId(bookingId: string): Promise<any>;
+  getQuotaByBookingId(bookingId: string): Promise<{ id: string; totalCost: number; paymentStatus: string } | null>;
 }

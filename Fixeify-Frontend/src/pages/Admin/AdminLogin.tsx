@@ -59,7 +59,7 @@ const AdminLogin = () => {
         });
         setErrors(fieldErrors);
       } else {
-        const err = error as any;
+        const err = error as { response?: { status?: number; data?: { message?: string } }; status?: number; message?: string };
         if (err.response?.status || err.status) {
           const status = err.response?.status || err.status;
           const message = err.response?.data?.message || err.message || "Login failed";

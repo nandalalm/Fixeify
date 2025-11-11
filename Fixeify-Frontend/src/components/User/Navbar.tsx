@@ -7,11 +7,11 @@ import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import { logoutUser } from "../../store/authSlice";
 import { Sun, Moon, Bell, MessageCircle, MapPin, PencilLine } from "lucide-react";
-import { useTheme } from "../../context/ThemeContext";
+import { useTheme } from "../../hooks/useTheme";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import NotificationPanel from "../Messaging/NotificationPanel";
 import MessagePanel from "../Messaging/MessagePanel";
-import { addNotification } from "../../store/chatSlice";
+import { addNotification, fetchAllNotifications } from "../../store/chatSlice";
 import { NotificationItem } from "../../interfaces/messagesInterface";
 import { getSocket } from "../../services/socket";
 import ChangeLocationModal from "./ChangeLocationModal";
@@ -56,8 +56,40 @@ const Navbar = () => {
 
   useEffect(() => {
     if (!user || !accessToken) return;
+    
     const socket = getSocket();
-    if (!socket) return;
+    let fallbackInterval: NodeJS.Timeout | null = null;
+    
+    if (!socket) {
+      // Fallback: Poll for notifications every 30 seconds when socket is not available
+      fallbackInterval = setInterval(() => {
+        dispatch(fetchAllNotifications({ 
+          userId: user.id, 
+          role: user.role === 'admin' ? 'admin' : 'user', 
+          page: 1, 
+          limit: 10, 
+          filter: 'all' 
+        }));
+      }, 30000);
+      return () => {
+        if (fallbackInterval) clearInterval(fallbackInterval);
+      };
+    }
+    
+    // Check if socket is connected
+    if (!socket.connected) {
+      // Start fallback polling when socket is disconnected
+      fallbackInterval = setInterval(() => {
+        dispatch(fetchAllNotifications({ 
+          userId: user.id, 
+          role: user.role === 'admin' ? 'admin' : 'user', 
+          page: 1, 
+          limit: 10, 
+          filter: 'all' 
+        }));
+      }, 30000);
+    }
+    
     const handler = (notif: NotificationItem & { receiverId?: string }) => {
       if ((notif.userId || notif.receiverId) === user.id) {
         const isValid = notif.title || notif.description;
@@ -67,10 +99,38 @@ const Navbar = () => {
     };
 
     socket.on("newNotification", handler);
+    
+    // Add connection status listeners
+    socket.on('connect', () => {
+      // Stop fallback polling when socket connects
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+        fallbackInterval = null;
+      }
+    });
+    
+    socket.on('disconnect', () => {
+      // Start fallback polling when socket disconnects
+      if (!fallbackInterval) {
+        fallbackInterval = setInterval(() => {
+          dispatch(fetchAllNotifications({ 
+            userId: user.id, 
+            role: user.role === 'admin' ? 'admin' : 'user', 
+            page: 1, 
+            limit: 10, 
+            filter: 'all' 
+          }));
+        }, 30000);
+      }
+    });
+
     return () => {
       socket.off("newNotification", handler);
+      socket.off('connect');
+      socket.off('disconnect');
+      if (fallbackInterval) clearInterval(fallbackInterval);
     };
-  }, [user, accessToken]);
+  }, [user, accessToken, dispatch]);
 
   const handleLogout = () => {
     const role = user?.role === "admin" ? "admin" : "user";

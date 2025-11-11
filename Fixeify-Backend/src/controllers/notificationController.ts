@@ -5,6 +5,7 @@ import { TYPES } from "../types";
 import { UserRole } from "../enums/roleEnum";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
+import logger from "../config/logger";
 
 @injectable()
 export class NotificationController {
@@ -33,7 +34,7 @@ export class NotificationController {
       );
       res.status(HttpStatus.OK).json(result);
     } catch (error) {
-      console.error(MESSAGES.FAILED_TO_FETCH_NOTIFICATIONS, {
+      logger.error(MESSAGES.FAILED_TO_FETCH_NOTIFICATIONS, {
         error: (error as Error).message,
         participantId,
         role,
@@ -89,7 +90,7 @@ export class NotificationController {
       );
       res.status(HttpStatus.OK).json(result);
     } catch (error) {
-      console.error("Failed to fetch message notifications", {
+      logger.error("Failed to fetch message notifications", {
         error: (error as Error).message,
         participantId,
         role,
@@ -117,7 +118,7 @@ export class NotificationController {
       );
       res.status(HttpStatus.OK).json(result);
     } catch (error) {
-      console.error("Failed to fetch non-message notifications", {
+      logger.error("Failed to fetch non-message notifications", {
         error: (error as Error).message,
         participantId,
         role,

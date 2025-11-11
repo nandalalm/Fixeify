@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from "react-redux";
 import { AppDispatch, RootState } from "../../store/store";
 import ChatInbox from "./ChatInbox";
 import MessageBox from "./MessageBox";
-import { useTheme } from "../../context/ThemeContext";
+import { useTheme } from "../../hooks/useTheme";
 import { getSocket, isSocketConnected, reconnectSocket } from "../../services/socket";
 import { fetchConversations, fetchAllNotifications, markMessagesRead, updateOnlineStatus, markChatMessageNotificationsRead } from "../../store/chatSlice";
 import { refreshToken } from "../../store/authSlice";
@@ -60,7 +60,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
       
       // Check for proId in URL path (for user chat routes)
       if (location.pathname.includes('/chat/')) {
-        const proIdMatch = location.pathname.match(/\/chat\/([^\/]+)/);
+        const proIdMatch = location.pathname.match(/\/chat\/([^/]+)/);
         if (proIdMatch) {
           const proId = proIdMatch[1];
           const targetConversation = conversations.find(conv => 
@@ -83,7 +83,7 @@ export default function MessagingApp({ role }: MessagingAppProps) {
         }
       }
     }
-  }, [conversations, location.pathname, searchParams, selectedConversationId]);
+  }, [conversations, location.pathname, searchParams, selectedConversationId, dispatch, role, user]);
 
   useEffect(() => {
     if (!socket || !isConnected) {

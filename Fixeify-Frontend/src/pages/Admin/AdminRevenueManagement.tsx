@@ -1,4 +1,4 @@
-import { type FC, useState, useEffect } from "react";
+import { type FC, useState, useEffect, useCallback } from "react";
 import { AdminNavbar } from "../../components/Admin/AdminNavbar";
 import { Search, ChevronLeft, ChevronRight, X, RotateCcw, IndianRupee, TrendingUp, TrendingDown, Calendar, CalendarDays, CalendarRange } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -79,7 +79,7 @@ const AdminRevenueManagement: FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
 
   // Helpers to refresh data so we can call on view/back
-  const refreshWithdrawals = async () => {
+  const refreshWithdrawals = useCallback(async () => {
     try {
       setWithdrawalsLoading(true);
       const isStatus = ["pending", "approved", "rejected"].includes(sortBy);
@@ -94,15 +94,15 @@ const AdminRevenueManagement: FC = () => {
       }
       setPros(proMap);
       setTotalPages(Math.ceil(total / limit));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch withdrawals:", error);
-      setError(error?.response?.data?.message || "Failed to load withdrawal requests");
+      setError((error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to load withdrawal requests");
     } finally {
       setWithdrawalsLoading(false);
     }
-  };
+  }, [sortBy, currentPage]);
 
-  const refreshAdminTransactions = async () => {
+  const refreshAdminTransactions = useCallback(async () => {
     if (!user) return;
     try {
       setAdminTxnsLoading(true);
@@ -114,27 +114,27 @@ const AdminRevenueManagement: FC = () => {
     } finally {
       setAdminTxnsLoading(false);
     }
-  };
+  }, [user, adminTxnPage]);
 
   // Revenue metrics fetch helper to reuse across effects and tab switches
-  const refreshRevenueMetrics = async () => {
+  const refreshRevenueMetrics = useCallback(async () => {
     if (!user) return;
     try {
       setRevenueLoading(true);
       const metrics = await fetchDashboardMetrics(user.id);
-      setTotalRevenue((metrics as any).totalRevenue ?? 0);
-      setMonthlyRevenue((metrics as any).monthlyRevenue ?? 0);
-      setYearlyRevenue((metrics as any).yearlyRevenue ?? 0);
-      setDailyRevenue((metrics as any).dailyRevenue ?? 0);
-      setYearlyDelta((metrics as any).yearlyDelta ?? (metrics as any).yearlyDeltaPercent ?? null);
-      setMonthlyDelta((metrics as any).monthlyDelta ?? (metrics as any).monthlyDeltaPercent ?? null);
-      setDailyDelta((metrics as any).dailyDelta ?? (metrics as any).dailyDeltaPercent ?? null);
+      setTotalRevenue(metrics.totalRevenue ?? 0);
+      setMonthlyRevenue(metrics.monthlyRevenue ?? 0);
+      setYearlyRevenue(metrics.yearlyRevenue ?? 0);
+      setDailyRevenue(metrics.dailyRevenue ?? 0);
+      setYearlyDelta(metrics.yearlyDeltaPercent ?? null);
+      setMonthlyDelta(metrics.monthlyDeltaPercent ?? null);
+      setDailyDelta(metrics.dailyDeltaPercent ?? null);
     } catch (err) {
       console.error('Failed to fetch revenue metrics', err);
     } finally {
       setRevenueLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (!user || user.role !== "admin") {
@@ -145,7 +145,7 @@ const AdminRevenueManagement: FC = () => {
       refreshAdminTransactions();
       refreshWithdrawals();
     }
-  }, [user, navigate, currentPage, adminTxnPage, sortBy]);
+  }, [user, navigate, currentPage, adminTxnPage, sortBy, refreshRevenueMetrics, refreshAdminTransactions, refreshWithdrawals]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -198,7 +198,7 @@ const AdminRevenueManagement: FC = () => {
 
   const handleViewAdminTransaction = async (t: AdminTransactionDTO) => {
     await refreshAdminTransactions();
-    setSelectedAdminTransaction({ _id: t.id, amount: t.amount, type: t.type as any, date: new Date(t.date) as any, description: t.description, bookingId: (t as any).bookingId, transactionId: (t as any).transactionId });
+    setSelectedAdminTransaction({ _id: t.id, amount: t.amount, type: t.type, date: new Date(t.date), description: t.description, bookingId: t.bookingId, transactionId: t.transactionId });
   };
 
   const handleAcceptWithdrawal = async () => {
@@ -214,9 +214,9 @@ const AdminRevenueManagement: FC = () => {
       setSelectedWithdrawal((prev) =>
         prev && prev.id === selectedWithdrawal.id ? { ...prev, status: "approved" } : prev
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Accept withdrawal error:", err);
-      setError(err.response?.data?.message || "Failed to accept withdrawal request");
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to accept withdrawal request");
     } finally {
       setActionLoading(false);
     }
@@ -243,9 +243,9 @@ const AdminRevenueManagement: FC = () => {
           ? { ...prev, status: "rejected", rejectionReason }
           : prev
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Reject withdrawal error:", err);
-      setError(err.response?.data?.message || "Failed to reject withdrawal request");
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to reject withdrawal request");
     } finally {
       setActionLoading(false);
     }
@@ -753,7 +753,7 @@ const AdminRevenueManagement: FC = () => {
                           <div key={t.id} className="bg-white p-4 rounded-md shadow border border-gray-200">
                             <p className="text-sm text-gray-700"><strong>S.No:</strong> {idx + 1 + (adminTxnPage - 1) * 5}</p>
                             <p className="text-sm text-gray-700"><strong>Description:</strong> {t.description || '-'}</p>
-                            <p className="text-sm text-gray-700"><strong>Transaction ID:</strong> {(t as any).transactionId || t.id}</p>
+                            <p className="text-sm text-gray-700"><strong>Transaction ID:</strong> {t.transactionId || t.id}</p>
                             <p className="text-sm text-gray-700">
                               <strong>Type:</strong>{' '}
                               <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${t.type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{t.type}</span>
@@ -800,7 +800,7 @@ const AdminRevenueManagement: FC = () => {
                               <tr key={t.id} className="hover:bg-gray-50">
                                 <td className="py-3 px-4 text-sm text-gray-900 border-b">{idx + 1 + (adminTxnPage - 1) * 5}</td>
                                 <td className="py-3 px-4 text-sm text-gray-700 border-b">{t.description || '-'}</td>
-                                <td className="py-3 px-4 text-sm text-gray-700 border-b">{(t as any).transactionId || t.id}</td>
+                                <td className="py-3 px-4 text-sm text-gray-700 border-b">{t.transactionId || t.id}</td>
                                 <td className="py-3 px-4 text-sm text-gray-700 border-b">
                                   <span className={`inline-block px-2 py-0.5 text-xs rounded-full font-medium ${t.type === 'credit' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{t.type}</span>
                                 </td>

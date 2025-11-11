@@ -29,13 +29,7 @@ interface MessageBoxProps {
   onBack?: () => void;
 }
 
-const MessageBox: FC<MessageBoxProps> = ({
-  conversationId,
-  currentUser,
-  otherUser: initialOtherUser,
-  onBack,
-}) => {
-  const Avatar: FC<{ src?: string | null; alt?: string; size?: number; className?: string }> = ({ src, alt = "", size = 40, className = "" }) => {
+const Avatar: FC<{ src?: string | null; alt?: string; size?: number; className?: string }> = ({ src, alt = "", size = 40, className = "" }) => {
     const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
     const [errored, setErrored] = useState(false);
 
@@ -99,6 +93,12 @@ const MessageBox: FC<MessageBoxProps> = ({
     );
   };
 
+const MessageBox: FC<MessageBoxProps> = ({
+  conversationId,
+  currentUser,
+  otherUser: initialOtherUser,
+  onBack,
+}) => {
   const isPro = currentUser.role === "pro";
 
   const [newMessage, setNewMessage] = useState("");
@@ -296,7 +296,10 @@ const MessageBox: FC<MessageBoxProps> = ({
   }, [socket, conversationId, currentUser.id, currentUser.role, dispatch]);
 
   const loadMessages = useCallback(async (isLoadingMore = false) => {
-    if ((isLoadingMore ? loadingMore : loading) || !hasMore) return;
+    // Use current state values to avoid stale closures
+    const currentLoading = isLoadingMore ? loadingMore : loading;
+    if (currentLoading || !hasMore) return;
+    
     const role = currentUser.role as Role;
     if (!isValidChatRole(role)) {
       setError("Admins cannot access chat functionality.");
@@ -330,11 +333,10 @@ const MessageBox: FC<MessageBoxProps> = ({
         setHasMore(false);
       }
 
-      if (isLoadingMore) {
-        setPage((prev) => prev + 1);
+      if (!isLoadingMore) {
+        setPage(2);
       } else {
-        setPage(2); // Next page for future loads
-        setIsInitialLoad(false);
+        setPage(prev => prev + 1);
       }
     } catch (error) {
       console.error("Failed to load messages:", error);
@@ -346,7 +348,8 @@ const MessageBox: FC<MessageBoxProps> = ({
         setLoading(false);
       }
     }
-  }, [conversationId, dispatch, currentUser, loading, loadingMore, hasMore, page, messagesPerPage]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId, dispatch, currentUser.role, messagesPerPage]);
 
   useEffect(() => {
     setPage(1);
@@ -357,25 +360,27 @@ const MessageBox: FC<MessageBoxProps> = ({
       loadMessages(false);
     }, 1000);
     return () => clearTimeout(timer);
-  }, [conversationId, currentUser.id, currentUser.role]);
+  }, [conversationId, currentUser.id, currentUser.role, loadMessages]);
 
   // Socket event handlers
   useEffect(() => {
     if (socket) {
-      const handleNewMessage = (raw: any) => {
+      const handleNewMessage = (raw: { id?: string; _id?: string; messageId?: string; chatId?: string; senderId?: string; senderModel?: string; receiverId?: string; receiverModel?: string; content?: string; body?: string; timestamp?: string; createdAt?: string; isRead?: boolean; status?: string; attachments?: { url: string; mime: string; size: number }[]; type?: string }) => {
         // Normalize to our Message shape
         const message: Message = {
-          id: raw.id || raw._id || raw.messageId,
-          chatId: raw.chatId,
-          senderId: raw.senderId,
-          senderModel: raw.senderModel,
+          id: raw.id || raw._id || raw.messageId || '',
+          chatId: raw.chatId || '',
+          senderId: raw.senderId || '',
+          senderModel: (raw.senderModel as "User" | "ApprovedPro") || "User",
+          receiverId: raw.receiverId || '',
+          receiverModel: (raw.receiverModel as "User" | "ApprovedPro") || "User",
           content: raw.content ?? raw.body ?? "",
           timestamp: raw.timestamp || raw.createdAt || new Date().toISOString(),
-          status: (raw.status as any) || (raw.isRead ? 'read' : 'delivered'),
+          status: (raw.status as "sent" | "delivered" | "read") || (raw.isRead ? 'read' : 'delivered'),
           isRead: typeof raw.isRead === 'boolean' ? raw.isRead : raw.status === 'read',
-          attachments: raw.attachments,
-          type: raw.type,
-        } as any;
+          attachments: raw.attachments || [],
+          type: (raw.type as "text" | "image" | "file") || "text",
+        };
         if (message.chatId === conversationId) {
           dispatch(addIncomingMessage({ message, currentUserId: currentUser.id, activeChatId: conversationId }));
           setOtherUserTyping(false);

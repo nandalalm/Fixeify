@@ -1,5 +1,5 @@
 import { BookingResponse } from "../../interfaces/bookingInterface";
-import { formatDate } from "../User/BookingHistory"; 
+import { formatDate } from "../../utils/dateUtils"; 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 

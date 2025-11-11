@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { useNavigate } from "react-router-dom";
@@ -41,6 +41,7 @@ const JobManagementPage = () => {
 
   const [bookings, setBookings] = useState<BookingResponse[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [initialLoad, setInitialLoad] = useState<boolean>(true);
   const [tabSwitching, setTabSwitching] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,7 @@ const JobManagementPage = () => {
     materialCost: "",
     additionalCharges: "",
   });
+  const [refreshKey, setRefreshKey] = useState<number>(0);
   // const [selectedQuota, setSelectedQuota] = useState<QuotaResponse | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "">("latest");
@@ -83,10 +85,13 @@ const JobManagementPage = () => {
   });
   const limit = 5;
 
-  const fetchBookings = async (tab: "requests" | "scheduled" | "history") => {
+  const fetchBookings = useCallback(async (tab: "requests" | "scheduled" | "history") => {
     if (!user || !accessToken || user.role !== UserRole.PRO) return;
 
-    setLoading(true);
+    // Only show full loading on non-initial loads
+    if (!initialLoad) {
+      setLoading(true);
+    }
     setError(null);
     try {
       let status: string | undefined;
@@ -99,7 +104,7 @@ const JobManagementPage = () => {
           break;
         case "history": {
           const historyStatuses = ["completed", "rejected", "cancelled"] as const;
-          if (historyStatuses.includes(sortOption as any)) {
+          if (historyStatuses.includes(sortOption as "completed" | "rejected" | "cancelled")) {
             status = sortOption as string; // narrow to specific history status
           } else {
             status = historyStatuses.join(",");
@@ -119,20 +124,22 @@ const JobManagementPage = () => {
       );
       setBookings(bookings);
       setTotalPages((prev) => ({ ...prev, [tab]: Math.ceil(total / limit) }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Fetch pro bookings error for ${tab}:`, err);
-      setError(err.response?.data?.message || "Failed to load bookings");
-      if (err.response?.status === 401) {
+      setError((err as { response?: { data?: { message?: string }; status?: number } })?.response?.data?.message || "Failed to load bookings");
+      if ((err as { response?: { status?: number } })?.response?.status === 401) {
         dispatch(logoutUserSync());
         navigate("/login");
       }
     } finally {
       setLoading(false);
+      setInitialLoad(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, accessToken, dispatch, navigate]);
 
   // Silent fetch to use during tab switching (no full-page loader)
-  const fetchBookingsSilent = async (tab: "requests" | "scheduled" | "history", pageOverride?: number) => {
+  const fetchBookingsSilent = useCallback(async (tab: "requests" | "scheduled" | "history", pageOverride?: number) => {
     if (!user || !accessToken || user.role !== UserRole.PRO) return;
     setError(null);
     try {
@@ -146,7 +153,7 @@ const JobManagementPage = () => {
           break;
         case "history": {
           const historyStatuses = ["completed", "rejected", "cancelled"] as const;
-          if (historyStatuses.includes(sortOption as any)) {
+          if (historyStatuses.includes(sortOption as "completed" | "rejected" | "cancelled")) {
             status = sortOption as string;
           } else {
             status = historyStatuses.join(",");
@@ -167,20 +174,22 @@ const JobManagementPage = () => {
       );
       setBookings(bookings);
       setTotalPages((prev) => ({ ...prev, [tab]: Math.ceil(total / limit) }));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(`Silent fetch pro bookings error for ${tab}:`, err);
-      setError(err.response?.data?.message || "Failed to load bookings");
-      if (err.response?.status === 401) {
+      setError((err as { response?: { data?: { message?: string }; status?: number } })?.response?.data?.message || "Failed to load bookings");
+      if ((err as { response?: { status?: number } })?.response?.status === 401) {
         dispatch(logoutUserSync());
         navigate("/login");
       }
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, accessToken, dispatch, navigate]);
 
   useEffect(() => {
     if (tabSwitching) return; // avoid page loader during tab switch; handled by silent fetch
     fetchBookings(activeTab);
-  }, [user, accessToken, dispatch, navigate, activeTab, currentPage[activeTab], sortOption]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, accessToken, activeTab, currentPage, sortOption, tabSwitching]);
 
   // Debounced search: avoid full-page loader to preserve input focus
   useEffect(() => {
@@ -193,7 +202,8 @@ const JobManagementPage = () => {
     }, 300);
     return () => clearTimeout(handler);
     // include only searchTerm and activeTab to debounce typing changes
-  }, [searchTerm, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, activeTab, tabSwitching]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -246,9 +256,11 @@ const JobManagementPage = () => {
       showSuccessMessage("Booking accepted successfully");
       setIsAcceptModalOpen(false);
       await fetchBookings(activeTab);
-    } catch (err: any) {
+      // Trigger BookingDetails refresh to show updated status
+      setRefreshKey(prev => prev + 1);
+    } catch (err: unknown) {
       console.error("Accept booking error:", err);
-      const errorMessage = err.response?.data?.message || "An error occurred while accepting the booking";
+      const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "An error occurred while accepting the booking";
       showErrorMessage(errorMessage);
       setIsAcceptModalOpen(false);
     } finally {
@@ -268,9 +280,11 @@ const JobManagementPage = () => {
       setRejectionReason("");
       setCustomRejectionReason("");
       await fetchBookings(activeTab);
-    } catch (err: any) {
+      // Trigger BookingDetails refresh to show updated status
+      setRefreshKey(prev => prev + 1);
+    } catch (err: unknown) {
       console.error("Reject booking error:", err);
-      showErrorMessage(err.response?.data?.message || "Failed to reject booking");
+      showErrorMessage((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to reject booking");
       setIsRejectModalOpen(false);
     } finally {
       setActionLoading(false);
@@ -341,9 +355,11 @@ const JobManagementPage = () => {
       setIsConfirmQuotaModalOpen(false);
       setQuotaData({ laborCost: "", materialCost: "", additionalCharges: "" });
       await fetchBookings(activeTab);
-    } catch (err: any) {
+      // Trigger BookingDetails refresh to show updated quota information
+      setRefreshKey(prev => prev + 1);
+    } catch (err: unknown) {
       console.error("Generate quota error:", err);
-      showErrorMessage(err.response?.data?.message || "Failed to generate quota");
+      showErrorMessage((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to generate quota");
       setIsConfirmQuotaModalOpen(false);
     } finally {
       setActionLoading(false);
@@ -356,8 +372,8 @@ const JobManagementPage = () => {
     return bookings.filter((booking) => {
       const matchesIssue = booking.issueDescription.toLowerCase().includes(term);
       const matchesLocation = booking.location.address.toLowerCase().includes(term);
-      const matchesBookingId = (booking as any).bookingId
-        ? String((booking as any).bookingId).toLowerCase().includes(term)
+      const matchesBookingId = booking.bookingId
+        ? String(booking.bookingId).toLowerCase().includes(term)
         : false;
       return matchesIssue || matchesLocation || matchesBookingId;
     });
@@ -398,8 +414,8 @@ const JobManagementPage = () => {
       // Refetch bookings so the complaint button hides based on updated flags
       await fetchBookings(activeTab);
       showSuccessMessage("Complaint submitted successfully");
-    } catch (err: any) {
-      showErrorMessage(err?.response?.data?.message || "Failed to submit complaint");
+    } catch (err: unknown) {
+      showErrorMessage((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to submit complaint");
     }
   };
 
@@ -413,7 +429,7 @@ const JobManagementPage = () => {
     return null;
   }
 
-  if (loading) {
+  if (loading && !initialLoad) {
     return (
       <div className="flex flex-col h-screen bg-gray-50">
         <ProTopNavbar 
@@ -542,6 +558,7 @@ const JobManagementPage = () => {
                 <BookingDetails
                   bookingId={selectedBooking.id}
                   viewerRole="pro"
+                  refreshKey={refreshKey}
                   onBack={async () => {
                     setSelectedBooking(null);
                     await fetchBookings(activeTab);
@@ -552,8 +569,8 @@ const JobManagementPage = () => {
                   onGenerateQuota={() => setIsQuotaModalOpen(true)}
                 />
               </div>
-            ) : tabSwitching ? (
-              // Table-only skeletons during tab switching (always take precedence over empty state)
+            ) : tabSwitching || initialLoad ? (
+              // Table-only skeletons during tab switching or initial load (always take precedence over empty state)
               <>
                 <div>
                   {/* Mobile cards skeleton */}

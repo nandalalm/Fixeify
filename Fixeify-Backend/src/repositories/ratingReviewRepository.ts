@@ -47,9 +47,9 @@ export class MongoRatingReviewRepository
     else if (sortBy === "lowest") sort = { rating: 1, createdAt: -1 };
     else if (sortBy === "highest") sort = { rating: -1, createdAt: -1 };
 
-    const matchStage: any = { proId: new mongoose.Types.ObjectId(proId) };
+    const matchStage: Record<string, mongoose.Types.ObjectId> = { proId: new mongoose.Types.ObjectId(proId) };
 
-    const pipeline: any[] = [
+    const pipeline: mongoose.PipelineStage[] = [
       { $match: matchStage },
       {
         $lookup: {
@@ -103,7 +103,6 @@ export class MongoRatingReviewRepository
       });
     }
 
-    // Total count with same match
     const countPipeline = [...pipeline, { $count: "total" }];
 
     pipeline.push({ $sort: sort }, { $skip: skip }, { $limit: limit });
@@ -147,14 +146,12 @@ export class MongoRatingReviewRepository
   ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }> {
     const skip = (page - 1) * limit;
 
-    // Determine sort object based on sortBy
-    let sort: Record<string, 1 | -1> = { createdAt: -1 }; // default latest
+    let sort: Record<string, 1 | -1> = { createdAt: -1 }; 
     if (sortBy === "oldest") sort = { createdAt: 1 };
     else if (sortBy === "lowest") sort = { rating: 1, createdAt: -1 };
     else if (sortBy === "highest") sort = { rating: -1, createdAt: -1 };
 
-    // Build aggregation with lookups to enable search on related fields
-    const pipeline: any[] = [
+    const pipeline: mongoose.PipelineStage[] = [
       {
         $lookup: {
           from: "users",
@@ -226,7 +223,7 @@ export class MongoRatingReviewRepository
     bookingId?: string
   ): Promise<boolean> {
     if (!bookingId) return false;
-    const query: any = {
+    const query: Record<string, mongoose.Types.ObjectId> = {
       userId: new mongoose.Types.ObjectId(userId),
       bookingId: new mongoose.Types.ObjectId(bookingId),
     };

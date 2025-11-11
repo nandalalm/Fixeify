@@ -4,7 +4,7 @@ import { RootState } from "@/store/store";
 import { getAllTickets, updateTicketStatus } from "@/api/ticketApi";
 import { getUserProfile } from "@/api/userApi";
 import { getProProfile } from "@/api/proApi";
-import { TicketResponse } from "@/interfaces/ticketInterface";
+import { TicketResponse, TicketPriority } from "@/interfaces/ticketInterface";
 import TicketTable from "@/components/Reuseable/TicketTable";
 import { ConfirmationModal } from "@/components/Reuseable/ConfirmationModal";
 import AdminTicketDetails from "@/components/Admin/AdminTicketDetails";
@@ -148,9 +148,9 @@ const AdminConflictManagement: React.FC = () => {
       );
       setTickets(populated);
       setTotal(res.total || 0);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Load tickets error", err);
-      showError(err?.response?.data?.message || "Failed to load tickets");
+      showError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to load tickets");
     } finally {
       setLoading(false);
     }
@@ -204,7 +204,7 @@ const AdminConflictManagement: React.FC = () => {
   const orderedTickets = useMemo(() => {
     const arr = [...filteredTickets];
     const byCreatedAsc = (a: TicketResponse, b: TicketResponse) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    const prVal = (p?: any) => (p === "high" ? 3 : p === "medium" ? 2 : p === "low" ? 1 : 0);
+    const prVal = (p?: TicketPriority) => (p === "high" ? 3 : p === "medium" ? 2 : p === "low" ? 1 : 0);
     if (sortKey === "default_all") {
       const under = arr.filter((t) => t.status === "under_review").sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       const pending = arr
@@ -257,9 +257,9 @@ const AdminConflictManagement: React.FC = () => {
       // Refresh list in background after we get the fresh ticket to avoid race
       load();
       return updated;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Update ticket status error", err);
-      showError(err?.response?.data?.message || "Failed to update ticket");
+      showError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update ticket");
       return undefined;
     }
   };

@@ -87,7 +87,7 @@ export const useMessageNotifications = ({ userId, role }: UseMessageNotification
     if (userId && role) {
       fetchNotifications(1, filter);
     }
-  }, [userId, role]); 
+  }, [userId, role, fetchNotifications, filter]); 
 
   const unreadCount = messageNotifications.filter(n => !n.isRead).length;
 

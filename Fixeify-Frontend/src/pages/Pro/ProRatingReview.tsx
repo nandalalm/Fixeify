@@ -46,7 +46,7 @@ const ProRatingReview: FC = () => {
       setBookingMap(prev => ({ ...prev, ...newMap }));
     };
     fetchBookings();
-  }, [reviews]);
+  }, [reviews, bookingMap]);
 
   // Track first load to avoid flicker
   const didInitialLoad = useRef(false);
@@ -56,11 +56,11 @@ const ProRatingReview: FC = () => {
     if (!user || !user.id) return;
     if (!didInitialLoad.current) {
       setBootLoading(true);
-      (dispatch(fetchReviewsByPro({ proId: user.id, page: 1, sortBy: sortOption, search: searchTerm })) as unknown as Promise<any>)
+      (dispatch(fetchReviewsByPro({ proId: user.id, page: 1, sortBy: sortOption, search: searchTerm })) as unknown as Promise<void>)
         .finally(() => setBootLoading(false));
       didInitialLoad.current = true;
     }
-  }, [user, dispatch]);
+  }, [user, dispatch, sortOption, searchTerm]);
 
   const handleView = (review: RatingReviewResponse) => {
     setSelectedReview(review);

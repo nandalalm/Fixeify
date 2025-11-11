@@ -37,10 +37,11 @@ const ProSlotManagement = () => {
         const { availability, isUnavailable } = await getProAvailability(user.id);
         setAvailability(availability);
         setIsUnavailable(isUnavailable);
-      } catch (err: any) {
-        console.error("Fetch availability error:", err.response?.data);
-        setError(err.response?.data?.message || "Failed to load availability");
-        if (err.response?.status === 401) {
+      } catch (err: unknown) {
+        const errorResponse = err as { response?: { data?: { message?: string }; status?: number } };
+        console.error("Fetch availability error:", errorResponse.response?.data);
+        setError(errorResponse.response?.data?.message || "Failed to load availability");
+        if (errorResponse.response?.status === 401) {
           dispatch(logoutUserSync());
           navigate("/login");
         }
@@ -90,9 +91,10 @@ const ProSlotManagement = () => {
       setSuccessMessage("Slots updated successfully");
       setTimeout(() => setSuccessMessage(null), 2000);
       setIsEditing(false);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Update slots error:", err);
-      setError(err.response?.data?.message || "Failed to update slots");
+      const errorResponse = err as { response?: { data?: { message?: string } } };
+      setError(errorResponse.response?.data?.message || "Failed to update slots");
     } finally {
       setLoading(false);
     }

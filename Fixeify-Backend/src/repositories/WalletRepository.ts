@@ -5,7 +5,7 @@ import Wallet, { WalletDocument } from "../models/walletModel";
 import { WalletResponseDTO } from "../dtos/response/walletDtos";
 import { Types, UpdateQuery } from "mongoose";
 import { isValidObjectId } from "mongoose";
-import TransactionModel from "../models/transactionModel";
+import TransactionModel, { TransactionDocument } from "../models/transactionModel";
 
 @injectable()
 export class MongoWalletRepository extends BaseRepository<WalletDocument> implements IWalletRepository {
@@ -19,9 +19,8 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
     return this.mapToWalletResponse(wallet, transactions);
   }
 
-  async findWalletByProId(proId: string, populateQuotas: boolean = true): Promise<WalletResponseDTO | null> {
+  async findWalletByProId(proId: string): Promise<WalletResponseDTO | null> {
     if (!isValidObjectId(proId)) {
-      console.error("Invalid proId format:", proId);
       return null;
     }
     let query = this._model.findOne({ proId: proId }); 
@@ -54,7 +53,6 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
     search?: string
   ): Promise<{ wallet: WalletResponseDTO | null; total: number }> {
     if (!isValidObjectId(proId)) {
-      console.error("Invalid proId format:", proId);
       return { wallet: null, total: 0 };
     }
 
@@ -64,7 +62,7 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
       if (!wallet) return { wallet: null, total: 0 };
     }
 
-    const txFilter: any = {
+    const txFilter: Record<string, unknown> = {
       proId: new Types.ObjectId(wallet.proId),
       $or: [{ adminId: { $exists: false } }, { adminId: null }],
     };
@@ -88,7 +86,7 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
       ];
     }
 
-    const sort: any = {};
+    const sort: Record<string, 1 | -1> = {};
     if (sortBy === "oldest") sort.createdAt = 1;
     else sort.createdAt = -1; 
 
@@ -105,7 +103,10 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
         .exec(),
     ]);
 
-    const transactions = txDocs.map((t: any) => ({
+    const transactions = txDocs.map((t: TransactionDocument & {
+      quotaId?: { _id?: Types.ObjectId; bookingId?: Types.ObjectId; userId?: Types.ObjectId; totalCost?: number };
+      bookingId?: { _id?: Types.ObjectId };
+    }) => ({
       _id: t._id.toString(),
       transactionId: t.transactionId,
       amount: t.amount,
@@ -128,11 +129,9 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
 
   async decreaseWalletBalance(walletId: string, amount: number): Promise<WalletResponseDTO | null> {
     if (!isValidObjectId(walletId)) {
-      console.error("Invalid walletId format:", walletId);
       return null;
     }
     if (amount <= 0) {
-      console.error("Amount must be positive:", amount);
       return null;
     }
     const update: UpdateQuery<WalletDocument> = { $inc: { balance: -amount } };
@@ -156,7 +155,10 @@ export class MongoWalletRepository extends BaseRepository<WalletDocument> implem
       .populate("bookingId", "_id")
       .sort({ createdAt: -1 })
       .exec();
-    return txs.map((t: any) => ({
+    return txs.map((t: TransactionDocument & {
+      quotaId?: { _id?: Types.ObjectId; bookingId?: Types.ObjectId; userId?: Types.ObjectId; totalCost?: number };
+      bookingId?: { _id?: Types.ObjectId };
+    }) => ({
       _id: t._id.toString(),
       transactionId: t.transactionId,
       amount: t.amount,

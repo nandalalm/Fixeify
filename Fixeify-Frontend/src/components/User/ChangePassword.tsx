@@ -71,7 +71,7 @@ const ChangePassword = ({ onCancel }: ChangePasswordProps) => {
       } else {
         setServerError(
           // Keep original message mapping
-          (error as any) === "Incorrect current password. Please try again"
+          (error as string) === "Incorrect current password. Please try again"
             ? "An error occurred. Please try again."
             : "Incorrect current password. Please try again"
         );

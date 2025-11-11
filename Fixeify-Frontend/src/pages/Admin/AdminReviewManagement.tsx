@@ -12,7 +12,6 @@ import { AdminTopNavbar } from "@/components/Admin/AdminTopNavbar";
 
 const AdminReviewManagement: FC = () => {
   const user = useSelector((state: RootState) => state.auth.user);
-  if (!user) return null; // Prevent rendering if user is null
   const navigate = useNavigate();
 
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
@@ -31,13 +30,13 @@ const AdminReviewManagement: FC = () => {
     const updates: Record<string, string> = {};
     await Promise.all(
       revList.map(async (rev) => {
-        const bid = typeof rev.bookingId === "string" ? rev.bookingId : (rev as any)?.bookingId?._id;
+        const bid = typeof rev.bookingId === "string" ? rev.bookingId : (rev as { bookingId?: { _id?: string } })?.bookingId?._id;
         if (!bid) return;
         if (!serviceMap[bid]) {
           try {
             const booking = await fetchBookingById(bid);
             updates[bid] = booking.category?.name || "-";
-          } catch (err) {
+          } catch {
             updates[bid] = "-";
           }
         }
@@ -118,7 +117,7 @@ const AdminReviewManagement: FC = () => {
       fetchReviews(1, sortOption, searchTerm);
     }, 300);
     return () => clearTimeout(t);
-  }, [user, sortOption, searchTerm]);
+  }, [user, sortOption, searchTerm, fetchReviews]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -154,6 +153,9 @@ const AdminReviewManagement: FC = () => {
     // Refetch latest data with current criteria
     fetchReviews(page, sortOption, searchTerm);
   };
+
+  // Early return after all hooks
+  if (!user) return null;
 
   // Show skeleton only for the table while keeping the header and filters visible
   if (loading && reviews.length === 0) {
@@ -345,10 +347,10 @@ const AdminReviewManagement: FC = () => {
                                 (() => {
                                   const direct = review.category?.name as string | undefined;
                                   if (direct) return direct;
-                                  const bid = typeof review.bookingId === 'string' ? review.bookingId : (review as any)?.bookingId?._id;
+                                  const bid = typeof review.bookingId === 'string' ? review.bookingId : (review as { bookingId?: { _id?: string } })?.bookingId?._id;
                                   const fromMap = bid ? serviceMap[bid] : undefined;
-                                  const fromBookingIdObj = (review as any)?.bookingId?.category?.name as string | undefined;
-                                  const fromBookingObj = (review as any)?.booking?.category?.name as string | undefined;
+                                  const fromBookingIdObj = (review as { bookingId?: { category?: { name?: string } } })?.bookingId?.category?.name as string | undefined;
+                                  const fromBookingObj = (review as { booking?: { category?: { name?: string } } })?.booking?.category?.name as string | undefined;
                                   return fromMap || fromBookingIdObj || fromBookingObj || '-';
                                 })()
                               }</td>
@@ -407,7 +409,7 @@ const AdminReviewManagement: FC = () => {
                           <p className="text-sm text-gray-600">
                             Pro: {review.pro?.firstName || '-'} {review.pro?.lastName || ''}
                           </p>
-                          <p className="text-sm text-gray-600">Service: {(() => { const direct = review.category?.name as string | undefined; if (direct) return direct; const bid = typeof review.bookingId === 'string' ? review.bookingId : (review as any)?.bookingId?._id; const fromMap = bid ? serviceMap[bid] : undefined; const fromBookingIdObj = (review as any)?.bookingId?.category?.name as string | undefined; const fromBookingObj = (review as any)?.booking?.category?.name as string | undefined; return fromMap || fromBookingIdObj || fromBookingObj || '-'; })()}</p>
+                          <p className="text-sm text-gray-600">Service: {(() => { const direct = review.category?.name as string | undefined; if (direct) return direct; const bid = typeof review.bookingId === 'string' ? review.bookingId : (review as { bookingId?: { _id?: string } })?.bookingId?._id; const fromMap = bid ? serviceMap[bid] : undefined; const fromBookingIdObj = (review as { bookingId?: { category?: { name?: string } } })?.bookingId?.category?.name as string | undefined; const fromBookingObj = (review as { booking?: { category?: { name?: string } } })?.booking?.category?.name as string | undefined; return fromMap || fromBookingIdObj || fromBookingObj || '-'; })()}</p>
                           <p>
                             {Array.from({ length: 5 }).map((_, i) => (
                               <Star

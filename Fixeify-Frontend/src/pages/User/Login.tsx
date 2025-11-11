@@ -37,18 +37,19 @@ const LoginPage = () => {
     };
 
     const timeoutId = setTimeout(updateWidth, 100);
+    const currentRef = gsiContainerRef.current; // Capture ref value at effect setup
 
     let ro: ResizeObserver | null = null;
-    if (typeof window !== 'undefined' && 'ResizeObserver' in window && gsiContainerRef.current) {
+    if (typeof window !== 'undefined' && 'ResizeObserver' in window && currentRef) {
       ro = new ResizeObserver(() => updateWidth());
-      ro.observe(gsiContainerRef.current);
+      ro.observe(currentRef);
     } else if (typeof window !== 'undefined') {
       window.addEventListener('resize', updateWidth);
     }
 
     return () => {
       clearTimeout(timeoutId);
-      if (ro && gsiContainerRef.current) ro.unobserve(gsiContainerRef.current);
+      if (ro && currentRef) ro.unobserve(currentRef);
       if (typeof window !== 'undefined') window.removeEventListener('resize', updateWidth);
     };
   }, [userRole]); // Re-run when userRole changes
@@ -91,7 +92,7 @@ const LoginPage = () => {
         error.errors.forEach((err) => (fieldErrors[err.path[0]] = err.message));
         setErrors(fieldErrors);
       } else if (error instanceof Error) {
-        const err = error as any;
+        const err = error as { response?: { status?: number; data?: { message?: string } }; status?: number; message?: string };
         if (err.response?.status || err.status) {
           const status = err.response?.status || err.status;
           const message = err.response?.data?.message || err.message || "Login failed";
@@ -145,9 +146,10 @@ const LoginPage = () => {
       };
       dispatch(setAuth({ user: mappedUser, accessToken }));
       navigate("/home", { replace: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Google login error:", error);
-      setServerError(error.response?.data?.message || error.message || "Google login failed. Please try again.");
+      const errorResponse = error as { response?: { data?: { message?: string } }; message?: string };
+      setServerError(errorResponse.response?.data?.message || errorResponse.message || "Google login failed. Please try again.");
       dispatch({ type: "auth/logoutUserSync" });
     }
   };

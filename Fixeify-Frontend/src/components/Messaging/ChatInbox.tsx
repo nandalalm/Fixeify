@@ -1,4 +1,4 @@
-import { useState, useEffect, FC, useCallback, useRef } from "react";
+import { useState, useEffect, FC, useCallback, useRef, useMemo } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../store/store";
 import { format } from "date-fns";
@@ -23,40 +23,42 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
   const [searchQuery, setSearchQuery] = useState("");
   const lastFetchRef = useRef<number>(0);
 
-  const handleNewNotification = useCallback((notification: any) => {
+  const handleNewNotification = useCallback((notification: { receiverId?: string; type?: string }) => {
     const now = Date.now();
-    if (notification.receiverId === user?.id && user && now - lastFetchRef.current > 1000) {
+    // Only fetch conversations for message-type notifications and throttle to prevent excessive calls
+    if (notification.receiverId === user?.id && user && notification.type === 'message' && now - lastFetchRef.current > 5000) {
       lastFetchRef.current = now;
       dispatch(fetchConversations({ userId: user.id, role }));
     }
   }, [user, role, dispatch]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     dispatch(fetchConversations({ userId: user.id, role }));
-  }, [user, role, dispatch]);
+  }, [user?.id, role, dispatch]);
 
 
   useEffect(() => {
     if (!socket || !isConnected) {
-      console.warn("Socket not connected, real-time features may not work");
       return;
     }
 
-    const handleNewMessage = (raw: any) => {
+    const handleNewMessage = (raw: { id?: string; _id?: string; messageId?: string; chatId?: string; senderId?: string; senderModel?: string; receiverId?: string; receiverModel?: string; content?: string; body?: string; timestamp?: string; createdAt?: string; isRead?: boolean; status?: string; attachments?: unknown[]; type?: string }) => {
       
       const message = {
-        id: raw.id || raw._id || raw.messageId,
-        chatId: raw.chatId,
-        senderId: raw.senderId,
-        senderModel: raw.senderModel,
+        id: raw.id || raw._id || raw.messageId || '',
+        chatId: raw.chatId || '',
+        senderId: raw.senderId || '',
+        senderModel: (raw.senderModel as "User" | "ApprovedPro") || "User",
+        receiverId: raw.receiverId || '',
+        receiverModel: (raw.receiverModel as "User" | "ApprovedPro") || "User",
         content: raw.content ?? raw.body ?? "",
         timestamp: raw.timestamp || raw.createdAt || new Date().toISOString(),
-        status: raw.status || (raw.isRead ? 'read' : 'delivered'),
+        status: (raw.status as "sent" | "delivered" | "read") || (raw.isRead ? 'read' : 'delivered'),
         isRead: typeof raw.isRead === 'boolean' ? raw.isRead : raw.status === 'read',
-        attachments: raw.attachments,
-        type: raw.type,
-      } as any;
+        attachments: (raw.attachments as { url: string; mime: string; size: number }[]) || [],
+        type: (raw.type as "text" | "image" | "file") || "text",
+      };
       
       if (user) {
         dispatch(addIncomingMessage({ message, currentUserId: user.id, activeChatId: selectedConversationId }));
@@ -80,7 +82,7 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
       dispatch(updateOnlineStatus({ userId, isOnline }));
     };
 
-    const handleConversationUpdated = (updatedConversation: any) => {
+    const handleConversationUpdated = (updatedConversation: { id: string; participants: { userId: string; userName: string; userPhoto?: string; proId: string; proName: string; proPhoto?: string }; lastMessage?: { id: string; content?: string; senderId: string; senderModel: "User" | "ApprovedPro"; timestamp: string; status: "sent" | "delivered" | "read" }; unreadCount: number; updatedAt: string }) => {
       dispatch(updateConversation(updatedConversation));
     };
 
@@ -99,37 +101,57 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
       socket.off("conversationUpdated", handleConversationUpdated);
       socket.off("newNotification", handleNewNotification);
     };
-  }, [socket, isConnected, user?.id, role, dispatch, selectedConversationId, handleNewNotification]);
+  }, [socket, isConnected, user, role, dispatch, selectedConversationId, handleNewNotification]);
 
   const Avatar: React.FC<{ src?: string | null; alt: string; className?: string }> = ({ src, alt, className }) => {
     const placeholder = "/placeholder-user.jpg";
     const [displayedSrc, setDisplayedSrc] = useState<string>(placeholder);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
 
     useEffect(() => {
       const url = (src || "").trim();
-      if (!url) {
-        setDisplayedSrc(placeholder);
+      if (!url || url === displayedSrc) {
+        if (!url) setDisplayedSrc(placeholder);
         return;
       }
+      
+      setIsLoading(true);
       let cancelled = false;
+      
       const img = new Image();
-      img.onload = () => { if (!cancelled) setDisplayedSrc(url); };
-      img.onerror = () => { if (!cancelled) setDisplayedSrc(placeholder); };
+      img.onload = () => { 
+        if (!cancelled) {
+          setDisplayedSrc(url);
+          setIsLoading(false);
+        }
+      };
+      img.onerror = () => { 
+        if (!cancelled) {
+          setDisplayedSrc(placeholder);
+          setIsLoading(false);
+        }
+      };
       img.src = url;
-      return () => { cancelled = true; };
-    }, [src]);
+      
+      return () => { 
+        cancelled = true;
+        setIsLoading(false);
+      };
+    }, [src, displayedSrc]);
 
-    if (displayedSrc === placeholder) {
+    const baseClassName = className || "w-10 h-10 rounded-full";
+
+    if (displayedSrc === placeholder || isLoading) {
       return (
         <div
           aria-label={alt}
-          className={(className || "w-10 h-10 rounded-full") + " bg-gray-200 dark:bg-gray-700 border flex items-center justify-center text-gray-500 dark:text-gray-300"}
+          className={`${baseClassName} bg-gray-200 dark:bg-gray-700 border flex items-center justify-center text-gray-500 dark:text-gray-300`}
         >
           <UserIcon className="w-5 h-5" />
         </div>
       );
     }
-    return <img src={displayedSrc} alt={alt} className={className || "w-10 h-10 rounded-full object-cover"} />;
+    return <img src={displayedSrc} alt={alt} className={`${baseClassName} object-cover`} />;
   };
 
   const formatTimestamp = (timestamp: string) => {
@@ -143,25 +165,39 @@ const ChatInbox: FC<ChatInboxProps> = ({ onSelectConversation, selectedConversat
     return message;
   };
 
-  const filteredConversations = conversations
-    .filter((conversation) =>
-      (user?.role === "user"
-        ? conversation.participants.proName
-        : conversation.participants.userName
+  const filteredConversations = useMemo(() => {
+    return conversations
+      // Remove duplicates by conversation ID (keep the first occurrence)
+      .filter((conversation, index, arr) => 
+        arr.findIndex(c => c.id === conversation.id) === index
       )
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase())
-    )
-    .sort((a, b) => {
-      // Sort by latest message timestamp (most recent first)
-      const aTimestamp = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
-      const bTimestamp = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
-      return bTimestamp - aTimestamp;
-    });
+      // Filter out conversations with Loading... names (temporary conversations)
+      .filter((conversation) => {
+        const displayName = user?.role === "user" 
+          ? conversation.participants.proName
+          : conversation.participants.userName;
+        return displayName !== "Loading...";
+      })
+      .filter((conversation) =>
+        (user?.role === "user"
+          ? conversation.participants.proName
+          : conversation.participants.userName
+        )
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase())
+      )
+      .sort((a, b) => {
+        // Sort by latest message timestamp (most recent first)
+        const aTimestamp = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
+        const bTimestamp = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
+        return bTimestamp - aTimestamp;
+      });
+  }, [conversations, user?.role, searchQuery]);
 
   const handleClearSearch = () => {
     setSearchQuery("");
   };
+
 
   return (
     <div className="h-full flex flex-col bg-gray-100 dark:bg-gray-900">

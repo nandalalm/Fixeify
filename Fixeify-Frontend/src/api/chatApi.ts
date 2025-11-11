@@ -3,6 +3,66 @@ import { Conversation, Message, NotificationItem } from "../interfaces/messagesI
 import { ChatBase } from "@/Constants/BaseRoutes";
 import { NotifBase } from "@/Constants/BaseRoutes";
 
+interface ChatResponse {
+  id: string;
+  participants: {
+    userId: string;
+    userName: string;
+    userPhoto?: string | null;
+    proId: string;
+    proName: string;
+    proPhoto?: string | null;
+  };
+  lastMessage?: {
+    id: string;
+    body?: string;
+    content?: string;
+    senderId: string;
+    senderModel: string;
+    timestamp?: string;
+    createdAt?: string;
+    isRead: boolean;
+    status?: string;
+  };
+  unreadCount: number;
+  updatedAt?: string;
+  createdAt?: string;
+}
+
+interface MessageResponse {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderModel: string;
+  receiverId: string;
+  receiverModel: string;
+  content?: string;
+  body?: string;
+  timestamp?: string;
+  createdAt?: string;
+  isRead: boolean;
+  attachments?: { url: string; mime: string; size: number }[];
+  type?: string;
+  status?: string;
+}
+
+interface NotificationResponse {
+  id: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  isRead: boolean;
+  type: string;
+  userId?: string;
+  proId?: string;
+  adminId?: string;
+  chatId?: string;
+  bookingId?: string;
+  quotaId?: string;
+  walletId?: string;
+  messageId?: string;
+}
+
 export const fetchUserChats = async (userId: string, role: "user" | "pro"): Promise<Conversation[]> => {
   if (!userId || !["user", "pro"].includes(role)) {
     throw new Error("Invalid userId or role");
@@ -11,7 +71,7 @@ export const fetchUserChats = async (userId: string, role: "user" | "pro"): Prom
   if (!response.data?.chats) {
     throw new Error("No chats found in response");
   }
-  return response.data.chats.map((chat: any) => ({
+  return response.data.chats.map((chat: ChatResponse) => ({
     id: chat.id,
     participants: {
       userId: chat.participants.userId || "",
@@ -70,6 +130,7 @@ export const getExistingChat = async (userId: string, proId: string, role: "user
        updatedAt: chat.updatedAt ? new Date(chat.updatedAt).toISOString() : new Date().toISOString(),
      };
   } catch (error) {
+    console.error('Failed to get chat for participant:', error);
     return null;
   }
 };
@@ -133,7 +194,7 @@ export const fetchChatMessages = async (
     throw new Error("No messages found in response");
   }
   return {
-    messages: response.data.messages.map((msg: any) => ({
+    messages: response.data.messages.map((msg: MessageResponse) => ({
       id: msg.id,
       chatId: msg.chatId,
       senderId: msg.senderId,
@@ -219,7 +280,7 @@ export const fetchUserNotifications = async (
     throw new Error("No notifications found in response");
   }
   return {
-    notifications: response.data.notifications.map((notif: any) => ({
+    notifications: response.data.notifications.map((notif: NotificationResponse) => ({
       id: notif.id,
       title: notif.title,
       description: notif.description,
@@ -271,7 +332,7 @@ export const fetchMessageNotifications = async (
     throw new Error("No message notifications found in response");
   }
   return {
-    notifications: response.data.notifications.map((notif: any) => ({
+    notifications: response.data.notifications.map((notif: NotificationResponse) => ({
       id: notif.id,
       title: notif.title,
       description: notif.description,
@@ -309,7 +370,7 @@ export const fetchNonMessageNotifications = async (
     throw new Error("No non-message notifications found in response");
   }
   return {
-    notifications: response.data.notifications.map((notif: any) => ({
+    notifications: response.data.notifications.map((notif: NotificationResponse) => ({
       id: notif.id,
       title: notif.title,
       description: notif.description,
@@ -352,7 +413,7 @@ export interface User {
   role: "user" | "pro" | "admin";
 }
 
-export interface MUser extends User {}
+export type MUser = User;
 
 export interface NotificationToastProps {
   id: string;

@@ -1,6 +1,21 @@
 import mongoose from "mongoose";
 import { injectable } from "inversify";
 
+declare const process: {
+  env: {
+    MONGO_URI?: string;
+    NODE_ENV?: string;
+    [key: string]: string | undefined;
+  };
+  on: (event: string, listener: () => void) => void;
+  exit: (code: number) => void;
+};
+
+declare const console: {
+  log: (message: string) => void;
+  error: (message: string, error?: unknown) => void;
+};
+
 @injectable()
 class DatabaseConnector {
   async connect(): Promise<void> {
@@ -19,7 +34,7 @@ class DatabaseConnector {
         serverSelectionTimeoutMS: 10000,
         connectTimeoutMS: 10000,
         maxPoolSize: 10,
-      } as any);
+      });
 
       const conn = mongoose.connection;
       conn.on("connected", () => console.log("MongoDB connected to Atlas"));

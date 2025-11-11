@@ -48,8 +48,8 @@ export const fetchConversations = createAsyncThunk<
     try {
       const conversations = await fetchUserChats(userId, role);
       return conversations;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch conversations");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to fetch conversations");
     }
   }
 );
@@ -64,8 +64,8 @@ export const fetchExistingChat = createAsyncThunk<
     try {
       const conversation = await getExistingChat(userId, proId, role);
       return conversation;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch existing chat");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to fetch existing chat");
     }
   }
 );
@@ -80,8 +80,8 @@ export const createChat = createAsyncThunk<
     try {
       const conversation: Conversation = await createNewChat({ userId, proId, role });
       return conversation;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to create chat");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to create chat");
     }
   }
 );
@@ -96,8 +96,8 @@ export const fetchConversationMessages = createAsyncThunk<
     try {
       const { messages, total } = await fetchChatMessages(chatId, page, limit, role);
       return { chatId, messages, total };
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch messages");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to fetch messages");
     }
   }
 );
@@ -119,8 +119,8 @@ export const sendChatMessage = createAsyncThunk<
     try {
       const message: Message = await sendNewMessage(chatId, senderId, senderModel, content, type, attachments);
       return message;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to send message");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to send message");
     }
   }
 );
@@ -135,8 +135,8 @@ export const markMessagesRead = createAsyncThunk<
     try {
       await markChatMessagesAsRead(chatId, userId, role);
       return chatId;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to mark messages as read");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to mark messages as read");
     }
   }
 );
@@ -151,8 +151,8 @@ export const fetchAllNotifications = createAsyncThunk<
     try {
       const { notifications } = await fetchUserNotifications(userId, role, page, limit, filter);
       return notifications;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch notifications");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to fetch notifications");
     }
   }
 );
@@ -167,8 +167,8 @@ export const markNotificationRead = createAsyncThunk<
     try {
       await markSingleNotificationAsRead(notificationId);
       return notificationId;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to mark notification as read");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to mark notification as read");
     }
   }
 );
@@ -182,8 +182,8 @@ export const markAllNotificationsRead = createAsyncThunk<
   async ({ userId, role }, { rejectWithValue }) => {
     try {
       await markAllNotificationsAsRead(userId, role);
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to mark all notifications as read");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to mark all notifications as read");
     }
   }
 );
@@ -198,8 +198,8 @@ export const fetchAllMessageNotifications = createAsyncThunk<
     try {
       const { notifications } = await fetchMessageNotifications(userId, role, page, limit, filter);
       return notifications;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch message notifications");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to fetch message notifications");
     }
   }
 );
@@ -214,8 +214,8 @@ export const fetchAllNonMessageNotifications = createAsyncThunk<
     try {
       const { notifications } = await fetchNonMessageNotifications(userId, role, page, limit, filter);
       return notifications;
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to fetch non-message notifications");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to fetch non-message notifications");
     }
   }
 );
@@ -228,8 +228,8 @@ export const markAllMessageNotificationsRead = createAsyncThunk<
   async ({ userId, role }, { rejectWithValue }) => {
     try {
       await markAllMessageNotificationsAsRead(userId, role);
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to mark all message notifications as read");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to mark all message notifications as read");
     }
   }
 );
@@ -245,19 +245,20 @@ export const markChatMessageNotificationsRead = createAsyncThunk<
       try {
         await markChatMessageNotificationsAsReadAPI(userId, role, chatId);
         return;
-      } catch (apiError) {
+      } catch {
+        // Fallback to individual notification marking if API fails
       }
       
-      const state = getState() as any;
+      const state = getState() as { chat: ChatState };
       const chatMessageNotifications = state.chat.messageNotifications.filter(
-        (notification: any) => notification.chatId === chatId && !notification.isRead
+        (notification: NotificationItem) => notification.chatId === chatId && !notification.isRead
       );
       
       for (const notification of chatMessageNotifications) {
         await markSingleNotificationAsRead(notification.id);
       }
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to mark chat message notifications as read");
+    } catch (err: unknown) {
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to mark chat message notifications as read");
     }
   }
 );
@@ -334,17 +335,17 @@ const chatSlice = createSlice({
       if (!conversation) {
         const isFromOther = message.senderId !== currentUserId;
         const senderId = message.senderId;
-        const receiverId = (message as any).receiverId || currentUserId;
+        const receiverId = message.receiverId || currentUserId;
         const senderModel = message.senderModel;
         
         const newConversation = {
           id: message.chatId,
           participants: {
             userId: senderModel === "User" ? senderId : receiverId,
-            userName: senderModel === "User" ? "Loading..." : "Loading...",
+            userName: "Loading...",
             userPhoto: null,
             proId: senderModel === "ApprovedPro" ? senderId : receiverId,
-            proName: senderModel === "ApprovedPro" ? "Loading..." : "Loading...",
+            proName: "Loading...",
             proPhoto: null
           },
           lastMessage: {
@@ -407,7 +408,7 @@ const chatSlice = createSlice({
         conversation.lastMessage.status = status;
       }
     },
-    updateConversation: (state, action: PayloadAction<any>) => {
+    updateConversation: (state, action: PayloadAction<Conversation>) => {
       const updatedConversation = action.payload;
       const index = state.conversations.findIndex((c) => c.id === updatedConversation.id);
       if (index !== -1) {
@@ -466,7 +467,7 @@ const chatSlice = createSlice({
         state.messages[chatId] = state.messages[chatId].map((msg) => ({
           ...msg,
           isRead: true,
-          status: "read" as "read",
+          status: "read" as const,
         }));
       }
     },
@@ -480,23 +481,14 @@ const chatSlice = createSlice({
         state.status = "succeeded";
         const fetchedConversations = action.payload;
         
-        fetchedConversations.forEach(fetchedConv => {
-          const existingIndex = state.conversations.findIndex(c => c.id === fetchedConv.id);
-          if (existingIndex !== -1) {
-            if (state.conversations[existingIndex].participants.userName === "Loading..." || 
-                state.conversations[existingIndex].participants.proName === "Loading...") {
-              state.conversations[existingIndex] = fetchedConv;
-            }
-          } else {
-            state.conversations.push(fetchedConv);
-          }
-        });
+        state.conversations = [...fetchedConversations];
         
         state.conversations.sort((a, b) => {
           const aTimestamp = a.lastMessage?.timestamp ? new Date(a.lastMessage.timestamp).getTime() : 0;
           const bTimestamp = b.lastMessage?.timestamp ? new Date(b.lastMessage.timestamp).getTime() : 0;
           return bTimestamp - aTimestamp;
         });
+        
       })
       .addCase(fetchConversations.rejected, (state, action) => {
         state.status = "failed";
@@ -593,7 +585,7 @@ const chatSlice = createSlice({
         state.messages[chatId] = state.messages[chatId].map((msg) => ({
           ...msg,
           isRead: true,
-          status: "read" as "read",
+          status: "read" as const,
         }));
         const conversation = state.conversations.find((conv) => conv.id === chatId);
         if (conversation) {

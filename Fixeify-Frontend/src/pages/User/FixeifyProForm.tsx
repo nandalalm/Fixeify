@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -73,6 +73,51 @@ const FixeifyProForm = () => {
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const locationInputRef = useRef<HTMLInputElement | null>(null);
 
+  const validateField = useCallback((name: string, value: unknown) => {
+    try {
+      const fieldSchema = fixeifyProFormSchema.shape[name as keyof typeof fixeifyProFormSchema.shape];
+      if (fieldSchema) {
+        if (name === "profilePhoto") {
+          // Validate File or URL
+          if (value instanceof File) {
+            fieldSchema.parse(value);
+          } else if (formData.profilePhotoUrl) {
+            fieldSchema.parse(formData.profilePhotoUrl);
+          } else {
+            throw new z.ZodError([{ code: "custom", message: "Profile photo is required", path: [] }]);
+          }
+        } else if (name === "idProof") {
+          // Validate File array or URL array
+          if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
+            fieldSchema.parse(value);
+          } else if (formData.idProofUrls.length > 0) {
+            fieldSchema.parse(formData.idProofUrls);
+          } else {
+            throw new z.ZodError([{ code: "custom", message: "At least one ID proof image is required", path: [] }]);
+          }
+        } else if (name === "location") {
+          // Validate location object
+          if (value === null || value === undefined) {
+            throw new z.ZodError([{ code: "custom", message: "Please provide your location", path: [] }]);
+          } else {
+            fieldSchema.parse(value);
+          }
+        } else {
+          fieldSchema.parse(value);
+        }
+        setErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors[name];
+          return newErrors;
+        });
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        setErrors((prev) => ({ ...prev, [name]: error.errors[0].message }));
+      }
+    }
+  }, [formData.profilePhotoUrl, formData.idProofUrls]);
+
   // Fetch pending pro data if pendingProId is present
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
@@ -99,7 +144,15 @@ const FixeifyProForm = () => {
             availability: pendingPro.availability || {},
           };
           setFormData(newFormData);
-          const newActiveDays = { ...activeDays };
+          const newActiveDays = {
+            monday: false,
+            tuesday: false,
+            wednesday: false,
+            thursday: false,
+            friday: false,
+            saturday: false,
+            sunday: false,
+          };
           Object.keys(pendingPro.availability || {}).forEach((day) => {
             if (pendingPro.availability[day as keyof Availability]?.length) {
               newActiveDays[day as keyof Availability] = true;
@@ -113,7 +166,7 @@ const FixeifyProForm = () => {
         })
         .catch((error) => {
           console.error("Failed to fetch pending pro data:", error);
-          setErrors((prev) => ({ ...prev, general: "Application aldredy Aprroved, Failed to load previous application data." }));
+          setErrors((prev) => ({ ...prev, general: "Failed to load previous application data. The application may have already been processed." }));
         })
         .finally(() => {
           setIsLoadingPendingPro(false);
@@ -127,7 +180,8 @@ const FixeifyProForm = () => {
       try {
         const response = await api.get("/pro/fetchCategories");
         setCategories(response.data);
-        if (response.data.length > 0 && !formData.categoryId) {
+        // Only set default category if no pending pro data is being loaded
+        if (response.data.length > 0 && !formData.categoryId && !isLoadingPendingPro) {
           setFormData((prev) => ({ ...prev, categoryId: response.data[0].id }));
         }
       } catch (error) {
@@ -137,7 +191,7 @@ const FixeifyProForm = () => {
     };
 
     fetchCategories();
-  }, []);
+  }, [formData.categoryId, isLoadingPendingPro]);
 
   useEffect(() => {
     const loadGoogleMapsScript = () => {
@@ -212,14 +266,14 @@ const FixeifyProForm = () => {
       const scripts = document.querySelectorAll('script[src*="maps.googleapis.com"]');
       scripts.forEach((script) => script.remove());
     };
-  }, [currentStep]);
+  }, [currentStep, validateField]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === "location") {
       setFormData((prev) => ({ ...prev, location: null }));
       if (!value.trim()) {
-        // Clear any existing location errors when field is empty
+        // Clear existing location errors when field is empty
         setErrors((prev) => {
           const newErrors = { ...prev };
           delete newErrors.location;
@@ -362,7 +416,7 @@ const FixeifyProForm = () => {
           }));
           validateField("idProof", [...formData.idProof, ...validFiles]);
         }
-      } catch (error) {
+      } catch {
         setErrors((prev) => ({ ...prev, [field]: "Failed to upload image(s)" }));
       } finally {
         if (field === "profilePhoto") setIsUploadingProfilePhoto(false);
@@ -400,7 +454,7 @@ const FixeifyProForm = () => {
           }));
           validateField("idProof", [...formData.idProof, ...validFiles]);
         }
-      } catch (error) {
+      } catch {
         setErrors((prev) => ({ ...prev, [field]: "Failed to upload image(s)" }));
       } finally {
         if (field === "profilePhoto") setIsUploadingProfilePhoto(false);
@@ -548,50 +602,6 @@ const FixeifyProForm = () => {
     validateField("categoryId", categoryId);
   };
 
-  const validateField = (name: string, value: any) => {
-    try {
-      const fieldSchema = fixeifyProFormSchema.shape[name as keyof typeof fixeifyProFormSchema.shape];
-      if (fieldSchema) {
-        if (name === "profilePhoto") {
-          // Validate File or URL
-          if (value instanceof File) {
-            fieldSchema.parse(value);
-          } else if (formData.profilePhotoUrl) {
-            fieldSchema.parse(formData.profilePhotoUrl);
-          } else {
-            throw new z.ZodError([{ code: "custom", message: "Profile photo is required", path: [] }]);
-          }
-        } else if (name === "idProof") {
-          // Validate File array or URL array
-          if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
-            fieldSchema.parse(value);
-          } else if (formData.idProofUrls.length > 0) {
-            fieldSchema.parse(formData.idProofUrls);
-          } else {
-            throw new z.ZodError([{ code: "custom", message: "At least one ID proof image is required", path: [] }]);
-          }
-        } else if (name === "location") {
-          // Validate location object
-          if (value === null || value === undefined) {
-            throw new z.ZodError([{ code: "custom", message: "Please provide your location", path: [] }]);
-          } else {
-            fieldSchema.parse(value);
-          }
-        } else {
-          fieldSchema.parse(value);
-        }
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors[name];
-          return newErrors;
-        });
-      }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        setErrors((prev) => ({ ...prev, [name]: error.errors[0].message }));
-      }
-    }
-  };
 
   const validateStep = (step: number) => {
     const stepFields: Record<number, string[]> = {

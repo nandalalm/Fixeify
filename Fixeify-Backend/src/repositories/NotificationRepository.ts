@@ -45,7 +45,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid userId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { userId: new mongoose.Types.ObjectId(userId) };
+    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId) };
     if (filter === 'unread') {
       query.isRead = false;
     }
@@ -69,7 +69,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid proId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { proId: new mongoose.Types.ObjectId(proId) };
+    const query: Record<string, unknown> = { proId: new mongoose.Types.ObjectId(proId) };
     if (filter === 'unread') {
       query.isRead = false;
     }
@@ -93,7 +93,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid adminId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { adminId: new mongoose.Types.ObjectId(adminId) };
+    const query: Record<string, unknown> = { adminId: new mongoose.Types.ObjectId(adminId) };
     if (filter === 'unread') {
       query.isRead = false;
     }
@@ -136,7 +136,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid userId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { userId: new mongoose.Types.ObjectId(userId), type: "message" };
+    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId), type: "message" };
     if (filter === 'unread') {
       query.isRead = false;
     }
@@ -160,7 +160,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid proId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { proId: new mongoose.Types.ObjectId(proId), type: "message" };
+    const query: Record<string, unknown> = { proId: new mongoose.Types.ObjectId(proId), type: "message" };
     if (filter === 'unread') {
       query.isRead = false;
     }
@@ -184,7 +184,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid adminId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { adminId: new mongoose.Types.ObjectId(adminId), type: "message" };
+    const query: Record<string, unknown> = { adminId: new mongoose.Types.ObjectId(adminId), type: "message" };
     if (filter === 'unread') {
       query.isRead = false;
     }
@@ -208,7 +208,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid userId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { userId: new mongoose.Types.ObjectId(userId), type: { $ne: "message" } };
+    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId), type: { $ne: "message" } };
     if (filter === 'unread') {
       query.isRead = false;
     }
@@ -232,7 +232,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid proId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { proId: new mongoose.Types.ObjectId(proId), type: { $ne: "message" } };
+    const query: Record<string, unknown> = { proId: new mongoose.Types.ObjectId(proId), type: { $ne: "message" } };
     if (filter === 'unread') {
       query.isRead = false;
     }
@@ -256,7 +256,7 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
       throw new Error("Invalid adminId");
     }
     const skip = (page - 1) * limit;
-    const query: any = { adminId: new mongoose.Types.ObjectId(adminId), type: { $ne: "message" } };
+    const query: Record<string, unknown> = { adminId: new mongoose.Types.ObjectId(adminId), type: { $ne: "message" } };
     if (filter === 'unread') {
       query.isRead = false;
     }

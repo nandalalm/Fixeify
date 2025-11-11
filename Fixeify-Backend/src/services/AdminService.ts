@@ -1,5 +1,15 @@
 import { injectable, inject } from "inversify";
+
+declare const process: {
+  env: {
+    FRONTEND_URL: string;
+    EMAIL_USER: string;
+    EMAIL_PASS: string;
+    [key: string]: string | undefined;
+  };
+};
 import { TYPES } from "../types";
+import logger from "../config/logger";
 import { IUserRepository } from "../repositories/IUserRepository";
 import { IProRepository } from "../repositories/IProRepository";
 import { ICategoryRepository } from "../repositories/ICategoryRepository";
@@ -115,7 +125,7 @@ export class AdminService implements IAdminService {
           userId: userId,
         });
       } catch (error) {
-        console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+        logger.error(MESSAGES.FAILED_CREATE_BAN_NOTIFICATION_USER, { userId, error });
       }
     } else {
       try {
@@ -126,7 +136,7 @@ export class AdminService implements IAdminService {
           userId: userId,
         });
       } catch (error) {
-        console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+        logger.error(MESSAGES.FAILED_CREATE_UNBAN_NOTIFICATION_USER, { userId, error });
       }
     }
 
@@ -156,7 +166,7 @@ export class AdminService implements IAdminService {
           proId: proId,
         });
       } catch (error) {
-        console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+        logger.error(MESSAGES.FAILED_CREATE_BAN_NOTIFICATION_PRO, { proId, error });
       }
     } else {
       try {
@@ -167,7 +177,7 @@ export class AdminService implements IAdminService {
           proId: proId,
         });
       } catch (error) {
-        console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+        logger.error(MESSAGES.FAILED_CREATE_UNBAN_NOTIFICATION_PRO, { proId, error });
       }
     }
 
@@ -294,7 +304,7 @@ export class AdminService implements IAdminService {
         proId: approvedProId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_PRO_APPROVAL_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_APPROVAL_NOTIFICATION_PRO, { proId: approvedProId, firstName, error });
     }
   }
 
@@ -381,9 +391,9 @@ export class AdminService implements IAdminService {
         type: "debit",
         date: new Date(),
         description: `Withdrawal approved (Request #${withdrawalId.slice(-6)})`,
-      } as any);
-    } catch (e) {
-      console.error("Failed to record withdrawal debit transaction:", e);
+      });
+    } catch (error) {
+      logger.error(MESSAGES.FAILED_CREATE_TRANSACTION_WITHDRAWAL_APPROVAL, { withdrawalId, proId: withdrawal.proId, amount: withdrawal.amount, error });
     }
 
     try {
@@ -394,7 +404,7 @@ export class AdminService implements IAdminService {
         proId: withdrawal.proId,
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_WITHDRAWAL_APPROVAL_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_WITHDRAWAL_APPROVAL_NOTIFICATION, { withdrawalId, proId: withdrawal.proId, amount: withdrawal.amount, error });
     }
   }
 
@@ -416,7 +426,7 @@ export class AdminService implements IAdminService {
         proId: withdrawal.proId,
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_WITHDRAWAL_REJECTION_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_WITHDRAWAL_REJECTION_NOTIFICATION, { withdrawalId, proId: withdrawal.proId, amount: withdrawal.amount, reason, error });
     }
   }
 
@@ -467,7 +477,7 @@ export class AdminService implements IAdminService {
     try {
       await transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_APPROVAL_EMAIL + ":", error);
+      logger.error(MESSAGES.FAILED_SEND_APPROVAL_EMAIL_LOG, { email, name, error });
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_APPROVAL_EMAIL);
     }
   }
@@ -476,7 +486,7 @@ export class AdminService implements IAdminService {
     return await this._bookingRepository.getTrendingService();
   }
 
-  async getDashboardMetrics(adminId: string): Promise<{
+  async getDashboardMetrics(): Promise<{
     userCount: number;
     proCount: number;
     totalRevenue: number;
@@ -553,7 +563,7 @@ export class AdminService implements IAdminService {
     try {
       await transporter.sendMail(mailOptions);
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_REJECTION_EMAIL + ":", error);
+      logger.error(MESSAGES.FAILED_SEND_REJECTION_EMAIL_LOG, { email, reason, pendingProId, error });
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_REJECTION_EMAIL);
     }
   }

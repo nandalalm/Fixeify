@@ -170,14 +170,14 @@ const ChangeLocationModal: React.FC<ChangeLocationModalProps> = ({ isOpen, onClo
     }
     try {
       setIsSaving(true);
-      await updateUserProfile(userId, { address: selectedLocation as any });
+      await updateUserProfile(userId, { address: selectedLocation });
       // Optimistically update auth user state to reflect new address
       if (user) {
-        dispatch(updateUser({ ...user, address: selectedLocation as any }));
+        dispatch(updateUser({ ...user, address: selectedLocation }));
       }
       onClose();
-    } catch (err: any) {
-      setErrors({ general: err.response?.data?.message || "Failed to save location. Please try again." });
+    } catch (err: unknown) {
+      setErrors({ general: (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to save location. Please try again." });
     } finally {
       setIsSaving(false);
     }

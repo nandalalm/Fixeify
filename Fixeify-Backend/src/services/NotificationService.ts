@@ -36,9 +36,13 @@ export class NotificationService implements INotificationService {
 
     const recipientId = response.userId || response.proId || response.adminId;
     const receiverModel = response.userId ? 'User' : response.proId ? 'ApprovedPro' : 'Admin';
-    if (recipientId && (global as any).io) {
-      const io = (global as any).io;
-      const connectedUsers = (global as any).connectedUsers || new Map();
+    if (recipientId && (globalThis as Record<string, unknown>).io) {
+      const io = (globalThis as Record<string, unknown>).io as {
+        to: (socketId: string) => {
+          emit: (event: string, data: unknown) => void;
+        };
+      };
+      const connectedUsers = ((globalThis as Record<string, unknown>).connectedUsers || new Map()) as Map<string, { socketId: string }>;
       const user = connectedUsers.get(recipientId);
       if (user) {
         io.to(user.socketId).emit("newNotification", {

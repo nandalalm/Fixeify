@@ -55,7 +55,7 @@ const AdminProManagement: FC = () => {
       };
       fetchProsData();
     }
-  }, [user?.id, navigate, currentPage, activeTab, sortOption]);
+  }, [user, navigate, currentPage, activeTab, sortOption]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -71,6 +71,16 @@ const AdminProManagement: FC = () => {
       setSidebarOpen(false);
     }
   }, [isLargeScreen]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortOption]);
+
+  useEffect(() => {
+    if (activeTab === "pending" && (sortOption === "active" || sortOption === "banned")) {
+      setSortOption("latest");
+    }
+  }, [activeTab, sortOption]);
 
   if (!user || user.role !== "admin") return null;
 
@@ -92,10 +102,6 @@ const AdminProManagement: FC = () => {
     return list;
   })();
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, sortOption]);
-
   const clearFilters = () => {
     setSearchQuery("");
     setSortOption("latest");
@@ -114,12 +120,6 @@ const AdminProManagement: FC = () => {
     setActiveTab(tab);
     setCurrentPage(1);
   };
-
-  useEffect(() => {
-    if (activeTab === "pending" && (sortOption === "active" || sortOption === "banned")) {
-      setSortOption("latest");
-    }
-  }, [activeTab]);
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">

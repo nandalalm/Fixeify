@@ -4,6 +4,7 @@ import { RootState } from "../../store/store";
 import { fetchBookingDetails, createPaymentIntent, cancelBooking } from "../../api/userApi";
 import { BookingResponse } from "../../interfaces/bookingInterface";
 import { QuotaResponse } from "../../interfaces/quotaInterface";
+import { IApprovedPro } from "../../interfaces/adminInterface";
 import { RotateCcw } from "lucide-react";
 import BookingTable from "../../components/Reuseable/BookingTable";
 import BookingDetails from "../../components/Reuseable/BookingDetails";
@@ -83,7 +84,7 @@ const OngoingRequest = () => {
     }
     
     setShowCancelButton(currentStatus === "pending");
-  }, [selectedBooking?.status, detailsLoading, bookings, selectedBooking?.id]);
+  }, [selectedBooking, detailsLoading, bookings]);
 
 
 
@@ -110,7 +111,7 @@ const OngoingRequest = () => {
         );
         setBookings(response.bookings);
         setTotalPages(Math.ceil(response.total / limit));
-      } catch (err) {
+      } catch {
         setError("Failed to fetch booking details.");
       } finally {
         setLoading(false);
@@ -161,7 +162,7 @@ const OngoingRequest = () => {
       setCancelReason("");
       setCustomCancelReason("");
       handleBack();
-    } catch (e) {
+    } catch {
       setIsCancelling(false);
       alert("Failed to cancel booking. Please try again.");
     }
@@ -187,7 +188,8 @@ const OngoingRequest = () => {
       try {
         const q = await fetchQuotaByBookingId(selectedBooking.id);
         if (q) setQuota(q);
-      } catch (e) {
+      } catch {
+        // Ignore quota fetch errors
       }
     };
     loadDetails();
@@ -225,19 +227,19 @@ const OngoingRequest = () => {
 
   const onPaymentSuccess = () => {
     if (!selectedBooking || !quota) return;
-    setQuota({ ...quota, paymentStatus: "completed" as any });
+    setQuota({ ...quota, paymentStatus: "completed" });
     setLocalPaymentStatus("completed");
     setClientSecret(null);
     dispatch(
       setPaymentSuccessData({
         bookingDetails: {
           ...selectedBooking,
-          // @ts-ignore augment for success page needs
+          // @ts-expect-error augment for success page needs
           paymentIntent: {},
           user: { ...selectedBooking.user, role: UserRole.USER },
         },
         proId: selectedBooking.pro.id,
-        pro: selectedBooking.pro as any,
+        pro: selectedBooking.pro as unknown as IApprovedPro,
         categoryId: selectedBooking.category.id,
         location: selectedBooking.location,
         totalCost: quota.totalCost,
@@ -267,7 +269,7 @@ const OngoingRequest = () => {
 
   const onPaymentFailure = async () => {
     setClientSecret(null);
-    setQuota((prev) => (prev ? { ...prev, paymentStatus: "failed" as any } : prev));
+    setQuota((prev) => (prev ? { ...prev, paymentStatus: "failed" } : prev));
     setLocalPaymentStatus("failed");
   };
 

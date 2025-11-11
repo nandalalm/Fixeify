@@ -13,14 +13,7 @@ import { RotateCcw } from "lucide-react";
 import { fetchReviewsByUser } from "../../store/ratingReviewSlice";
 import { createTicket } from "../../store/ticketSlice";
 import { TicketPriority } from "../../interfaces/ticketInterface";
-
-export const formatDate = (date: Date): string => {
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-};
+import { formatDate } from "../../utils/dateUtils";
 
 
 const BookingHistory: React.FC = () => {
@@ -176,8 +169,8 @@ const BookingHistory: React.FC = () => {
       setDetailsRefreshKey((k) => k + 1);
       setSuccessMessage("Complaint submitted successfully");
       setTimeout(() => setSuccessMessage(null), 2000);
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || "Failed to submit complaint";
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to submit complaint";
       setSuccessMessage(null);
       setError(msg);
       setTimeout(() => setError(null), 2000);

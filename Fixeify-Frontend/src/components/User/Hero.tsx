@@ -9,6 +9,13 @@ interface Category {
   image?: string;
 }
 
+interface CategoriesResponse {
+  categories?: Category[];
+  data?: Category[];
+}
+
+type ApiResponse = Category[] | CategoriesResponse;
+
 const Hero = () => {
   const navigate = useNavigate();
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -43,24 +50,24 @@ const Hero = () => {
       try {
         setLoading(true);
         setError(null);
-        const res = await api.get<{ categories?: Category[]; data?: Category[] } | Category[]>(
+        const res = await api.get<ApiResponse>(
           "/pro/fetchCategories",
           { params: { q: debounced }, signal: controller.signal }
         );
         let fetched: Category[] = [];
         if (Array.isArray(res.data)) {
-          fetched = res.data as Category[];
-        } else if ((res.data as any).categories) {
-          fetched = (res.data as any).categories as Category[];
-        } else if ((res.data as any).data) {
-          fetched = (res.data as any).data as Category[];
+          fetched = res.data;
+        } else if ((res.data as CategoriesResponse).categories) {
+          fetched = (res.data as CategoriesResponse).categories!;
+        } else if ((res.data as CategoriesResponse).data) {
+          fetched = (res.data as CategoriesResponse).data!;
         }
         // Fallback client-side filter to ensure correctness if backend doesn't filter by q yet
         const q = debounced.toLowerCase();
         const filtered = q ? fetched.filter(c => c.name?.toLowerCase().includes(q)) : fetched;
         setSuggestions(filtered.slice(0, 8));
-      } catch (e: any) {
-        if (e?.name === "CanceledError") return;
+      } catch (e: unknown) {
+        if ((e as Error)?.name === "CanceledError") return;
         setError("Failed to fetch suggestions");
         setSuggestions([]);
       } finally {

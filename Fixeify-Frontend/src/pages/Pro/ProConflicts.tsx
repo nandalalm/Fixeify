@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { getTicketsByComplainant, getTicketById } from "@/api/ticketApi";
@@ -56,7 +56,7 @@ const ProConflicts: React.FC = () => {
     }
   };
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!proId) return;
     setLoading(true);
     try {
@@ -74,11 +74,11 @@ const ProConflicts: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [proId, page, sort, limit]);
 
   useEffect(() => {
     load();
-  }, [proId, page, sort]);
+  }, [proId, page, sort, load]);
 
   useEffect(() => {
     const checkAny = async () => {

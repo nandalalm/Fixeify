@@ -114,6 +114,7 @@ const ProProfileView: FC = () => {
             const approvedProData = await fetchApprovedProById(id);
             setPro(approvedProData);
           } catch (approvedError) {
+            console.error('Failed to fetch approved pro, trying pending:', approvedError);
             const pendingProData = await fetchPendingProById(id);
             setPro(pendingProData);
           }
@@ -126,7 +127,7 @@ const ProProfileView: FC = () => {
       }
     };
     fetchPro();
-  }, [id, user?.id, navigate, location.state]);
+  }, [id, user, navigate, location.state]);
 
   useEffect(() => {
     const handleResize = () => setIsLargeScreen(window.innerWidth >= 1024);
@@ -278,7 +279,7 @@ const ProProfileView: FC = () => {
                   <h1 className="text-2xl font-semibold text-gray-800">{`${pro.firstName} ${pro.lastName}`}</h1>
                   {pro && !("createdAt" in pro) && (
                     <p className="text-md text-gray-600 mt-2">
-                      {pro.about ?? `Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.category.name} works, and if you have any questions, feel free to message me.`}
+                      {pro.about ?? `Hi, I am ${pro.firstName} ${pro.lastName}, I specialize in ${pro.category.name} works, and if you have questions, feel free to message me.`}
                     </p>
                   )}
                 </div>

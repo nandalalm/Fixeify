@@ -261,11 +261,12 @@ const EditProSlot = ({ onCancel, onSave, initialAvailability, initialIsUnavailab
         isUnavailable,
       });
       onSave(updatedData.availability, updatedData.isUnavailable);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Update availability error:", err);
+      const errorResponse = err as { response?: { data?: { message?: string } } };
       setErrors((prev) => ({
         ...prev,
-        general: err.response?.data?.message || "Failed to update availability",
+        general: errorResponse.response?.data?.message || "Failed to update availability",
       }));
     } finally {
       setIsSubmitting(false);

@@ -133,8 +133,6 @@ const ProDashboard: FC = () => {
     loadSeries();
   }, [user]);
 
-  const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
   const availableYears = useMemo(() => {
     const s = new Set<number>();
     series.forEach((d) => s.add(d.year));
@@ -142,6 +140,7 @@ const ProDashboard: FC = () => {
   }, [series]);
 
   const chartData = useMemo(() => {
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     if (!selectedYear) return [] as Array<{ name: string; revenue: number }>;
     const byMonth = Array.from({ length: 12 }, (_, i) => ({ name: MONTHS[i], revenue: 0 }));
     series
@@ -348,7 +347,7 @@ const ProDashboard: FC = () => {
                                   tick={{ fontSize: isSmall ? 10 : 12 }}
                                 />
                                 <Tooltip
-                                  formatter={(v: any) => [`₹${Number(v).toLocaleString()}`, "Revenue"]}
+                                  formatter={(v: number) => [`₹${Number(v).toLocaleString()}`, "Revenue"]}
                                   contentStyle={{ fontSize: isSmall ? 12 : 14 }}
                                 />
                                 {!isSmall && <Legend />}

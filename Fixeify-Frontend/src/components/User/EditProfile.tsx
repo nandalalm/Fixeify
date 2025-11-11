@@ -91,7 +91,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
             photo: fetchedUser.photo || "",
           });
           setOriginalData({ ...fetchedUser, id: user.id });
-        } catch (error) {
+        } catch {
           navigate("/login");
         }
       }
@@ -175,7 +175,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
     };
   }, []);
 
-  const validateField = (name: string, value: any) => {
+  const validateField = (name: string, value: unknown) => {
     try {
       const fieldSchema = editProfileSchema.shape[name as keyof typeof editProfileSchema.shape];
       if (fieldSchema) {
@@ -309,7 +309,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
           return newErrors;
         });
         validateField("photo", url);
-      } catch (error) {
+      } catch {
         setErrors((prev) => ({ ...prev, photo: "Failed to upload image" }));
         // Don't call validateField for photo errors to avoid Zod validation
       } finally {
@@ -342,7 +342,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
           return newErrors;
         });
         validateField("photo", url);
-      } catch (error) {
+      } catch {
         setErrors((prev) => ({ ...prev, photo: "Failed to upload image" }));
         // Don't call validateField for photo errors to avoid Zod validation
       } finally {
@@ -356,7 +356,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
     if (name === "location") {
       setFormData((prev) => ({ ...prev, address: null }));
       if (!value.trim()) {
-        // Clear any existing location errors when field is empty
+        // Clear existing location errors when field is empty
         setErrors((prev) => {
           const newErrors = { ...prev };
           delete newErrors.address;
@@ -383,7 +383,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
       return newErrors;
     });
 
-    // Check if there are any existing validation errors
+    // Check if there are existing validation errors
     const hasErrors = Object.keys(errors).some(key => key !== 'general' && errors[key]);
     if (hasErrors) {
       setErrors((prev) => ({
@@ -426,7 +426,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
       );
       onCancel();
       sessionStorage.setItem("isEditing", "false");
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         const newErrors: Record<string, string> = { ...errors };
         const addressErrors: string[] = [];
@@ -458,7 +458,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
       } else {
         setErrors((prev) => ({
           ...prev,
-          general: error.response?.data?.message || "Failed to update profile. Please try again.",
+          general: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update profile. Please try again.",
         }));
       }
     } finally {

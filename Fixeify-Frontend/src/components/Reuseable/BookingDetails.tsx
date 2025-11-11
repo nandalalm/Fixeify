@@ -44,7 +44,7 @@ const Avatar: React.FC<{
   useEffect(() => {
     if (!src || src === placeholder) {
       setDisplayedSrc(placeholder);
-      onSrcChange && onSrcChange(placeholder);
+      if (onSrcChange) onSrcChange(placeholder);
       return;
     }
     let cancelled = false;
@@ -54,7 +54,7 @@ const Avatar: React.FC<{
       img.onload = () => {
         if (!cancelled) {
           setDisplayedSrc(targetSrc);
-          onSrcChange && onSrcChange(targetSrc);
+          if (onSrcChange) onSrcChange(targetSrc);
         }
       };
       img.onerror = () => {
@@ -64,7 +64,7 @@ const Avatar: React.FC<{
           tryLoad(targetSrc);
         } else {
           setDisplayedSrc(placeholder);
-          onSrcChange && onSrcChange(placeholder);
+          if (onSrcChange) onSrcChange(placeholder);
         }
       };
       img.src = targetSrc;
@@ -101,7 +101,7 @@ const Avatar: React.FC<{
       decoding="async"
       onError={() => {
         setDisplayedSrc(placeholder);
-        onSrcChange && onSrcChange(placeholder);
+        if (onSrcChange) onSrcChange(placeholder);
       }}
     />
   );
@@ -193,33 +193,37 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
           try {
             const q = await fetchUserQuotaByBookingId(bookingId);
             if (mounted) setQuota(q);
-          } catch (e: any) {
+          } catch (e: unknown) {
             try {
               const q2 = await fetchProQuotaByBookingId(bookingId);
-              if (mounted) setQuota(q2 as any);
-            } catch (e2: any) {
-              const msg = e2?.response?.data?.message || e?.response?.data?.message;
+              if (mounted) setQuota(q2);
+            } catch (e2: unknown) {
+              const msg = (e2 as { response?: { data?: { message?: string } } })?.response?.data?.message || (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
               if (mounted && msg) setBannerError(msg);
             }
           }
         } else {
           if (mounted) setQuota(null);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (mounted) {
-          const msg = e?.response?.data?.message || "Failed to load booking details";
+          const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to load booking details";
           setError(msg);
           setBannerError(msg);
         }
       }
       if (mounted) {
         setLoading(false);
-        try { onReady && onReady(); } catch {}
+        try { 
+          if (onReady) onReady(); 
+        } catch (error) {
+          console.error('Error calling onReady:', error);
+        }
       }
     };
     load();
     return () => { mounted = false; };
-  }, [bookingId, refreshKey, showQuotaSection]);
+  }, [bookingId, refreshKey, showQuotaSection, onReady, onBookingUpdate]);
 
   useEffect(() => {
     if (!bannerError) return;
@@ -231,8 +235,8 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
   const canRate = useMemo(() => viewerRole === "user" && booking?.status === "completed" && booking?.isRated === false, [viewerRole, booking?.status, booking?.isRated]);
   const canRaiseComplaint = useMemo(() => {
     if (!booking || booking.status !== "completed") return false;
-    if (viewerRole === "user") return !(booking as any).hasComplaintRaisedByUser;
-    if (viewerRole === "pro") return !(booking as any).hasComplaintRaisedByPro;
+    if (viewerRole === "user") return !booking.hasComplaintRaisedByUser;
+    if (viewerRole === "pro") return !booking.hasComplaintRaisedByPro;
     return false; 
   }, [viewerRole, booking]);
 
@@ -240,7 +244,8 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
     if (!booking || !quota) return;
     try {
       generateInvoice({ booking, quota });
-    } catch (e) {
+    } catch (error) {
+      console.error('Failed to generate invoice:', error);
       alert("Failed to generate invoice");
     }
   };
@@ -348,12 +353,12 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
             </button>
             <div className="text-sm">
               <div className="font-medium text-gray-900 dark:text-gray-100">{booking.pro ? `${booking.pro.firstName} ${booking.pro.lastName}` : "-"}</div>
-              <div className="text-gray-600 dark:text-gray-300">{(booking as any).pro?.email || "-"}</div>
+              <div className="text-gray-600 dark:text-gray-300">{booking.pro?.email || "-"}</div>
             </div>
           </div>
           <div className="flex items-center gap-2 py-1 text-sm text-gray-900 dark:text-gray-100">
             <Phone className="w-4 h-4" />
-            <span>{(booking as any).pro?.phoneNumber || "-"}</span>
+            <span>{booking.pro?.phoneNumber || "-"}</span>
           </div>
         </Section>
       </div>
@@ -402,8 +407,8 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
 
       {viewerRole === "admin" && booking.status === "completed" && (
         <Section title="Revenue">
-          <LabelValue label="Admin Revenue" value={typeof (booking as any).adminRevenue === 'number' ? `₹${(booking as any).adminRevenue}` : "-"} />
-          <LabelValue label="Pro Revenue" value={typeof (booking as any).proRevenue === 'number' ? `₹${(booking as any).proRevenue}` : "-"} />
+          <LabelValue label="Admin Revenue" value={typeof booking.adminRevenue === 'number' ? `₹${booking.adminRevenue}` : "-"} />
+          <LabelValue label="Pro Revenue" value={typeof booking.proRevenue === 'number' ? `₹${booking.proRevenue}` : "-"} />
         </Section>
       )}
 

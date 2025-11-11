@@ -65,7 +65,7 @@ const HomeServices = () => {
         let popular: Category[] = [];
         try {
           popular = await fetchPopularCategories(2);
-        } catch (_) {
+        } catch {
           // ignore and fallback
         }
 
@@ -79,10 +79,10 @@ const HomeServices = () => {
               let all: Category[] = [];
               if (Array.isArray(res.data)) {
                 all = res.data as Category[];
-              } else if ((res.data as any).categories) {
-                all = (res.data as any).categories as Category[];
-              } else if ((res.data as any).data) {
-                all = (res.data as any).data as Category[];
+              } else if ('categories' in res.data && res.data.categories) {
+                all = res.data.categories;
+              } else if ('data' in res.data && res.data.data) {
+                all = res.data.data;
               }
               const remaining = all.filter(c => c.id !== popular[0].id);
               const extra = remaining.length > 0 ? remaining[Math.floor(Math.random() * remaining.length)] : undefined;
@@ -102,14 +102,14 @@ const HomeServices = () => {
           let fetched: Category[] = [];
           if (Array.isArray(res.data)) {
             fetched = res.data as Category[];
-          } else if ((res.data as any).categories) {
-            fetched = (res.data as any).categories as Category[];
-          } else if ((res.data as any).data) {
-            fetched = (res.data as any).data as Category[];
+          } else if ('categories' in res.data && res.data.categories) {
+            fetched = res.data.categories;
+          } else if ('data' in res.data && res.data.data) {
+            fetched = res.data.data;
           }
           if (!cancelled) setCategories((fetched ?? []).slice(0, 2));
         }
-      } catch (_e) {
+      } catch {
         if (!cancelled) setError("Failed to load categories");
       } finally {
         if (!cancelled) setLoading(false);
@@ -146,7 +146,7 @@ const HomeServices = () => {
               description={c.description || `Explore top-rated ${c.name} services near you.`}
               image={c.image || c.imageUrl || "/placeholder.svg"}
               onBook={() => {
-                const savedLocation = user?.address as any;
+                const savedLocation = user?.address;
                 if (savedLocation && savedLocation.coordinates?.coordinates) {
                   navigate(`/nearby-pros?categoryId=${encodeURIComponent(c.id)}`, { state: { location: savedLocation } });
                 } else {

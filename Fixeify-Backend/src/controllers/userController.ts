@@ -9,6 +9,18 @@ import Stripe from "stripe";
 import { HttpStatus } from "../enums/httpStatus";
 import PaymentEventModel from "../models/paymentEventModel";
 
+declare const process: {
+  env: {
+    STRIPE_SECRET_KEY: string;
+    STRIPE_WEBHOOK_SECRET?: string;
+    [key: string]: string | undefined;
+  };
+};
+
+declare const console: {
+  error: (message: string) => void;
+};
+
 @injectable()
 export class UserController {
   private _stripe: Stripe;
@@ -221,11 +233,12 @@ export class UserController {
       if (event.type === "payment_intent.succeeded") {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const pid = paymentIntent.id;
-        const bookingId = paymentIntent.metadata?.bookingId;
+        // Extract booking ID from payment intent metadata
         try {
           await PaymentEventModel.create({ paymentIntentId: pid });
-        } catch (e: any) {
-          if (e && e.code === 11000) {
+        } catch (e: unknown) {
+          const error = e as { code?: number };
+          if (error && error.code === 11000) {
             res.status(HttpStatus.OK).json({ received: true, duplicate: true });
             return;
           }

@@ -6,7 +6,11 @@ import { CategoryDocument } from "../models/categoryModel";
 import { IProRepository } from "./IProRepository";
 import { ProResponse, ProProfileResponse } from "../dtos/response/proDtos";
 import { UserRole } from "../enums/roleEnum";
-import { Types } from "mongoose";
+import { Types, PipelineStage } from "mongoose";
+
+declare const console: {
+  error: (message: string, error?: unknown) => void;
+};
 
 type PopulatedApprovedProDocument = Omit<ApprovedProDocument, "categoryId"> & {
   categoryId: CategoryDocument;
@@ -158,7 +162,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
   ): Promise<{ pros: ProResponse[]; total: number; hasMore: boolean }> {
     try {
      
-      let pipeline: any[] = [
+      let pipeline: PipelineStage[] = [
         {
           $geoNear: {
             near: {
@@ -222,7 +226,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
               }
             });
           }
-        } catch (error) {
+        } catch {
          
           if (availabilityFilter === 'all7days') {
             pipeline.push({
@@ -242,7 +246,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
         }
       }
 
-      let sortStage: any = {};
+      let sortStage: PipelineStage;
       switch (sortBy) {
         case 'highest_rated':
           sortStage = { $sort: { averageRating: -1, distance: 1 } };
@@ -266,47 +270,52 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
 
       const pros = await ApprovedProModel.aggregate(pipeline);
       
-      const prosWithRatings = pros.map((pro: any) =>
-        new ProResponse({
-          _id: pro._id.toString(),
-          firstName: pro.firstName,
+      const prosWithRatings = pros.map((pro: unknown) => {
+        const proData = pro as Record<string, unknown>;
+        const categoryData = proData.category as Record<string, unknown>;
+        const locationData = proData.location as Record<string, unknown>;
+        const availabilityData = proData.availability as Record<string, unknown>;
+        
+        return new ProResponse({
+          _id: (proData._id as Record<string, unknown>).toString(),
+          firstName: proData.firstName as string,
           role: UserRole.PRO,
-          lastName: pro.lastName,
-          email: pro.email,
-          phoneNumber: pro.phoneNumber,
+          lastName: proData.lastName as string,
+          email: proData.email as string,
+          phoneNumber: proData.phoneNumber as string,
           category: {
-            id: pro.category._id.toString(),
-            name: pro.category.name,
-            image: pro.category.image || "",
+            id: (categoryData._id as Record<string, unknown>).toString(),
+            name: categoryData.name as string,
+            image: (categoryData.image as string) || "",
           },
-          customService: pro.customService ?? null,
+          customService: (proData.customService as string) ?? null,
           location: {
-            address: pro.location.address,
-            city: pro.location.city,
-            state: pro.location.state,
-            coordinates: pro.location.coordinates,
+            address: locationData.address as string,
+            city: locationData.city as string,
+            state: locationData.state as string,
+            coordinates: locationData.coordinates as { type: "Point"; coordinates: [number, number] },
           },
-          profilePhoto: pro.profilePhoto,
-          idProof: pro.idProof,
-          accountHolderName: pro.accountHolderName,
-          accountNumber: pro.accountNumber,
-          bankName: pro.bankName,
+          profilePhoto: proData.profilePhoto as string,
+          idProof: proData.idProof as string[],
+          accountHolderName: proData.accountHolderName as string,
+          accountNumber: proData.accountNumber as string,
+          bankName: proData.bankName as string,
           availability: {
-            monday: pro.availability.monday || [],
-            tuesday: pro.availability.tuesday || [],
-            wednesday: pro.availability.wednesday || [],
-            thursday: pro.availability.thursday || [],
-            friday: pro.availability.friday || [],
-            saturday: pro.availability.saturday || [],
-            sunday: pro.availability.sunday || [],
+            monday: (availabilityData.monday as ITimeSlot[]) || [],
+            tuesday: (availabilityData.tuesday as ITimeSlot[]) || [],
+            wednesday: (availabilityData.wednesday as ITimeSlot[]) || [],
+            thursday: (availabilityData.thursday as ITimeSlot[]) || [],
+            friday: (availabilityData.friday as ITimeSlot[]) || [],
+            saturday: (availabilityData.saturday as ITimeSlot[]) || [],
+            sunday: (availabilityData.sunday as ITimeSlot[]) || [],
           },
-          isBanned: pro.isBanned,
-          about: pro.about ?? null,
-          isUnavailable: pro.isUnavailable,
-          averageRating: pro.averageRating || 0,
-          totalRatings: pro.totalRatings || 0,
-        })
-      );
+          isBanned: proData.isBanned as boolean,
+          about: (proData.about as string) ?? null,
+          isUnavailable: proData.isUnavailable as boolean,
+          averageRating: (proData.averageRating as number) || 0,
+          totalRatings: (proData.totalRatings as number) || 0,
+        });
+      });
 
       const hasMore = skip + limit < total;
 
@@ -324,11 +333,10 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
   async updateAvailability(proId: string, dayOfWeek: string, timeSlots: ITimeSlot[], booked: boolean = true): Promise<ApprovedProDocument | null> {
     try {
       try { 
-        const slotsStr = timeSlots.map(s => `${s.startTime}-${s.endTime}`).join(','); 
-        if (!booked) {
-          const stack = new Error().stack?.split('\n').slice(2, 6).join(' | ') || 'no-stack';
-        }
-      } catch {}
+        // Debug logging removed
+      } catch {
+        // Debug logging failed
+      }
       const startTimes = timeSlots.map(slot => slot.startTime);
       const endTimes = timeSlots.map(slot => slot.endTime);
 
@@ -357,7 +365,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
         const pro = await ApprovedProModel.findById(proId);
         if (pro) {
           pro.availability = pro.availability || {};
-          // @ts-ignore-next-line
+          // @ts-expect-error - Dynamic property assignment
           pro.availability[dayOfWeek] = timeSlots.map(slot => ({ ...slot, booked }));
           return await pro.save();
         }

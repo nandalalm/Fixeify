@@ -69,7 +69,7 @@ const ProChangePassword = ({ onCancel }: ProChangePasswordProps) => {
         setErrors(fieldErrors);
       } else {
         setServerError(
-          (error as any) === "Incorrect current password. Please try again."
+          (error as string) === "Incorrect current password. Please try again."
             ? "Incorrect current password"
             : "Incorrect current password. Please try again."
         );

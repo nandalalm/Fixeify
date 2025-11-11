@@ -26,17 +26,14 @@ const initialState: RatingReviewState = {
   error: null,
 };
 
-export const fetchReviewsByPro = createAsyncThunk<
-  PaginatedReviews,
-  { proId: string; page?: number; limit?: number; sortBy?: "latest" | "oldest" | "lowest" | "highest"; search?: string; append?: boolean },
-  { rejectValue: string }
->(
+export const fetchReviewsByPro = createAsyncThunk<PaginatedReviews, { proId: string; page?: number; limit?: number; sortBy?: "latest" | "oldest" | "lowest" | "highest"; search?: string; append?: boolean }, { rejectValue: string }>(
   "ratingReview/fetchByPro",
   async ({ proId, page = 1, limit = 5, sortBy, search }, { rejectWithValue }) => {
     try {
       return await getReviewsByPro(proId, page, limit, sortBy, search);
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to load reviews");
+    } catch (err: unknown) {
+      const errorResponse = err as { response?: { data?: { message?: string } } };
+      return rejectWithValue(errorResponse.response?.data?.message || "Failed to load reviews");
     }
   }
 );
@@ -46,8 +43,9 @@ export const fetchReviewsByUser = createAsyncThunk<PaginatedReviews, { userId: s
   async ({ userId, page = 1 }, { rejectWithValue }) => {
     try {
       return await getReviewsByUser(userId, page, 5);
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to load reviews");
+    } catch (err: unknown) {
+      const errorResponse = err as { response?: { data?: { message?: string } } };
+      return rejectWithValue(errorResponse.response?.data?.message || "Failed to load reviews");
     }
   }
 );
@@ -57,8 +55,9 @@ export const submitReview = createAsyncThunk<RatingReviewResponse, CreateReviewP
   async (payload, { rejectWithValue }) => {
     try {
       return await createReview(payload);
-    } catch (err: any) {
-      return rejectWithValue(err.response?.data?.message || "Failed to create review");
+    } catch (err: unknown) {
+      const errorResponse = err as { response?: { data?: { message?: string } } };
+      return rejectWithValue(errorResponse.response?.data?.message || "Failed to create review");
     }
   }
 );

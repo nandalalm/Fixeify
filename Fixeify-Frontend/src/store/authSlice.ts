@@ -2,6 +2,7 @@ import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
 import api from "../api/axios";
 import { initializeSocket, disconnectSocket } from "../services/socket";
 import { RootState } from "../store/store";
+import { IApprovedPro } from "../interfaces/adminInterface";
 
 export enum UserRole {
   USER = "user",
@@ -33,7 +34,11 @@ export interface User {
 export interface BookingResponse {
   id: string;
   user: User;
-  pro: any; 
+  pro: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  }; 
   category: { id: string; name: string };
   location: ILocation;
   preferredDate: Date;
@@ -42,7 +47,11 @@ export interface BookingResponse {
   issueDescription: string;
   status: string;
   rejectedReason?: string;
-  paymentIntent?: any; 
+  paymentIntent?: {
+    id: string;
+    status: string;
+    amount: number;
+  }; 
 }
 
 interface AuthState {
@@ -54,7 +63,7 @@ interface AuthState {
   paymentSuccessData: {
     bookingDetails: BookingResponse | null;
     proId: string | null;
-    pro: any | null; 
+    pro: IApprovedPro | null; 
     categoryId: string | null;
     location: ILocation | null;
     totalCost: number | null;
@@ -97,14 +106,14 @@ export const refreshToken = createAsyncThunk<RefreshTokenResponse, void, { rejec
 
       dispatch(setAccessToken(accessToken));
       return { accessToken, user };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Refresh error details:", {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        config: err.config?.url,
+        message: (err as Error).message,
+        response: (err as { response?: { data?: unknown; status?: number } })?.response?.data,
+        status: (err as { response?: { status?: number } })?.response?.status,
+        config: (err as { config?: { url?: string } })?.config?.url,
       });
-      return rejectWithValue(err.response?.data?.message || "Session expired");
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Session expired");
     }
   }
 );
@@ -123,9 +132,9 @@ export const checkBanStatus = createAsyncThunk<{ isBanned: boolean } | void, voi
       });
 
       return { isBanned: !!response.data.isBanned };
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Ban status check failed:", err);
-      return rejectWithValue(err.response?.data?.message || "Failed to check ban status");
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to check ban status");
     }
   }
 );
@@ -136,9 +145,9 @@ export const logoutUser = createAsyncThunk(
     try {
       await api.post("/auth/logout", { role }, { withCredentials: true });
       return role;
-    } catch (err: any) {
-      console.error(`${role} logout error:`, err.response?.data);
-      return rejectWithValue(err.response?.data?.message || "Logout failed");
+    } catch (err: unknown) {
+      console.error(`${role} logout error:`, (err as { response?: { data?: unknown } })?.response?.data);
+      return rejectWithValue((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Logout failed");
     }
   }
 );
@@ -183,7 +192,7 @@ const authSlice = createSlice({
       action: PayloadAction<{
         bookingDetails: BookingResponse;
         proId: string;
-        pro: any;
+        pro: IApprovedPro;
         categoryId: string | null; 
         location: ILocation;
         totalCost: number;

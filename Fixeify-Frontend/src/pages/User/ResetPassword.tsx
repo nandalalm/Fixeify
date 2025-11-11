@@ -45,7 +45,7 @@ const ResetPassword = () => {
         error.errors.forEach((err) => (fieldErrors[err.path[0]] = err.message));
         setErrors(fieldErrors);
       } else if (error instanceof Error) {
-        const err = error as any;
+        const err = error as { response?: { status?: number; data?: { message?: string } }; status?: number; message?: string };
         if (err.response?.status || err.status) {
           const status = err.response?.status || err.status;
           const message = err.response?.data?.message || err.message || "Password reset failed";

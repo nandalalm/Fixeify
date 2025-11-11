@@ -2,6 +2,7 @@ import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
 import { IChat, Chat } from "../models/chatModel";
 import { IMessage, MessageModel } from "../models/messageModel";
+import logger from "../config/logger";
 import { IChatRepository,PopulatedUser,PopulatedPro,PopulatedChat } from "./IChatRepository";
 import {  MessageResponse } from "../dtos/response/chatDtos";
 import mongoose from "mongoose";
@@ -181,7 +182,7 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
         total,
       };
     } catch (error) {
-      console.error("Error finding messages by chatId:", error);
+      logger.error("Error finding messages by chatId:", error);
       throw error;
     }
   }

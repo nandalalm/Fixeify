@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { RootState, AppDispatch } from "../../store/store";
@@ -75,7 +75,7 @@ const ProWalletManagement = () => {
   const [debouncedTxnSearch, setDebouncedTxnSearch] = useState<string>("");
 
   // Helpers to refresh wallet transactions and withdrawals, returning fresh data
-  const refreshWallet = async (opts?: { silent?: boolean }): Promise<WalletResponse | null> => {
+  const refreshWallet = useCallback(async (opts?: { silent?: boolean }): Promise<WalletResponse | null> => {
     if (!user || !accessToken || user.role !== UserRole.PRO) return null;
     if (!opts?.silent) setLoading(true);
     try {
@@ -90,30 +90,30 @@ const ProWalletManagement = () => {
       setWallet(walletData || { id: "", proId: user.id, balance: 0, transactions: [], createdAt: new Date(), updatedAt: new Date() });
       setTotalPages(Math.ceil(total / itemsPerPage));
       return walletData || null;
-    } catch (err: any) {
-      console.error("Fetch wallet error:", err.response?.data);
-      if (err.response?.status === 404) {
+    } catch (err: unknown) {
+      console.error("Fetch wallet error:", (err as { response?: { data?: unknown } })?.response?.data);
+      if ((err as { response?: { status?: number } })?.response?.status === 404) {
         setWallet(null);
-      } else if (err.response?.status === 401) {
+      } else if ((err as { response?: { status?: number } })?.response?.status === 401) {
         dispatch(logoutUserSync());
         navigate("/login");
       } else {
-        setError(err.response?.data?.message || "Failed to load wallet");
+        setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to load wallet");
       }
       return null;
     } finally {
       if (!opts?.silent) setLoading(false);
     }
-  };
+  }, [user, accessToken, debouncedTxnSearch, currentPage, itemsPerPage, txnSortBy, dispatch, navigate]);
 
-  const refreshProWithdrawals = async (opts?: { silent?: boolean }): Promise<IWithdrawalRequest[]> => {
+  const refreshProWithdrawals = useCallback(async (opts?: { silent?: boolean }): Promise<IWithdrawalRequest[]> => {
     if (!user || user.role !== UserRole.PRO) return [];
     if (!opts?.silent) setWithdrawalsLoading(true);
     try {
       const v = (withdrawalsSortBy || '').toLowerCase();
       const sortByParam: "latest" | "oldest" | undefined = v === 'oldest' ? 'oldest' : v === 'latest' ? 'latest' : undefined;
       const statusParam: "pending" | "approved" | "rejected" | undefined =
-        v === 'pending' || v === 'approved' || v === 'rejected' ? (v as any) : undefined;
+        v === 'pending' || v === 'approved' || v === 'rejected' ? (v as "pending" | "approved" | "rejected") : undefined;
       const { withdrawals, total } = await fetchProWithdrawalRequests(
         user.id,
         withdrawalsPage,
@@ -130,7 +130,7 @@ const ProWalletManagement = () => {
     } finally {
       if (!opts?.silent) setWithdrawalsLoading(false);
     }
-  };
+  }, [user, withdrawalsSortBy, withdrawalsPage, itemsPerPage]);
 
   useEffect(() => {
     // Show skeleton on first load to avoid flashing empty state
@@ -143,7 +143,7 @@ const ProWalletManagement = () => {
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [refreshWallet]);
 
   useEffect(() => {
     if (!isLargeScreen) {
@@ -160,7 +160,7 @@ const ProWalletManagement = () => {
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize); // Cleanup
-  }, [user, accessToken, dispatch, navigate, currentPage, itemsPerPage, txnSortBy, debouncedTxnSearch]);
+  }, [user, accessToken, dispatch, navigate, currentPage, itemsPerPage, txnSortBy, debouncedTxnSearch, refreshWallet]);
 
   // Debounce search input for transactions
   useEffect(() => {
@@ -173,7 +173,7 @@ const ProWalletManagement = () => {
     if (activeTab === 'withdrawals') {
       refreshProWithdrawals();
     }
-  }, [activeTab, user, withdrawalsPage, itemsPerPage, withdrawalsSortBy]);
+  }, [activeTab, user, withdrawalsPage, itemsPerPage, withdrawalsSortBy, refreshProWithdrawals]);
 
   // Refetch latest data when switching tabs and clear any selected details
   useEffect(() => {
@@ -299,9 +299,9 @@ const ProWalletManagement = () => {
       setWithdrawalsPage(1);
       await refreshWallet({ silent: true });
       await refreshProWithdrawals({ silent: true });
-    } catch (err: any) {
-      console.error("Withdrawal request error:", err.response?.data);
-      setError(err.response?.data?.message || "Failed to send withdrawal request");
+    } catch (err: unknown) {
+      console.error("Withdrawal request error:", (err as { response?: { data?: unknown } })?.response?.data);
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to send withdrawal request");
       setIsConfirmationModalOpen(false);
       setIsWithdrawalModalOpen(true);
     } finally {
@@ -444,7 +444,7 @@ const ProWalletManagement = () => {
                         <div className="relative w-full sm:w-1/6">
                           <select
                             value={txnSortBy}
-                            onChange={(e) => { setTxnSortBy(e.target.value as any); setCurrentPage(1); }}
+                            onChange={(e) => { setTxnSortBy(e.target.value as "latest" | "oldest" | "credit" | "debit"); setCurrentPage(1); }}
                             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
                           >
                             <option value="latest">Sort by Latest</option>

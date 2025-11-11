@@ -11,7 +11,7 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
   }
 
   async findOneByKeys(filter: { bookingId: string; type: "credit" | "debit"; proId: string; amount: number; adminId?: string }): Promise<TransactionResponseDTO | null> {
-    const query: any = {
+    const query: Record<string, Types.ObjectId | string | number> = {
       bookingId: new Types.ObjectId(filter.bookingId),
       type: filter.type,
       proId: new Types.ObjectId(filter.proId),
@@ -28,8 +28,8 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
     try {
       const created = await this._model.create(data);
       return this.map(created);
-    } catch (error: any) {
-      if (error.code === 11000) {
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && (error as { code: number }).code === 11000) {
         const existing = await this.findOneByKeys({
           bookingId: data.bookingId!.toString(),
           type: data.type as "credit" | "debit",
@@ -67,7 +67,7 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
     const l = Math.max(1, limit || 5);
     const skip = (p - 1) * l;
 
-    const query = { adminId: new Types.ObjectId(adminId) } as any;
+    const query: Record<string, Types.ObjectId> = { adminId: new Types.ObjectId(adminId) };
     const [docs, total] = await Promise.all([
       this._model
         .find(query)
@@ -83,7 +83,7 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
 
   private map = (doc: TransactionDocument): TransactionResponseDTO => ({
     id: doc._id.toString(),
-    transactionId: (doc as any).transactionId,
+    transactionId: doc.transactionId,
     proId: doc.proId.toString(),
     walletId: doc.walletId ? doc.walletId.toString() : undefined,
     amount: doc.amount,
@@ -92,7 +92,7 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
     description: doc.description,
     bookingId: doc.bookingId ? doc.bookingId.toString() : undefined,
     quotaId: doc.quotaId ? doc.quotaId.toString() : undefined,
-    adminId: (doc as any).adminId ? (doc as any).adminId.toString() : undefined,
+    adminId: doc.adminId ? doc.adminId.toString() : undefined,
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
   });

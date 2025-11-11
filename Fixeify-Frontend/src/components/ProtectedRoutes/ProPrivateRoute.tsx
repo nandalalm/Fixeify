@@ -19,15 +19,16 @@ const ProPrivateRoute = () => {
     (async () => {
       try {
         const result = await dispatch(checkBanStatus()).unwrap();
-        if (result && (result as any).isBanned) {
-          // Allow notifications page to be viewed
+        if (result && (result as { isBanned?: boolean }).isBanned) {
+         
           if (!location.pathname.startsWith(NotifBase)) {
             dispatch(logoutUserSync());
             navigate("/login", { replace: true });
           }
         }
-      } catch (err) {
-        // Silent fail; do not logout on transient errors
+      } catch (error) {
+      
+        console.error('Pro route validation error:', error);
       }
     })();
   }, [dispatch, isAuthenticated, isPro, location.pathname, navigate]);

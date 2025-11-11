@@ -102,8 +102,8 @@ const availabilitySchema = z
   )
   .refine(
     (data) => {
-      const daysWithSlots = Object.entries(data).filter(([_, slots]) => Array.isArray(slots) && slots.length > 0);
-      return daysWithSlots.every(([_, slots]) => slots.length >= 1);
+      const daysWithSlots = Object.entries(data).filter(([, slots]) => Array.isArray(slots) && slots.length > 0);
+      return daysWithSlots.every(([, slots]) => slots.length >= 1);
     },
     "Each selected day must have at least 1 time slot"
   );

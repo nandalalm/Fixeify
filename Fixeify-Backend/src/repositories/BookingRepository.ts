@@ -21,9 +21,9 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
           { path: "proId", select: "firstName lastName profilePhoto" },
           { path: "categoryId", select: "name image" },
         ])
-      ) as any; 
+      ) as PopulatedBookingDocument; 
 
-    return this.mapToBookingResponse(booking.toObject() as PopulatedBookingDocument);
+    return this.mapToBookingResponse(booking as PopulatedBookingDocument);
   }
 
   async fetchBookingDetails(
@@ -37,7 +37,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
   ): Promise<{ bookings: BookingResponse[]; total: number }> {
     const skip = (page - 1) * limit;
 
-    const query: any = { userId: new mongoose.Types.ObjectId(userId) };
+    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId) };
 
     if (status && status.trim().length > 0) {
       const statusArray = status.split(",").map((s) => s.trim());
@@ -46,7 +46,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       query.status = { $in: ["pending", "accepted"] };
     }
 
-    const orClauses: any[] = [];
+    const orClauses: Record<string, unknown>[] = [];
     if (search && search.trim().length > 0) {
       orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
@@ -62,7 +62,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       query.$or = orClauses;
     }
 
-    const sort: any = { createdAt: sortBy === "oldest" ? 1 : -1, _id: sortBy === "oldest" ? 1 : -1 };
+    const sort: Record<string, 1 | -1> = { createdAt: sortBy === "oldest" ? 1 : -1, _id: sortBy === "oldest" ? 1 : -1 };
 
     const bookings = await this._model
       .find(query)
@@ -94,7 +94,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     bookingId?: string
   ): Promise<{ bookings: BookingResponse[]; total: number }> {
     const skip = (page - 1) * limit;
-    const query: any = { userId: new mongoose.Types.ObjectId(userId) };
+    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId) };
 
     const historyStatuses = ["completed", "rejected", "cancelled"];
     if (status && status.trim().length > 0) {
@@ -104,7 +104,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       query.status = { $in: historyStatuses };
     }
 
-    const orClauses: any[] = [];
+    const orClauses: Record<string, unknown>[] = [];
     if (search && search.trim().length > 0) {
       orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
@@ -120,7 +120,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       query.$or = orClauses;
     }
 
-    const sort: any = { createdAt: sortBy === "oldest" ? 1 : -1, _id: sortBy === "oldest" ? 1 : -1 };
+    const sort: Record<string, 1 | -1> = { createdAt: sortBy === "oldest" ? 1 : -1, _id: sortBy === "oldest" ? 1 : -1 };
 
     const bookings = await this._model
       .find(query)
@@ -152,7 +152,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     bookingId?: string
   ): Promise<{ bookings: BookingResponse[]; total: number }> {
     const skip = (page - 1) * limit;
-    const query: any = { proId: new mongoose.Types.ObjectId(proId) };
+    const query: Record<string, unknown> = { proId: new mongoose.Types.ObjectId(proId) };
     if (status) {
       const statusArray = status.split(",").map(s => s.trim());
       if (statusArray.length > 1) {
@@ -162,7 +162,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       }
     }
 
-    const orClauses: any[] = [];
+    const orClauses: Record<string, unknown>[] = [];
     if (search) {
       orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
@@ -178,9 +178,9 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       query.$or = orClauses;
     }
 
-    const sort: any = {};
+    const sort: Record<string, 1 | -1> = {};
     sort.createdAt = sortBy === "oldest" ? 1 : -1;
-    (sort as any)._id = sortBy === "oldest" ? 1 : -1;
+    (sort as Record<string, 1 | -1>)._id = sortBy === "oldest" ? 1 : -1;
     const bookings = await this._model
       .find(query)
       .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
@@ -205,13 +205,13 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
     const skip = (page - 1) * limit;
     
   
-    const query: any = {};
+    const query: Record<string, unknown> = {};
     
     if (status) {
       query.status = status;
     }
     
-    const orClauses: any[] = [];
+    const orClauses: Record<string, unknown>[] = [];
     if (search) {
       orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
@@ -227,13 +227,13 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
       query.$or = orClauses;
     }
     
-    const sort: any = {};
+    const sort: Record<string, 1 | -1> = {};
     if (sortBy === "latest") {
       sort.createdAt = -1;
-      (sort as any)._id = -1;
+      (sort as Record<string, 1 | -1>)._id = -1;
     } else if (sortBy === "oldest") {
       sort.createdAt = 1;
-      (sort as any)._id = 1; 
+      (sort as Record<string, 1 | -1>)._id = 1; 
     }
     
     const bookings = await this._model
@@ -280,7 +280,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
 
   async findBookingByIdComplete(bookingId: string): Promise<BookingCompleteResponse | null> {
     const isObjectId = mongoose.Types.ObjectId.isValid(bookingId);
-    const query = isObjectId ? { _id: new mongoose.Types.ObjectId(bookingId) } : { bookingId } as any;
+    const query = isObjectId ? { _id: new mongoose.Types.ObjectId(bookingId) } : { bookingId };
     const booking = await this._model
       .findOne(query)
       .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
@@ -302,15 +302,15 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
         id: booking.userId._id.toString(),
         name: booking.userId.name,
         email: booking.userId.email,
-        photo: (booking.userId as any).photo,
+        photo: (booking.userId as unknown as Record<string, unknown>).photo as string,
       },
       pro: {
         id: booking.proId._id.toString(),
         firstName: booking.proId.firstName,
         lastName: booking.proId.lastName,
-        profilePhoto: (booking.proId as any).profilePhoto,
-        email: (booking.proId as any).email,
-        phoneNumber: (booking.proId as any).phoneNumber,
+        profilePhoto: (booking.proId as unknown as Record<string, unknown>).profilePhoto as string,
+        email: (booking.proId as unknown as Record<string, unknown>).email as string,
+        phoneNumber: (booking.proId as unknown as Record<string, unknown>).phoneNumber as string,
       },
       category: {
         id: booking.categoryId._id.toString(),
@@ -351,7 +351,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
     const endOfDay = new Date(preferredDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const query: any = {
+    const query: Record<string, unknown> = {
       proId: new mongoose.Types.ObjectId(proId),
       preferredDate: { $gte: startOfDay, $lte: endOfDay },
       status,
@@ -394,7 +394,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
     const endOfDay = new Date(preferredDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const query: any = {
+    const query: Record<string, unknown> = {
       userId: new mongoose.Types.ObjectId(userId),
       proId: new mongoose.Types.ObjectId(proId),
       preferredDate: { $gte: startOfDay, $lte: endOfDay },
@@ -496,13 +496,13 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
         id: booking.userId._id.toString(),
         name: booking.userId.name,
         email: booking.userId.email,
-        photo: (booking.userId as any).photo,
+        photo: booking.userId.photo,
       },
       pro: {
         id: booking.proId._id.toString(),
         firstName: booking.proId.firstName,
         lastName: booking.proId.lastName,
-        profilePhoto: (booking.proId as any).profilePhoto,
+        profilePhoto: booking.proId.profilePhoto,
       },
       category: {
         id: booking.categoryId._id.toString(),
@@ -547,7 +547,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
     const startOfNextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const startOfPrevDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
-    const matchBase = { status: "completed", adminRevenue: { $exists: true, $ne: null } } as any;
+    const matchBase = { status: "completed", adminRevenue: { $exists: true, $ne: null } };
 
     const [
       totalAgg,
@@ -754,7 +754,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
           revenue: { $sum: "$adminRevenue" },
         },
       },
-      { $sort: { "_id.year": 1 as 1, "_id.month": 1 as 1 } },
+      { $sort: { "_id.year": 1 as const, "_id.month": 1 as const } },
       {
         $project: {
           _id: 0,
@@ -763,8 +763,8 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
           revenue: 1,
         },
       },
-    ] as any[];
-    const result = await this._model.aggregate(pipeline as any).exec();
+    ];
+    const result = await this._model.aggregate(pipeline).exec();
     return result as Array<{ year: number; month: number; revenue: number }>;
   }
 
@@ -779,7 +779,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
           revenue: { $sum: "$proRevenue" },
         },
       },
-      { $sort: { "_id.year": 1 as 1, "_id.month": 1 as 1 } },
+      { $sort: { "_id.year": 1 as const, "_id.month": 1 as const } },
       {
         $project: {
           _id: 0,
@@ -788,8 +788,8 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
           revenue: 1,
         },
       },
-    ] as any[];
-    const result = await this._model.aggregate(pipeline as any).exec();
+    ];
+    const result = await this._model.aggregate(pipeline).exec();
     return result as Array<{ year: number; month: number; revenue: number }>;
   }
 
@@ -805,7 +805,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
           revenue: { $sum: "$proRevenue" },
         },
       },
-      { $sort: { "_id.year": 1 as 1, "_id.month": 1 as 1 } },
+      { $sort: { "_id.year": 1 as const, "_id.month": 1 as const } },
       {
         $project: {
           _id: 0,
@@ -814,8 +814,8 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
           revenue: 1,
         },
       },
-    ] as any[];
-    const result = await this._model.aggregate(pipeline as any).exec();
+    ];
+    const result = await this._model.aggregate(pipeline).exec();
     return result as Array<{ year: number; month: number; revenue: number }>;
   }
 }

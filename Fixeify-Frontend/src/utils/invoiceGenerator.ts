@@ -39,7 +39,7 @@ export const generateInvoice = (data: InvoiceData): void => {
   
   let yPosition = 20;
   
-  const addText = (text: string, x: number, y: number, options?: any) => {
+  const addText = (text: string, x: number, y: number, options?: { align?: "left" | "center" | "right" | "justify"; maxWidth?: number }) => {
     pdf.text(text, x, y, options);
   };
   

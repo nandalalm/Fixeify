@@ -6,7 +6,7 @@ export interface IAuthService {
   sendOtp(email: string, role?: UserRole): Promise<void>;
   verifyOtp(email: string, otp: string): Promise<boolean>;
   isEmailVerified(email: string): Promise<boolean>;
-  register(name: string, email: string, password: string, role: UserRole): Promise<any>;
+  register(name: string, email: string, password: string, role: UserRole): Promise<UserResponse>;
   login(email: string, password: string, role: UserRole, res: Response): Promise<{
     accessToken: string;
     refreshToken: string;

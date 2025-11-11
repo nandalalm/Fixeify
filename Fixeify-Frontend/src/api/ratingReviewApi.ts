@@ -43,7 +43,7 @@ export const getReviewsByPro = async (
   sortBy?: "latest" | "oldest" | "lowest" | "highest",
   search?: string
 ): Promise<PaginatedReviews> => {
-  const params: Record<string, any> = { page, limit };
+  const params: Record<string, string | number> = { page, limit };
   if (sortBy) params.sortBy = sortBy;
   if (search) params.search = search;
   const { data } = await axiosInstance.get(`${ReviewBase}/pro/${proId}`, { params });
@@ -70,7 +70,7 @@ export const getAllReviews = async (
   sortBy?: "latest" | "oldest" | "lowest" | "highest",
   search?: string
 ): Promise<PaginatedReviews> => {
-  const params: Record<string, any> = { page, limit };
+  const params: Record<string, string | number> = { page, limit };
   if (sortBy) params.sortBy = sortBy;
   if (search) params.search = search;
   const { data } = await axiosInstance.get(`${ReviewBase}/all`, { params });

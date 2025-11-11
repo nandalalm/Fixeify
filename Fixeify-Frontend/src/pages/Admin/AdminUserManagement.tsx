@@ -31,6 +31,8 @@ export interface User {
 }
 
 const UserManagement: FC = () => {
+  const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.auth.user);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [isLargeScreen, setIsLargeScreen] = useState(window.innerWidth >= 1024);
   const [users, setUsers] = useState<User[]>([]);
@@ -46,28 +48,21 @@ const UserManagement: FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const limit = 5;
 
-  const navigate = useNavigate();
-  const user = useSelector((state: RootState) => state.auth.user);
-
   useEffect(() => {
-    if (!user || user.role !== "admin") {
-      navigate("/admin-login");
-    } else {
-      const getUsers = async () => {
-        try {
-          setIsLoading(true);
-          const sortBy = (sortOption === "latest" || sortOption === "oldest") ? sortOption : "latest";
-          const { users, total } = await fetchUsers(currentPage, limit, sortBy);
-          setUsers(users);
-          setTotalPages(Math.ceil(total / limit));
-        } catch (error) {
-          console.error("Failed to fetch users:", error);
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      getUsers();
-    }
+    const getUsers = async () => {
+      try {
+        setIsLoading(true);
+        const sortBy = (sortOption === "latest" || sortOption === "oldest") ? sortOption : "latest";
+        const { users, total } = await fetchUsers(currentPage, limit, sortBy);
+        setUsers(users);
+        setTotalPages(Math.ceil(total / limit));
+      } catch (error) {
+        console.error("Failed to fetch users:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    getUsers();
   }, [user, navigate, currentPage, sortOption]);
 
   useEffect(() => {
@@ -161,7 +156,6 @@ const UserManagement: FC = () => {
     return <img src={displayedSrc} alt={alt} className={className || "h-10 w-10 rounded-full object-cover"} />;
   };
 
-  if (!user || user.role !== "admin") return null;
 
   const filteredUsers = users.filter(
     (user) =>
@@ -180,6 +174,10 @@ const UserManagement: FC = () => {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, sortOption]);
+
+  if (!user || user.role !== "admin") {
+    return null;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">

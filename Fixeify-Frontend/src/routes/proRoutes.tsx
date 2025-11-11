@@ -8,8 +8,7 @@ import ProWalletManagement from "@/pages/Pro/ProWalletManagement";
 import ProMessages from "@/pages/Pro/ProMessages";
 import ProRatingReview from "@/pages/Pro/ProRatingReview";
 import ProConflicts from "@/pages/Pro/ProConflicts";
-
-const ProEarnings = () => <div>Pro Earnings Page (To be implemented)</div>;
+import ProEarnings from "@/pages/Pro/ProEarnings";
 
 const proRoutes = (
   <>

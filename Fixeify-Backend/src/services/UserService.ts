@@ -1,5 +1,13 @@
 import { injectable, inject } from "inversify";
+
+declare const process: {
+  env: {
+    STRIPE_SECRET_KEY: string;
+    [key: string]: string | undefined;
+  };
+};
 import { TYPES } from "../types";
+import logger from "../config/logger";
 import { IUserRepository } from "../repositories/IUserRepository";
 import { IProRepository } from "../repositories/IProRepository";
 import { IBookingRepository } from "../repositories/IBookingRepository";
@@ -91,12 +99,12 @@ export class UserService implements IUserService {
     try {
       await this._notificationService.createNotification({
         type: "general",
-        title: "Profile Updated Successfully",
+        title: "Profile Updated",
         description: "Your profile information has been updated successfully. Your changes are now active.",
         userId: userId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_PROFILE_UPDATE_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_USER_PROFILE_UPDATE_NOTIFICATION, { userId, error });
     }
 
     return this.mapToUserResponse(updatedUser);
@@ -127,12 +135,12 @@ export class UserService implements IUserService {
     try {
       await this._notificationService.createNotification({
         type: "general",
-        title: "Password Changed Successfully",
+        title: "Password Changed",
         description: "Your password has been changed successfully. If you didn't make this change, please contact support immediately.",
         userId: userId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_PASSWORD_CHANGE_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_USER_PASSWORD_CHANGE_NOTIFICATION, { userId, error });
     }
 
     return this.mapToUserResponse(updatedUser);
@@ -248,8 +256,8 @@ export class UserService implements IUserService {
       try {
         const rollbackSlots = updatedSlots.map((s) => ({ ...s, booked: false }));
         await this._proRepository.updateAvailability(pro.id, dayOfWeek, rollbackSlots, false);
-      } catch (e) {
-        console.error(MESSAGES.FAILED_ROLLBACK_AVAILABILITY_AFTER_BOOKING_ERROR + ":", e);
+      } catch (error) {
+        logger.error(MESSAGES.FAILED_ROLLBACK_PRO_AVAILABILITY_BOOKING_ERROR, { proId: pro.id, dayOfWeek, error });
       }
       throw error;
     }
@@ -264,7 +272,7 @@ export class UserService implements IUserService {
         bookingId: createdBooking.id
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_BOOKING_CREATION_NOTIFICATION + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_BOOKING_CREATION_NOTIFICATION_PRO, { proId, bookingId: createdBooking.id, userName: user.name, error });
     }
 
     try {
@@ -276,7 +284,7 @@ export class UserService implements IUserService {
         bookingId: createdBooking.id
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_BOOKING_CONFIRMATION_TO_USER + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_BOOKING_CREATION_NOTIFICATION_USER, { userId, bookingId: createdBooking.id, proName: `${pro.firstName} ${pro.lastName}`, error });
     }
 
     return createdBooking;
@@ -339,7 +347,9 @@ export class UserService implements IUserService {
             return { clientSecret: existing.client_secret };
           }
         }
-      } catch {}
+      } catch (error) {
+        logger.error(MESSAGES.FAILED_REDIS_OPERATION_PAYMENT_INTENT, { bookingId, error });
+      }
     }
 
     const paymentIntent = await this._stripe.paymentIntents.create({
@@ -351,14 +361,11 @@ export class UserService implements IUserService {
     if (!paymentIntent.client_secret) {
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_CREATE_PAYMENT_INTENT);
     }
-    await this._quotaRepository.updateQuota(quota.id, { paymentIntentId: paymentIntent.id } as any);
+    await this._quotaRepository.updateQuota(quota.id, { paymentIntentId: paymentIntent.id });
     return { clientSecret: paymentIntent.client_secret };
   }
 
   async completeBookingPayment(bookingId: string): Promise<void> {
-    try { 
-      const stack = new Error().stack?.split('\n').slice(2, 6).join(' | ') || 'no-stack';
-    } catch {}
     const redis = new RedisConnector();
     let lockKey: string | null = null;
     let locked = false;
@@ -366,13 +373,15 @@ export class UserService implements IUserService {
       if (redis.isConnected()) {
         const client = redis.getClient();
         lockKey = `lock:booking:${bookingId}:payment`;
-        const ok = await client.set(lockKey, "1", { NX: true, PX: 5 * 60 * 1000 } as any);
+        const ok = await client.set(lockKey, "1", { NX: true, PX: 5 * 60 * 1000 });
         if (!ok) {
           return;
         }
         locked = true;
       }
-    } catch {}
+    } catch (error) {
+      logger.error(MESSAGES.FAILED_REDIS_OPERATION_PAYMENT_LOCK, { bookingId, error });
+    }
 
     const booking = await this._bookingRepository.findBookingById(bookingId);
     if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
@@ -390,7 +399,7 @@ export class UserService implements IUserService {
       wallet = await this._walletRepository.createWallet({
         proId: booking.proId,
         balance: 0,
-      } as any);
+      });
     }
 
     const updatedWallet = await this._walletRepository.updateWallet(wallet.id, {
@@ -417,8 +426,9 @@ export class UserService implements IUserService {
           quotaId: new mongoose.Types.ObjectId(quota.id),
           bookingId: new mongoose.Types.ObjectId(booking.id),
           description: `Payment for booking #${booking.id.slice(-6)}`,
-        } as any);
-      } catch (e) {
+        });
+      } catch (error) {
+        logger.error(MESSAGES.FAILED_CREATE_PRO_REVENUE_TRANSACTION, { proId: booking.proId, amount: proAmount, bookingId: booking.id, error });
       }
     }
 
@@ -438,7 +448,7 @@ export class UserService implements IUserService {
           type: "credit",
           proId: booking.proId.toString(),
           amount: adminRevenue,
-          adminId: (admin as any)._id.toString(),
+          adminId: ((admin as unknown as Record<string, unknown>)._id as string).toString(),
         });
         if (!existingAdminTx) {
           try {
@@ -450,15 +460,16 @@ export class UserService implements IUserService {
               date: new Date(),
               quotaId: new mongoose.Types.ObjectId(quota.id),
               bookingId: new mongoose.Types.ObjectId(booking.id),
-              adminId: new mongoose.Types.ObjectId((admin as any)._id),
+              adminId: new mongoose.Types.ObjectId((admin as unknown as Record<string, unknown>)._id as string),
               description: `Admin revenue for booking #${booking.id.slice(-6)}`,
-            } as any);
-          } catch (e) {
+            });
+          } catch (error) {
+            logger.error(MESSAGES.FAILED_CREATE_ADMIN_REVENUE_TRANSACTION, { adminId: admin._id, amount: adminRevenue, bookingId: booking.id, error });
           }
         } 
       }
-    } catch (e) {
-      console.error(MESSAGES.FAILED_RECORD_ADMIN_REVENUE_TRANSACTION + ":", e);
+    } catch (error) {
+      logger.error(MESSAGES.FAILED_CREATE_ADMIN_REVENUE_TRANSACTION, { bookingId: booking.id, error });
     }
 
     await this._bookingRepository.updateBooking(bookingId, {
@@ -484,14 +495,16 @@ export class UserService implements IUserService {
         quotaId: quota.id
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_PAYMENT_COMPLETION_NOTIFICATIONS + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_PAYMENT_COMPLETION_NOTIFICATION, { proId: booking.proId, amount: proAmount, walletId: wallet.id, quotaId: quota.id, error });
     }
     
     try {
       if (locked && lockKey && redis.isConnected()) {
         await redis.getClient().del(lockKey);
       }
-    } catch {}
+    } catch (error) {
+      logger.error(MESSAGES.FAILED_REDIS_CLEANUP_PAYMENT_LOCK, { lockKey, error });
+    }
   }
 
  async cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }> {
@@ -513,7 +526,6 @@ export class UserService implements IUserService {
 
     const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, false);
     if (!availabilityUpdate) {
-      console.error(MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY + ":", await this._proRepository.findApprovedProById(pro.id));
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
     }
 
@@ -523,8 +535,10 @@ export class UserService implements IUserService {
       preferredTime: updatedSlots.map((slot) => ({ ...slot })),
     });
 
-    try { await cancelSlotRelease(bookingId); } catch {}
-    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null } as any);
+    try { await cancelSlotRelease(bookingId); } catch (error) {
+      logger.error(MESSAGES.FAILED_CANCEL_SLOT_RELEASE_USER, { bookingId, error });
+    }
+    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null });
 
 
     try {
@@ -536,7 +550,7 @@ export class UserService implements IUserService {
         bookingId: bookingId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_BOOKING_CANCELLATION_TO_USER + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_BOOKING_CANCELLATION_NOTIFICATION_USER, { userId, bookingId, error });
     }
 
     try {
@@ -548,7 +562,7 @@ export class UserService implements IUserService {
         bookingId: bookingId
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_BOOKING_CANCELLATION_TO_PRO + ":", error);
+      logger.error(MESSAGES.FAILED_CREATE_BOOKING_CANCELLATION_NOTIFICATION_PRO, { proId: booking.proId.toString(), bookingId, error });
     }
 
     return { message: "Booking cancelled successfully" };
@@ -566,28 +580,28 @@ export class UserService implements IUserService {
 
   async handleWebhookEvent(event: Stripe.Event): Promise<void> {
     switch (event.type) {
-      case "payment_intent.succeeded":
+      case "payment_intent.succeeded": {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         if (paymentIntent.metadata?.bookingId) {
           const bookingId = paymentIntent.metadata.bookingId;
           const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
           if (!quota) {
-            console.error("[payment] succeeded for booking without quota", { bookingId, paymentIntentId: paymentIntent.id });
             return;
           }
           if (quota.paymentIntentId && quota.paymentIntentId !== paymentIntent.id) {
-            try { console.warn('[payment] ignoring mismatched PI', { bookingId, quotaPI: quota.paymentIntentId, eventPI: paymentIntent.id }); } catch {}
             return; 
           }
           await this.completeBookingPayment(bookingId);
         }
         break;
-      case "payment_intent.payment_failed":
+      }
+      case "payment_intent.payment_failed": {
         const failedPaymentIntent = event.data.object as Stripe.PaymentIntent;
         if (failedPaymentIntent.metadata?.bookingId) {
           await this.handlePaymentFailure(failedPaymentIntent.metadata.bookingId);
         }
         break;
+      }
       default:
     }
   }

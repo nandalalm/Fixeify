@@ -31,7 +31,7 @@ export class TicketService implements ITicketService {
     }
 
     const ticket = await this._ticketRepository.create(ticketData);
-    const flagUpdate: any = {};
+    const flagUpdate: Record<string, boolean> = {};
     if (ticketData.complainantType === "user") {
       flagUpdate.hasComplaintRaisedByUser = true;
     } else if (ticketData.complainantType === "pro") {
@@ -50,8 +50,8 @@ export class TicketService implements ITicketService {
         proId: ticketData.complainantType === "pro" ? ticketData.complainantId : undefined,
         bookingId: ticketData.bookingId
       });
-    } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+    } catch {
+      // Notification failed, continue execution
     }
 
     try {
@@ -65,21 +65,21 @@ export class TicketService implements ITicketService {
           bookingId: ticketData.bookingId
         });
       }
-    } catch (error) {
-      console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+    } catch {
+      // Notification failed, continue execution
     }
 
-    return this.formatTicketResponse(ticket);
+    return this.formatTicketResponse(ticket as unknown);
   }
 
   async getTicketById(id: string): Promise<TicketResponse | null> {
     const ticket = await this._ticketRepository.findById(id);
-    return ticket ? this.formatTicketResponse(ticket) : null;
+    return ticket ? this.formatTicketResponse(ticket as unknown) : null;
   }
 
   async getTicketByTicketId(ticketId: string): Promise<TicketResponse | null> {
     const ticket = await this._ticketRepository.findByTicketId(ticketId);
-    return ticket ? this.formatTicketResponse(ticket) : null;
+    return ticket ? this.formatTicketResponse(ticket as unknown) : null;
   }
 
   async getTicketsByComplainant(complainantId: string, page: number = 1, limit: number = 10): Promise<TicketListResponse> {
@@ -107,8 +107,9 @@ export class TicketService implements ITicketService {
     const ticket = await this._ticketRepository.updateStatus(id, updateData);
 
     if (ticket) {
-      const complainantIdStr = (ticket as any)?.complainantId?._id?.toString?.() ?? (ticket as any)?.complainantId?.toString?.();
-      const bookingIdStr = (ticket as any)?.bookingId?._id?.toString?.() ?? (ticket as any)?.bookingId?.toString?.();
+      const ticketData = ticket as unknown as Record<string, unknown>;
+      const complainantIdStr = (ticketData?.complainantId as Record<string, unknown>)?._id?.toString?.() ?? (ticketData?.complainantId as Record<string, unknown>)?.toString?.();
+      const bookingIdStr = (ticketData?.bookingId as Record<string, unknown>)?._id?.toString?.() ?? (ticketData?.bookingId as Record<string, unknown>)?.toString?.();
 
       if (updateData.status === 'under_review') {
         try {
@@ -120,8 +121,8 @@ export class TicketService implements ITicketService {
             proId: ticket.complainantType === "pro" ? complainantIdStr : undefined,
             bookingId: bookingIdStr
           });
-        } catch (err) {
-          console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", err);
+        } catch {
+          // Notification failed, continue execution
         }
       }
 
@@ -135,46 +136,47 @@ export class TicketService implements ITicketService {
             proId: ticket.complainantType === "pro" ? complainantIdStr : undefined,
             bookingId: bookingIdStr
           });
-        } catch (err) {
-          console.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", err);
+        } catch {
+          // Notification failed, continue execution
         }
       }
     }
 
-    return ticket ? this.formatTicketResponse(ticket) : null;
+    return ticket ? this.formatTicketResponse(ticket as unknown) : null;
   }
 
   async updateTicketBanStatus(ticketId: string, isUserBanned?: boolean, isProBanned?: boolean): Promise<TicketResponse | null> {
     const ticket = await this._ticketRepository.updateBanStatus(ticketId, isUserBanned, isProBanned);
-    return ticket ? this.formatTicketResponse(ticket) : null;
+    return ticket ? this.formatTicketResponse(ticket as unknown) : null;
   }
 
   async getTicketStats(): Promise<{ pending: number; underReview: number; resolved: number; total: number }> {
     return await this._ticketRepository.getTicketStats();
   }
 
-  private formatTicketResponse(ticket: any): TicketResponse {
+  private formatTicketResponse(ticket: unknown): TicketResponse {
+    const ticketData = ticket as Record<string, unknown>;
     return {
-      _id: ticket._id.toString(),
-      ticketId: ticket.ticketId,
-      complainantType: ticket.complainantType,
-      complainantId: ticket.complainantId._id ? ticket.complainantId._id.toString() : ticket.complainantId.toString(),
-      complainantName: ticket.complainantId.name || `${ticket.complainantId.firstName || ''} ${ticket.complainantId.lastName || ''}`.trim(),
-      againstType: ticket.againstType,
-      againstId: ticket.againstId._id ? ticket.againstId._id.toString() : ticket.againstId.toString(),
-      againstName: ticket.againstId.name || `${ticket.againstId.firstName || ''} ${ticket.againstId.lastName || ''}`.trim(),
-      bookingId: ticket.bookingId._id ? ticket.bookingId._id.toString() : ticket.bookingId.toString(),
-      subject: ticket.subject,
-      description: ticket.description,
-      status: ticket.status,
-      priority: ticket.priority,
-      adminComment: ticket.adminComment,
-      resolvedBy: ticket.resolvedBy?._id?.toString(),
-      resolvedAt: ticket.resolvedAt,
-      isUserBanned: ticket.isUserBanned,
-      isProBanned: ticket.isProBanned,
-      createdAt: ticket.createdAt,
-      updatedAt: ticket.updatedAt
+      _id: (ticketData._id as Record<string, unknown>).toString(),
+      ticketId: ticketData.ticketId as string,
+      complainantType: ticketData.complainantType as "user" | "pro",
+      complainantId: (ticketData.complainantId as Record<string, unknown>)._id ? ((ticketData.complainantId as Record<string, unknown>)._id as Record<string, unknown>).toString() : (ticketData.complainantId as Record<string, unknown>).toString(),
+      complainantName: (ticketData.complainantId as Record<string, unknown>).name as string || `${((ticketData.complainantId as Record<string, unknown>).firstName as string) || ''} ${((ticketData.complainantId as Record<string, unknown>).lastName as string) || ''}`.trim(),
+      againstType: ticketData.againstType as "user" | "pro",
+      againstId: (ticketData.againstId as Record<string, unknown>)._id ? ((ticketData.againstId as Record<string, unknown>)._id as Record<string, unknown>).toString() : (ticketData.againstId as Record<string, unknown>).toString(),
+      againstName: (ticketData.againstId as Record<string, unknown>).name as string || `${((ticketData.againstId as Record<string, unknown>).firstName as string) || ''} ${((ticketData.againstId as Record<string, unknown>).lastName as string) || ''}`.trim(),
+      bookingId: (ticketData.bookingId as Record<string, unknown>)._id ? ((ticketData.bookingId as Record<string, unknown>)._id as Record<string, unknown>).toString() : (ticketData.bookingId as Record<string, unknown>).toString(),
+      subject: ticketData.subject as string,
+      description: ticketData.description as string,
+      status: ticketData.status as "pending" | "under_review" | "resolved",
+      priority: ticketData.priority as "low" | "medium" | "high",
+      adminComment: ticketData.adminComment as string | undefined,
+      resolvedBy: (ticketData.resolvedBy as Record<string, unknown>)?._id?.toString(),
+      resolvedAt: ticketData.resolvedAt as Date | undefined,
+      isUserBanned: ticketData.isUserBanned as boolean | undefined,
+      isProBanned: ticketData.isProBanned as boolean | undefined,
+      createdAt: ticketData.createdAt as Date,
+      updatedAt: ticketData.updatedAt as Date
     };
   }
 }

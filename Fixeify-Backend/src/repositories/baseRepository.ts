@@ -7,7 +7,7 @@ export abstract class BaseRepository<T extends Document, P = T> {
     return this._model.create(data);
   }
 
-  async findOne(query: any): Promise<T | null> {
+  async findOne(query: Record<string, unknown>): Promise<T | null> {
     return this._model.findOne(query).exec();
   }
 

@@ -1,5 +1,3 @@
-import { ILocation, ITimeSlot } from "../../models/bookingModel";
-
 export class QuotaResponse {
   id: string;
 

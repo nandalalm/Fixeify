@@ -93,15 +93,19 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, on
       try {
         const b = await fetchUserBookingById(transaction.bookingId);
         setBooking(b);
-      } catch {}
+      } catch (error) {
+        console.error('Failed to fetch booking:', error);
+      }
       try {
         const q = await fetchUserQuotaByBookingId(transaction.bookingId);
         setQuota(q);
       } catch {
         try {
           const q2 = await fetchProQuotaByBookingId(transaction.bookingId);
-          setQuota(q2 as any);
-        } catch {}
+          setQuota(q2);
+        } catch (error) {
+          console.error('Failed to fetch pro quota:', error);
+        }
       }
       setLoading(false);
     };

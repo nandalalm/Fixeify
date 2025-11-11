@@ -7,6 +7,12 @@ import { HttpError } from "../middleware/errorMiddleware";
 import { ProResponse } from "../dtos/response/proDtos";
 import { HttpStatus } from "../enums/httpStatus";
 
+type AvailabilitySlot = {
+  startTime: string;
+  endTime: string;
+  booked: boolean;
+};
+
 @injectable()
 export class ProController {
   constructor(@inject(TYPES.IProService) private _proService: IProService) { }
@@ -71,7 +77,7 @@ export class ProController {
 
       if (isUnavailable) {
         const hasBookedSlots = Object.values(availability).some(
-          (slots: any[] | undefined) => slots?.some((slot: any) => slot.booked)
+          (slots: AvailabilitySlot[] | undefined) => slots?.some((slot: AvailabilitySlot) => slot.booked)
         );
         if (hasBookedSlots) {
           throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CANNOT_MARK_UNAVAILABLE_WITH_BOOKED_SLOTS);
@@ -178,8 +184,9 @@ export class ProController {
       const wallet = await this._proService.getWallet(proId);
       if (!wallet) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WALLET_NOT_FOUND);
       res.status(HttpStatus.OK).json(wallet);
-    } catch (error: any) {
-      res.status(error.status || HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorObj = error as { status?: number; message: string };
+      res.status(errorObj.status || HttpStatus.INTERNAL_SERVER_ERROR).json({ message: errorObj.message });
     }
   }
 
@@ -193,8 +200,9 @@ export class ProController {
       const { wallet, total } = await this._proService.getWalletWithPagination(proId, page, limit, sortBy, search);
       if (!wallet) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WALLET_NOT_FOUND);
       res.status(HttpStatus.OK).json({ wallet, total });
-    } catch (error: any) {
-      res.status(error.status || 500).json({ message: error.message });
+    } catch (error: unknown) {
+      const errorObj = error as { status?: number; message: string };
+      res.status(errorObj.status || 500).json({ message: errorObj.message });
     }
   }
 

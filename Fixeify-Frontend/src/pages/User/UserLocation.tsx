@@ -39,7 +39,7 @@ const UserLocation = () => {
         if (response.address) {
           setSavedLocation(response.address);
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Failed to fetch user profile:", error);
         setErrors({ location: "Failed to fetch saved location. Please select a location manually." });
       } finally {
@@ -226,9 +226,9 @@ const UserLocation = () => {
     const persistAndNavigate = async () => {
       try {
         if (userId) {
-          await updateUserProfile(userId, { address: selectedLocation as any });
+          await updateUserProfile(userId, { address: selectedLocation });
           if (user) {
-            dispatch(updateUser({ ...user, address: selectedLocation as any } as any));
+            dispatch(updateUser({ ...user, address: selectedLocation }));
           }
         }
       } catch (err) {

@@ -12,7 +12,7 @@ export const errorMiddleware = (
   err: HttpError | Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   const status = err instanceof HttpError ? err.status : 500;
   const message = err.message || "Internal Server Error";

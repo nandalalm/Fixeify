@@ -1,15 +1,26 @@
+const js = require("@eslint/js");
+const typescriptEslint = require("@typescript-eslint/eslint-plugin");
+const tsParser = require("@typescript-eslint/parser");
 
-import js from "@eslint/js";
-import typescriptEslint from "@typescript-eslint/eslint-plugin";
-import tsParser from "@typescript-eslint/parser";
-
-export default [
+module.exports = [
   {
     files: ["**/*.ts"],
     languageOptions: {
       parser: tsParser,
       sourceType: "module",
       ecmaVersion: "latest",
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        global: "writable",
+        __dirname: "readonly",
+        __filename: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+      },
     },
     plugins: {
       "@typescript-eslint": typescriptEslint,
@@ -18,7 +29,13 @@ export default [
       ...js.configs.recommended.rules,
       ...typescriptEslint.configs.recommended.rules,
       "no-console": "warn",
-      "@typescript-eslint/no-unused-vars": "error",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_",
+          "varsIgnorePattern": "^_",
+        }
+      ],
     },
   },
   {

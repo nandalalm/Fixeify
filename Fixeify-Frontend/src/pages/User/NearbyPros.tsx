@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import { getNearbyPros } from "../../api/userApi";
 import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
@@ -96,7 +96,7 @@ const NearbyPros = () => {
   
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-  const fetchNearbyPros = async (page: number = 1, isLoadMore: boolean = false) => {
+  const fetchNearbyPros = useCallback(async (page: number = 1, isLoadMore: boolean = false) => {
     if (!selectedLocation || !selectedLocation.coordinates?.coordinates) {
       setError("Invalid location data. Please select a location again.");
       setLoading(false);
@@ -139,17 +139,18 @@ const NearbyPros = () => {
       }
       
       setError(null);
-    } catch (err: any) {
-      const errorMessage = err.response
-        ? `Failed to load professionals: ${err.response.status} - ${JSON.stringify(err.response.data)}`
-        : `Failed to load professionals: ${err.message}`;
+    } catch (err: unknown) {
+      const error = err as { response?: { status?: number; data?: unknown }; message?: string };
+      const errorMessage = error.response
+        ? `Failed to load professionals: ${error.response.status} - ${JSON.stringify(error.response.data)}`
+        : `Failed to load professionals: ${error.message}`;
       setError(errorMessage);
       console.error("Error fetching nearby pros:", err);
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
-  };
+  }, [selectedLocation, navigate, categoryId, sortBy, availabilityFilter, hasEverLoadedPros]);
 
   const loadMorePros = () => {
     const nextPage = currentPage + 1;
@@ -217,7 +218,7 @@ const NearbyPros = () => {
       setLoading(false);
       navigate(`/location?categoryId=${categoryId}`);
     }
-  }, [categoryId, stateLocation, savedLocation, navigate, sortBy, availabilityFilter]);
+  }, [categoryId, stateLocation, savedLocation, navigate, sortBy, availabilityFilter, fetchNearbyPros, selectedLocation]);
 
   return (
     <div className="flex flex-col min-h-screen dark:bg-gray-900">

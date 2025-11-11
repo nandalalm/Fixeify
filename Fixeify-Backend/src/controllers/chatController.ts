@@ -8,6 +8,10 @@ import { UserRole } from "../enums/roleEnum";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
 
+declare const console: {
+  error: (message: string, data?: unknown) => void;
+};
+
 @injectable()
 export class ChatController {
   constructor(@inject(TYPES.IChatService) private _chatService: IChatService) { }
@@ -62,15 +66,16 @@ export class ChatController {
       }
       const chat = await this._chatService.createChat({ userId, proId, role });
       res.status(HttpStatus.CREATED).json(chat);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorObj = error as Error;
       console.error(MESSAGES.FAILED_TO_CREATE_CHAT, {
-        error: error.message,
+        error: errorObj.message,
         userId,
         proId,
         role,
-        stack: error.stack,
+        stack: errorObj.stack,
       });
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_CREATE_CHAT, error: error.message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_CREATE_CHAT, error: errorObj.message });
     }
   }
 

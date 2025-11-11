@@ -2,6 +2,7 @@ import api from "./axios";
 import { UserProfile } from "../interfaces/userInterface";
 import { IApprovedPro, ILocation, ITimeSlot } from "../interfaces/adminInterface";
 import { BookingResponse, BookingCompleteResponse } from "../interfaces/bookingInterface";
+import { QuotaResponse } from "../interfaces/quotaInterface";
 import { UserBase } from "@/Constants/BaseRoutes";
 
 export const getUserProfile = async (userId: string): Promise<UserProfile> => {
@@ -31,7 +32,7 @@ export const getNearbyPros = async (
   sortBy: string = 'nearest', 
   availabilityFilter?: string
 ): Promise<{ pros: IApprovedPro[]; total: number; hasMore: boolean }> => {
-  const params: any = { categoryId, longitude, latitude, page, limit, sortBy };
+  const params: Record<string, string | number> = { categoryId, longitude, latitude, page, limit, sortBy };
   if (availabilityFilter) {
     params.availabilityFilter = availabilityFilter;
   }
@@ -76,7 +77,7 @@ export const fetchBookingDetails = async (
   sortBy: "latest" | "oldest" = "latest",
   bookingId?: string
 ): Promise<{ bookings: BookingResponse[]; total: number }> => {
-  const params: any = { page, limit, sortBy };
+  const params: Record<string, string | number> = { page, limit, sortBy };
   if (search && search.trim().length > 0) params.search = search;
   if (status && status.trim().length > 0) params.status = status;
   if (bookingId && bookingId.trim().length > 0) params.bookingId = bookingId;
@@ -96,7 +97,7 @@ export const fetchBookingHistoryDetails = async (
   sortBy: "latest" | "oldest" = "latest",
   bookingId?: string
 ): Promise<{ bookings: BookingResponse[]; total: number }> => {
-  const params: any = { page, limit, sortBy };
+  const params: Record<string, string | number> = { page, limit, sortBy };
   if (search && search.trim().length > 0) params.search = search;
   if (status && status.trim().length > 0) params.status = status;
   if (bookingId && bookingId.trim().length > 0) params.bookingId = bookingId;
@@ -122,7 +123,7 @@ export const fetchBookingById = async (bookingId: string): Promise<BookingComple
   return response.data;
 };
 
-export const fetchQuotaByBookingId = async (bookingId: string): Promise<any> => {
+export const fetchQuotaByBookingId = async (bookingId: string): Promise<QuotaResponse> => {
   const response = await api.get(`${UserBase}/quota/by-booking/${bookingId}`, { withCredentials: true });
   return response.data;
 };

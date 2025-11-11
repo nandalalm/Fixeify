@@ -62,7 +62,7 @@ export class ChatService implements IChatService {
     }
 
     try {
-      const newChat = await this._chatRepository.createChat(data.userId, data.proId);
+      await this._chatRepository.createChat(data.userId, data.proId);
       chat = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
       if (!chat) {
         throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_TO_FETCH_CHAT);
@@ -74,8 +74,8 @@ export class ChatService implements IChatService {
         proName: `${pro.firstName} ${pro.lastName || ""}`.trim(),
         proPhoto: pro.profilePhoto || null,
       });
-    } catch (error: any) {
-      if (error.code === 11000 && error.message.includes('participants.userId')) {
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && (error as { code: number; message: string }).code === 11000 && (error as { message: string }).message.includes('participants.userId')) {
         chat = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
         if (chat) {
           return this.mapToChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro", {
@@ -184,7 +184,7 @@ export class ChatService implements IChatService {
       description = "New message";
     }
 
-    const notification = await this._notificationService.createNotification({
+    await this._notificationService.createNotification({
       userId: receiverModel === "User" ? receiverId : undefined,
       proId: receiverModel === "ApprovedPro" ? receiverId : undefined,
       title: `New message from ${senderName}`,
@@ -194,7 +194,7 @@ export class ChatService implements IChatService {
       messageId: message._id.toString(),
     });
 
-    const globalIo = (global as any).io;
+    const globalIo = (global as { io?: { emit: (event: string, data: Record<string, unknown>) => void } }).io;
     if (globalIo) {
       globalIo.emit("newNotification", { receiverId, receiverModel });
     }

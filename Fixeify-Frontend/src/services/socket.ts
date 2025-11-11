@@ -108,19 +108,26 @@ export const isSocketConnected = (): boolean => {
   return socket?.connected || false;
 };
 
+export const getSocketStatus = (): string => {
+  if (!socket) return 'not_initialized';
+  if (socket.connected) return 'connected';
+  if (socket.disconnected) return 'disconnected';
+  return 'connecting';
+};
+
 export const reconnectSocket = (accessToken: string): Socket => {
   disconnectSocket();
   return initializeSocket(accessToken);
 };
 
-export const emitWithErrorHandling = (event: string, data: any): Promise<any> => {
+export const emitWithErrorHandling = (event: string, data: unknown): Promise<unknown> => {
   return new Promise((resolve, reject) => {
     if (!socket?.connected) {
       reject(new Error('Socket not connected'));
       return;
     }
 
-    socket.emit(event, data, (response: any) => {
+    socket.emit(event, data, (response: { error?: string }) => {
       if (response?.error) {
         reject(new Error(response.error));
       } else {

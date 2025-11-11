@@ -61,7 +61,7 @@ const WithdrawalRequestDetails: React.FC<WithdrawalRequestDetailsProps> = ({ wit
         if (withdrawal.bookingId) {
           try {
             const b: BookingResponse = await fetchProBookingById(withdrawal.bookingId);
-            setCategoryName((b as any)?.category?.name || null);
+            setCategoryName((b as { category?: { name?: string } })?.category?.name || null);
           } catch {
             setCategoryName(null);
           }
@@ -69,19 +69,19 @@ const WithdrawalRequestDetails: React.FC<WithdrawalRequestDetailsProps> = ({ wit
         if (!categoryName) {
           try {
             const ap = await fetchApprovedProById(withdrawal.proId);
-            setCategoryName((ap as any)?.category?.name || (ap as any)?.customService || null);
+            setCategoryName((ap as { category?: { name?: string }; customService?: string })?.category?.name || (ap as { customService?: string })?.customService || null);
           } catch {
             // ignore
           }
         }
-      } catch (e: any) {
-        setError(e?.response?.data?.message || "Failed to load pro details.");
+      } catch (e: unknown) {
+        setError((e as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to load pro details.");
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [withdrawal.proId, withdrawal.bookingId, showProDetails]);
+  }, [withdrawal.proId, withdrawal.bookingId, showProDetails, categoryName]);
 
   return (
     <div className="space-y-4">

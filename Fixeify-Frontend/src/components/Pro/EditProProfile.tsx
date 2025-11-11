@@ -67,6 +67,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
           });
           setOriginalData(fetchedPro);
         } catch (error) {
+          console.error('Failed to fetch pro profile:', error);
           navigate("/login");
         }
       }
@@ -150,7 +151,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
     };
   }, []);
 
-  const validateField = (name: string, value: any) => {
+  const validateField = (name: string, value: unknown) => {
     try {
       const fieldSchema = editProProfileSchema.shape[name as keyof typeof editProProfileSchema.shape];
       if (fieldSchema) {
@@ -297,6 +298,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
         });
         validateField("profilePhoto", url);
       } catch (error) {
+        console.error('Failed to upload profile photo:', error);
         setErrors((prev) => ({
           ...prev,
           profilePhoto: "Failed to upload image",
@@ -336,6 +338,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
         });
         validateField("profilePhoto", url);
       } catch (error) {
+        console.error('Failed to upload profile photo:', error);
         setErrors((prev) => ({
           ...prev,
           profilePhoto: "Failed to upload image",
@@ -352,7 +355,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
     if (name === "location") {
       setFormData((prev) => ({ ...prev, location: prev.location }));
       if (!value.trim()) {
-        // Clear any existing location errors when field is empty
+        // Clear existing location errors when field is empty
         setErrors((prev) => {
           const newErrors = { ...prev };
           delete newErrors.location;
@@ -379,7 +382,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
       return newErrors;
     });
 
-    // Check if there are any existing validation errors
+    // Check if there are existing validation errors
     const hasErrors = Object.keys(errors).some(key => key !== 'general' && errors[key]);
     if (hasErrors) {
       setErrors((prev) => ({
@@ -422,7 +425,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
         })
       );
       onCancel();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (error instanceof z.ZodError) {
         const newErrors: Record<string, string> = { ...errors };
         const locationErrors: string[] = [];
@@ -454,7 +457,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
       } else {
         setErrors((prev) => ({
           ...prev,
-          general: error.response?.data?.message || "Failed to update profile. Please try again.",
+          general: (error as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to update profile. Please try again.",
         }));
       }
     } finally {

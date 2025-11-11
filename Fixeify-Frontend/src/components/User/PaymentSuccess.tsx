@@ -19,6 +19,16 @@ const PaymentSuccess = () => {
     ...dataFromState,
   };
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      dispatch(clearPaymentSuccessData()); 
+    };
+  }, [dispatch]);
+
   if (!bookingDetails || !proId || !pro || !categoryId || !loc || totalCost === undefined) {
     console.error("Missing payment success data:", { bookingDetails, proId, pro, categoryId, loc, totalCost });
     return (
@@ -46,16 +56,6 @@ const PaymentSuccess = () => {
     const adjustedHours = hours % 12 || 12;
     return `${adjustedHours}:${minutes.toString().padStart(2, "0")} ${period}`;
   };
-
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      dispatch(clearPaymentSuccessData()); 
-    };
-  }, [dispatch]);
 
   return (
     <div className="bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 dark:from-gray-800 dark:via-gray-900 dark:to-gray-900 flex items-center justify-center p-4">

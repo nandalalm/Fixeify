@@ -39,7 +39,7 @@ const Avatar: React.FC<{
   useEffect(() => {
     if (!src || src === placeholder) {
       setDisplayedSrc(placeholder);
-      onSrcChange && onSrcChange(placeholder);
+      if (onSrcChange) onSrcChange(placeholder);
       return;
     }
     let cancelled = false;
@@ -49,7 +49,7 @@ const Avatar: React.FC<{
       img.onload = () => {
         if (!cancelled) {
           setDisplayedSrc(targetSrc);
-          onSrcChange && onSrcChange(targetSrc);
+          if (onSrcChange) onSrcChange(targetSrc);
         }
       };
       img.onerror = () => {
@@ -59,12 +59,12 @@ const Avatar: React.FC<{
           tryLoad(targetSrc);
         } else {
           setDisplayedSrc(placeholder);
-          onSrcChange && onSrcChange(placeholder);
+          if (onSrcChange) onSrcChange(placeholder);
         }
       };
       img.src = targetSrc;
       if (img.complete && img.naturalWidth > 0) {
-        img.onload?.(new Event('load'));
+        if (img.onload) img.onload(new Event('load'));
       }
     };
     tryLoad(src);
@@ -92,7 +92,7 @@ const Avatar: React.FC<{
       decoding="async"
       onError={() => {
         setDisplayedSrc(placeholder);
-        onSrcChange && onSrcChange(placeholder);
+        if (onSrcChange) onSrcChange(placeholder);
       }}
     />
   );
@@ -163,9 +163,9 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
     if (
       typeof review.bookingId === "object" &&
       "_id" in review.bookingId &&
-      typeof (review.bookingId as any)._id === "string"
+      typeof (review.bookingId as { _id?: string })._id === "string"
     ) {
-      return (review.bookingId as any)._id as string;
+      return (review.bookingId as { _id: string })._id;
     }
     return null;
   }, [review]);
@@ -182,7 +182,8 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
         setQuota(quotaRes);
         setBooking(bookingRes);
         setError(null);
-      } catch (err) {
+      } catch (error) {
+        console.error('Failed to load booking/quota details:', error);
         setError("Failed to load booking/quota details");
       } finally {
         setLoading(false);

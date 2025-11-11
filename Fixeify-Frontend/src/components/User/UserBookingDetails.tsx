@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { cancelBooking } from "../../api/userApi";
 import { fetchQuotaByBookingId } from "../../api/proApi";
 import { BookingResponse } from "../../interfaces/bookingInterface";
 import { QuotaResponse } from "../../interfaces/quotaInterface";
+import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
 import { ArrowLeft } from "lucide-react";
 import { loadStripe } from "@stripe/stripe-js";
 import type { Stripe, StripeError, PaymentIntent } from "@stripe/stripe-js";
@@ -60,9 +60,9 @@ const CheckoutForm = ({
   onPaymentSuccess: () => void;
   navigate: ReturnType<typeof useNavigate>;
   proId: string;
-  pro: any;
+  pro: { id: string; firstName: string; lastName: string };
   categoryId: string | undefined;
-  location: any;
+  location: { address: string; city: string; state: string; coordinates: { type: "Point"; coordinates: [number, number] } };
   clientSecret: string | null;
   booking: BookingResponse;
   onPaymentFailure: () => Promise<void>;
@@ -113,9 +113,9 @@ const CheckoutForm = ({
                   user: { ...booking.user, role: UserRole.USER },
                 },
                 proId,
-                pro,
+                pro: pro as unknown as IApprovedPro,
                 categoryId: categoryId || null,
-                location,
+                location: location as unknown as ILocation,
                 totalCost,
               })
             );
@@ -127,9 +127,9 @@ const CheckoutForm = ({
                   user: { ...booking.user, role: UserRole.USER },
                 },
                 proId,
-                pro,
+                pro: pro as unknown as IApprovedPro,
                 categoryId: categoryId || null,
-                location,
+                location: location as unknown as ILocation,
                 totalCost,
               },
             });
@@ -212,7 +212,7 @@ const UserBookingDetails = ({ booking, onBack }: { booking: BookingResponse; onB
         }
         const quotaResponse = await fetchQuotaByBookingId(booking.id);
         if (quotaResponse) setQuota(quotaResponse);
-      } catch (err) {
+      } catch {
         setError("Failed to load booking or quota details.");
       } finally {
         setLoading(false);
@@ -224,7 +224,7 @@ const UserBookingDetails = ({ booking, onBack }: { booking: BookingResponse; onB
     if (stripeKey) {
       setStripePromise(loadStripe(stripeKey));
     }
-  }, [booking.id, booking.user.id]);
+  }, [booking]);
 
   const handlePayment = async () => {
     if (!quota || !currentBooking) return;
@@ -281,13 +281,13 @@ const UserBookingDetails = ({ booking, onBack }: { booking: BookingResponse; onB
       await cancelBooking(currentBooking!.user.id, currentBooking!.id, cancelReason || customCancelReason);
       setIsConfirmModalOpen(false); 
       onBack();
-    } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to cancel booking.");
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to cancel booking.");
       setIsConfirmModalOpen(false); 
       setTimeout(() => {
         setError(null); 
         onBack(); 
-      }, 2000); 
+      }, 2000); // Display error for 2 seconds
     } finally {
       setLoading(false);
     }

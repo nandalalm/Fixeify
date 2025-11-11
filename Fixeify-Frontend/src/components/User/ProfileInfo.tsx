@@ -8,6 +8,7 @@ import { User, Mail, Phone, Home, Edit, Lock, User as UserIcon } from "lucide-re
 import { getUserProfile } from "@/api/userApi";
 import { updateUser } from "@/store/authSlice";
 import { SkeletonLine } from "@/components/Reuseable/Skeleton";
+import { UserProfile } from "@/interfaces/userInterface";
 
 interface ProfileInfoProps {
   onEdit: () => void;
@@ -31,12 +32,12 @@ const ProfileInfo = ({ onEdit, onChangePassword }: ProfileInfoProps) => {
         dispatch(
           updateUser({
             ...user,
-            name: (latest as any)?.name ?? user.name,
-            email: (latest as any)?.email ?? user.email,
-            phoneNo: (latest as any)?.phoneNo ?? user.phoneNo,
-            address: (latest as any)?.address ?? user.address,
-            photo: (latest as any)?.photo ?? user.photo,
-            isBanned: (latest as any)?.isBanned ?? user.isBanned,
+            name: (latest as UserProfile)?.name ?? user.name,
+            email: (latest as UserProfile)?.email ?? user.email,
+            phoneNo: (latest as UserProfile)?.phoneNo ?? user.phoneNo,
+            address: (latest as UserProfile)?.address ?? user.address,
+            photo: (latest as UserProfile)?.photo ?? user.photo,
+            isBanned: user.isBanned, // UserProfile doesn't have isBanned, keep original
           })
         );
       } catch (e) {

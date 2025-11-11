@@ -24,7 +24,7 @@ export class RedisConnector {
     try {
       const url = process.env.REDIS_URL;
       if (!url) {
-        console.warn("REDIS_URL not set. Skipping Redis connection (features depending on Redis will be disabled).\nSet REDIS_URL in Fixeify-Backend/.env to enable Redis.");
+        logger.warn("REDIS_URL not set. Skipping Redis connection (features depending on Redis will be disabled). Set REDIS_URL in Fixeify-Backend/.env to enable Redis.");
         return; 
       }
 
@@ -44,7 +44,7 @@ export class RedisConnector {
       });
 
       this._client.on("ready", () => {
-        console.log("Redis connected successfully");
+        logger.info("Redis connected successfully");
       });
 
       this._client.on("end", () => {

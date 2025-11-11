@@ -6,7 +6,7 @@ export interface User {
   role: "user" | "pro" | "admin";
 }
 
-export interface MUser extends User {}
+export type MUser = User;
 
 export interface Message {
   id: string;

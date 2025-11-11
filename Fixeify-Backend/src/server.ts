@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import { Server } from "http";
 import DatabaseConnector from "./config/databaseConnector";
+import logger from "./config/logger";
 import RedisConnector from "./config/redisConnector";
 import createAuthRoutes from "./routes/authRoutes";
 import createAdminRoutes from "./routes/adminRoutes";
@@ -184,30 +185,28 @@ const connectServices = async (): Promise<void> => {
       ];
       
       const duplicates = await TransactionModel.aggregate(pipeline);
-      let removedCount = 0;
       
       for (const duplicate of duplicates) {
         const docsToRemove = duplicate.docs.slice(1);
         for (const doc of docsToRemove) {
           await TransactionModel.deleteOne({ _id: doc._id });
-          removedCount++;
         }
       }
     
       
       await TransactionModel.syncIndexes();
     } catch (err) {
-      console.error("Failed to sync transaction indexes:", err);
+      logger.error("Failed to sync transaction indexes:", err);
     }
     
     await initSlotReleaseWorker();
     await resyncSlotReleaseJobs();
     
     server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      logger.info(`Server running on port ${PORT}`);
     });
   } catch (err) {
-    console.error("Failed to connect to services:", err);
+    logger.error("Failed to connect to services:", err);
     process.exit(1);
   }
 };

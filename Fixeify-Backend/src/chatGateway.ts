@@ -7,6 +7,21 @@ import { MessageResponse } from "./dtos/response/chatDtos";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import { JwtPayload } from "jsonwebtoken";
+import { Server as HttpServer } from "http";
+
+declare const process: {
+  env: {
+    FRONTEND_URL: string;
+    ACCESS_TOKEN_SECRET: string;
+    [key: string]: string | undefined;
+  };
+};
+
+declare const global: {
+  io: Server;
+  connectedUsers: Map<string, { socketId: string; userId: string; userRole: string }>;
+  [key: string]: unknown;
+};
 
 export interface SocketMessage {
   chatId: string;
@@ -33,7 +48,7 @@ export class ChatGateway {
     @inject(TYPES.INotificationService) private notificationService: INotificationService
   ) { }
 
-  public init(server: any): void {
+  public init(server: HttpServer): void {
     this._io = new Server(server, {
       cors: {
         origin: process.env.FRONTEND_URL,
@@ -42,20 +57,18 @@ export class ChatGateway {
       },
     });
 
-    (global as any).io = this._io;
-    (global as any).connectedUsers = this._connectedUsers;
+    global.io = this._io;
+    global.connectedUsers = this._connectedUsers;
 
     this._io.use(async (socket: AuthenticatedSocket, next) => {
       try {
         const token = socket.handshake.auth.token;
         if (!token) {
-          console.error("No token provided for socket authentication");
           throw new Error("No token provided");
         }
 
         const secret = process.env.ACCESS_TOKEN_SECRET;
         if (!secret) {
-          console.error("ACCESS_TOKEN_SECRET is not defined in environment variables");
           throw new Error("Server configuration error: ACCESS_TOKEN_SECRET not set");
         }
         const decoded = jwt.verify(token, secret) as JwtPayload;
@@ -84,10 +97,10 @@ export class ChatGateway {
           userRole: socket.userRole,
         });
 
-        (global as any).connectedUsers = this._connectedUsers;
+        global.connectedUsers = this._connectedUsers;
 
         next();
-      } catch (error) {
+      } catch {
         next(new Error("Authentication failed"));
       }
     });
@@ -100,7 +113,7 @@ export class ChatGateway {
           userId: socket.userId,
           userRole: socket.userRole
         });
-        (global as any).connectedUsers = this._connectedUsers;
+        global.connectedUsers = this._connectedUsers;
 
         const onlineUserIds = Array.from(this._connectedUsers.keys());
         for (const userId of onlineUserIds) {
@@ -269,7 +282,7 @@ export class ChatGateway {
         if (socket.userId) {
           this._io.emit("onlineStatus", { userId: socket.userId, isOnline: false });
           this._connectedUsers.delete(socket.userId);
-          (global as any).connectedUsers = this._connectedUsers;
+          global.connectedUsers = this._connectedUsers;
         }
       });
     });
@@ -279,7 +292,7 @@ export class ChatGateway {
     return this._connectedUsers;
   }
 
-  public emitToUser(userId: string, event: string, data: any): void {
+  public emitToUser(userId: string, event: string, data: unknown): void {
     const user = this._connectedUsers.get(userId);
     if (user) {
       this._io.to(user.socketId).emit(event, data);

@@ -1,4 +1,4 @@
-import { type FC, useState, useEffect } from "react";
+import { type FC, useState, useEffect, useCallback } from "react";
 import { AdminNavbar } from "../../components/Admin/AdminNavbar";
 import { RotateCcw } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -30,34 +30,7 @@ const AdminBookingManagement: FC = () => {
   const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.auth.user);
 
-  useEffect(() => {
-    if (!user || user.role !== "admin") {
-      navigate("/admin-login");
-    } else {
-      fetchBookings();
-    }
-  }, [user, navigate, currentPage, sortOption, searchTerm]);
-
-  useEffect(() => {
-    fetchBookings();
-  }, [user, navigate, currentPage, sortOption, searchTerm]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsLargeScreen(window.innerWidth >= 1024);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
-    if (!isLargeScreen) {
-      setSidebarOpen(false);
-    }
-  }, [isLargeScreen]);
-
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -81,16 +54,44 @@ const AdminBookingManagement: FC = () => {
       );
       setBookings(bookings);
       setTotalPages(Math.ceil(total / limit));
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Fetch admin bookings error:", err);
-      setError(err.response?.data?.message || "Failed to load bookings");
-      if (err.response?.status === 401) {
+      const errorResponse = err as { response?: { data?: { message?: string }; status?: number } };
+      setError(errorResponse.response?.data?.message || "Failed to load bookings");
+      if (errorResponse.response?.status === 401) {
         navigate("/admin-login");
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, sortOption, searchTerm, navigate]);
+
+  useEffect(() => {
+    if (!user || user.role !== "admin") {
+      navigate("/admin-login");
+    } else {
+      fetchBookings();
+    }
+  }, [user, navigate, currentPage, sortOption, searchTerm, fetchBookings]);
+
+  useEffect(() => {
+    fetchBookings();
+  }, [currentPage, sortOption, searchTerm, fetchBookings]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth >= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isLargeScreen) {
+      setSidebarOpen(false);
+    }
+  }, [isLargeScreen]);
 
   // Check if there are no bookings at all (initial load without filters)
   const hasNoBookingsAtAll = !loading && bookings.length === 0 && !searchTerm && sortOption === "latest" && currentPage === 1;

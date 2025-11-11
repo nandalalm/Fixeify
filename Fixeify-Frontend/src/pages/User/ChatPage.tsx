@@ -106,13 +106,13 @@ const ChatPage = () => {
       ).unwrap();
 
       await dispatch(markMessagesRead({ chatId: conversation.id, userId: user.id, role: user.role }));
-    } catch (err: any) {
-      const errorMessage = typeof err === "string" ? err : err.message || "Failed to initialize chat";
+    } catch (err: unknown) {
+      const errorMessage = typeof err === "string" ? err : (err as Error).message || "Failed to initialize chat";
       setError(errorMessage);
       console.error("Error initializing chat:", {
         error: errorMessage,
-        message: err.message,
-        stack: err.stack,
+        message: (err as Error).message,
+        stack: (err as Error).stack,
         userId: user?.id,
         proId,
         role: user?.role,
@@ -123,7 +123,7 @@ const ChatPage = () => {
       setLoading(false);
       setMinLoadingTime(false);
     }
-  }, [user?.id, user?.role, accessToken, proId, proFromState, dispatch, navigate]);
+  }, [conversationId, user, accessToken, proId, proFromState, dispatch, navigate]);
 
   useEffect(() => {
     initializeChat();

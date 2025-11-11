@@ -103,7 +103,7 @@ export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implemen
       additionalCharges: quota.additionalCharges,
       totalCost: quota.totalCost,
       paymentStatus: quota.paymentStatus,
-      paymentIntentId: (quota as any).paymentIntentId,
+      paymentIntentId: (quota as unknown as Record<string, unknown>).paymentIntentId as string,
       createdAt: quota.createdAt,
       updatedAt: quota.updatedAt,
     });

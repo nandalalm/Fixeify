@@ -5,6 +5,7 @@ import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
+import logger from "../config/logger";
 
 @injectable()
 export class TicketController {
@@ -40,7 +41,7 @@ export class TicketController {
     }
   };
 
-  getTicketByTicketId = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  getTicketByTicketId = async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
     try {
       const { ticketId } = req.params;
       const ticket = await this._ticketService.getTicketByTicketId(ticketId);
@@ -57,7 +58,7 @@ export class TicketController {
         data: ticket
       });
     } catch (error) {
-      console.error(MESSAGES.FAILED_TO_FETCH_TICKET, error);
+      logger.error(MESSAGES.FAILED_TO_FETCH_TICKET, error);
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         success: false,
         message: MESSAGES.FAILED_TO_FETCH_TICKET

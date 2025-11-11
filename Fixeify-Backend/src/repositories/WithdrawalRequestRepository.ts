@@ -36,7 +36,7 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
     sortBy: "latest" | "oldest" = "latest",
     status?: "pending" | "approved" | "rejected"
   ): Promise<WithdrawalRequestResponse[]> {
-    const query: any = { proId: new Types.ObjectId(proId) };
+    const query: Record<string, Types.ObjectId | string> = { proId: new Types.ObjectId(proId) };
     if (status) query.status = status;
     const sortOrder = sortBy === "oldest" ? 1 : -1;
     const withdrawalRequests = await this._model
@@ -61,7 +61,7 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
     sortBy: "latest" | "oldest" = "latest",
     status?: "pending" | "approved" | "rejected"
   ): Promise<WithdrawalRequestResponse[]> {
-    const query: any = {};
+    const query: Record<string, string> = {};
     if (status) query.status = status;
     const sortOrder = sortBy === "oldest" ? 1 : -1;
     const withdrawalRequests = await this._model
@@ -74,7 +74,7 @@ export class MongoWithdrawalRequestRepository extends BaseRepository<WithdrawalR
   }
 
   async getTotalWithdrawalRequestsCount(status?: "pending" | "approved" | "rejected"): Promise<number> {
-    const query: any = {};
+    const query: Record<string, string> = {};
     if (status) query.status = status;
     return this._model.countDocuments(query).exec();
   }

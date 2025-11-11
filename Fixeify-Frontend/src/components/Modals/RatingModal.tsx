@@ -29,7 +29,6 @@ const RatingModal: React.FC<RatingModalProps> = ({ isOpen, onClose, userId, proI
   const [review, setReview] = useState<string>("");
   const [localMsg, setLocalMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Reset local state when modal opens
   useEffect(() => {
     if (isOpen) {
       setRating(0);
@@ -38,9 +37,8 @@ const RatingModal: React.FC<RatingModalProps> = ({ isOpen, onClose, userId, proI
       setLocalMsg(null);
       dispatch(resetError());
     }
-  }, [isOpen]);
+  }, [isOpen, dispatch]);
 
-  // Handle global error display
   useEffect(() => {
     if (error) {
       setLocalMsg({ type: "error", text: error });
@@ -49,7 +47,7 @@ const RatingModal: React.FC<RatingModalProps> = ({ isOpen, onClose, userId, proI
         dispatch(resetError());
       }, 2000);
     }
-  }, [error]);
+  }, [error, dispatch]);
 
   if (!isOpen) return null;
 

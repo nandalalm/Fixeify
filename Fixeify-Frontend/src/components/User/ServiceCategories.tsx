@@ -85,10 +85,11 @@ const ServiceCategories = () => {
         }
         setCategories(fetchedCategories);
         setError(null);
-      } catch (err: any) {
-        const errorMessage = err.response
-          ? `Failed to load categories: ${err.response.status} - ${JSON.stringify(err.response.data)}`
-          : `Failed to load categories: ${err.message}`;
+      } catch (err: unknown) {
+        const error = err as { response?: { status?: number; data?: unknown }; message?: string };
+        const errorMessage = error.response
+          ? `Failed to load categories: ${error.response.status} - ${JSON.stringify(error.response.data)}`
+          : `Failed to load categories: ${error.message}`;
         setError(errorMessage);
         console.error("Error fetching categories:", err);
       } finally {

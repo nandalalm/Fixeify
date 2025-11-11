@@ -48,7 +48,7 @@ const Register = () => {
       if (error instanceof z.ZodError) {
         setErrors({ email: error.errors[0].message });
       } else if (error instanceof Error) {
-        const err = error as any;
+        const err = error as { response?: { data?: { message?: string }; status?: number }; message?: string };
         const errorMessage = err.response?.data?.message || err.message || "";
         
         if (errorMessage.includes("already registered") || errorMessage.includes("Email already registered")) {
@@ -279,7 +279,7 @@ const Register = () => {
                   <button
                     type="button"
                     onClick={handleVerifyOtp}
-                    className="mt-4 bg-green-500 text-white py-1 px-3 rounded-md hover:bg-green-600 transition-all duration-300 transform hover:scale-105 dark:bg-green-600 dark:hover:bg-green-700"
+                    className="mt-4 bg-[#032B44] text-white py-1 px-3 rounded-md hover:bg-[#054869] transition-all duration-300 transform hover:scale-105 dark:!text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600"
                     disabled={formData.otp.length !== 6}
                   >
                     Verify OTP

@@ -7,6 +7,7 @@ import { MESSAGES } from "../constants/messages";
 import { HttpError } from "../middleware/errorMiddleware";
 import { UserRole } from "../enums/roleEnum";
 import { HttpStatus } from "../enums/httpStatus";
+import logger from "../config/logger";
 
 interface AuthRequest extends Request {
   userId?: string;
@@ -96,7 +97,7 @@ export class AuthController {
       const accessToken = await this._authService.refreshAccessToken(req, res);
       res.status(HttpStatus.OK).json({ accessToken });
     } catch (error) {
-      console.error(MESSAGES.REFRESH_TOKEN_ERROR, error);
+      logger.error(MESSAGES.REFRESH_TOKEN_ERROR, error);
       next(error);
     }
   }

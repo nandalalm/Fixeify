@@ -100,7 +100,7 @@ export class MongoTicketRepository implements ITicketRepository {
       return null;
     }
 
-    const updateFields: any = {
+    const updateFields: Record<string, unknown> = {
       status: updateData.status,
       updatedAt: new Date()
     };
@@ -124,7 +124,7 @@ export class MongoTicketRepository implements ITicketRepository {
   }
 
   async updateBanStatus(ticketId: string, isUserBanned?: boolean, isProBanned?: boolean): Promise<TicketDocument | null> {
-    const updateFields: any = {};
+    const updateFields: Record<string, boolean> = {};
     if (isUserBanned !== undefined) updateFields.isUserBanned = isUserBanned;
     if (isProBanned !== undefined) updateFields.isProBanned = isProBanned;
     
@@ -146,7 +146,12 @@ export class MongoTicketRepository implements ITicketRepository {
     return { pending, underReview, resolved, total };
   }
 
-  private formatTicketResponse(ticket: any): TicketResponse {
+  private formatTicketResponse(ticket: TicketDocument & {
+    complainantId: { _id: mongoose.Types.ObjectId; name?: string; firstName?: string; lastName?: string };
+    againstId: { _id: mongoose.Types.ObjectId; name?: string; firstName?: string; lastName?: string };
+    bookingId: { _id: mongoose.Types.ObjectId };
+    resolvedBy?: { _id: mongoose.Types.ObjectId };
+  }): TicketResponse {
     return {
       _id: ticket._id.toString(),
       ticketId: ticket.ticketId,

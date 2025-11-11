@@ -65,7 +65,7 @@ const getCroppedImg = async (imageSrc: string, crop: Area): Promise<File> => {
 export const EditCategory: FC<EditCategoryProps> = ({ onClose, onSuccess, category }) => {
   const [name, setName] = useState("");
   const [image, setImage] = useState<string | undefined>(undefined);
-  const [errors, setErrors] = useState<{ name?: string; image?: string }>({});
+  const [errors, setErrors] = useState<{ name?: string; image?: string; general?: string }>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -159,6 +159,7 @@ export const EditCategory: FC<EditCategoryProps> = ({ onClose, onSuccess, catego
       setImage(url);
       setErrors((prev) => ({ ...prev, image: undefined }));
     } catch (error) {
+      console.error('Failed to upload category image:', error);
       setErrors((prev) => ({ ...prev, image: "Failed to upload image" }));
       setImage(category?.image);
     } finally {
@@ -187,11 +188,12 @@ export const EditCategory: FC<EditCategoryProps> = ({ onClose, onSuccess, catego
       setImage(undefined);
       setErrors({});
       onClose();
-    } catch (err: any) {
-      if (err.response?.data?.message === "Category name already exists") {
+    } catch (err: unknown) {
+      const errorResponse = err as { response?: { data?: { message?: string } } };
+      if (errorResponse.response?.data?.message === "Category name already exists") {
         setErrors({ name: "Category name already exists" });
       } else {
-        setErrors({ name: "Failed to update category" });
+        setErrors({ general: errorResponse.response?.data?.message || "Failed to update category" });
       }
     } finally {
       setIsProcessing(false);

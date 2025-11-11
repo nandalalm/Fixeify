@@ -1,4 +1,5 @@
 import { inject, injectable } from "inversify";
+import mongoose from "mongoose";
 import { TYPES } from "../types";
 import { IRatingReviewRepository } from "../repositories/IRatingReviewRepository";
 import { IRatingReviewService } from "./IRatingReviewService";
@@ -32,22 +33,22 @@ export class RatingReviewService implements IRatingReviewService {
     }
 
     const saved = await this._ratingReviewRepository.create({
-      userId: data.userId as any,
-      proId: data.proId as any,
-      categoryId: data.categoryId as any,
-      bookingId: data.bookingId as any,
-      quotaId: data.quotaId as any,
+      userId: new mongoose.Types.ObjectId(data.userId),
+      proId: new mongoose.Types.ObjectId(data.proId),
+      categoryId: new mongoose.Types.ObjectId(data.categoryId),
+      bookingId: data.bookingId ? new mongoose.Types.ObjectId(data.bookingId) : undefined,
+      quotaId: data.quotaId ? new mongoose.Types.ObjectId(data.quotaId) : undefined,
       rating: data.rating,
       review: data.review,
     });
 
     if (data.bookingId) {
-      const bookingRepo = require("../repositories/BookingRepository");
-      const repoInstance = new bookingRepo.MongoBookingRepository();
+      const { MongoBookingRepository } = await import("../repositories/BookingRepository");
+      const repoInstance = new MongoBookingRepository();
       await repoInstance.updateBooking(data.bookingId, { isRated: true });
     }
 
-    return new RatingReviewResponse(saved as any);
+    return new RatingReviewResponse(saved as never);
   }
 
   async getRatingReviewsByPro(
@@ -65,7 +66,7 @@ export class RatingReviewService implements IRatingReviewService {
     const { items, total } = await this._ratingReviewRepository.findByProId(proId, page, limit, sortBy, search);
 
     return {
-      items: items.map((doc) => new RatingReviewResponse(doc as any)),
+      items: items.map((doc) => new RatingReviewResponse(doc as never)),
       total, page, limit,
     };
   }
@@ -82,7 +83,7 @@ export class RatingReviewService implements IRatingReviewService {
   }> {
     const { items, total } = await this._ratingReviewRepository.findByUserId(userId,page,limit);
     return {
-      items: items.map((doc) => new RatingReviewResponse(doc as any)),
+      items: items.map((doc) => new RatingReviewResponse(doc as never)),
       total,page,limit,
     };
   }
@@ -95,13 +96,13 @@ export class RatingReviewService implements IRatingReviewService {
   ): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }> {
     const { items, total } = await this._ratingReviewRepository.findAll(page, limit, sortBy, search);
     return {
-      items: items.map((doc) => new RatingReviewResponse(doc as any)),
+      items: items.map((doc) => new RatingReviewResponse(doc as never)),
       total,page,limit,
     };
   }
 
   async getRatingReviewById(id: string): Promise<RatingReviewResponse | null> {
     const doc = await this._ratingReviewRepository.findById(id);
-    return doc ? new RatingReviewResponse(doc as any) : null;
+    return doc ? new RatingReviewResponse(doc as never) : null;
   }
 }

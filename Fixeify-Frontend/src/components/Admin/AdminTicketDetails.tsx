@@ -99,7 +99,7 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
         } catch {
           try {
             const q2 = await fetchProQuotaByBookingId(ticket.bookingId);
-            if (mounted) setQuota(q2 as any);
+            if (mounted) setQuota(q2);
           } catch {
             // ignore
           }
@@ -176,7 +176,7 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
       setTimeout(() => {
         setSuccessBanner(null);
       }, 1000);
-    } catch (e) {
+    } catch {
       setSuccessBanner(`Failed to ${banAction}. Please try again.`);
       
       // Auto-hide banner after 1 second

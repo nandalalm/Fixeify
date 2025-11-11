@@ -4,6 +4,13 @@ import mongoose from 'mongoose';
 import Booking from '../../models/bookingModel';
 import ApprovedProModel from '../../models/approvedProModel';
 
+declare const process: {
+  env: {
+    REDIS_URL: string;
+    [key: string]: string | undefined;
+  };
+};
+
 const QUEUE_NAME = 'slot-release';
 
 export type SlotReleaseJobData = {
@@ -30,10 +37,10 @@ function ensureRedisAndQueue(): { ok: boolean } {
   }
   return { ok: true };
 }
-const getDayKeyFromDateIST = (date: Date): keyof NonNullable<any> => {
+const getDayKeyFromDateIST = (date: Date): string => {
   const ist = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
   const day = ist.toLocaleString('en-US', { weekday: 'long' }).toLowerCase();
-  return day as any;
+  return day;
 };
 
 async function freeSlotsForBooking(bookingId: string) {
@@ -42,17 +49,18 @@ async function freeSlotsForBooking(bookingId: string) {
   const pro = await ApprovedProModel.findById(booking.proId);
   if (!pro) return;
   const dayKey = getDayKeyFromDateIST(new Date(booking.preferredDate));
-  const daySlots: any[] = (pro as any).availability?.[dayKey] || [];
+  const proData = pro as unknown as { availability: Record<string, Array<{ startTime: string; endTime: string; booked: boolean }>> };
+  const daySlots = proData.availability?.[dayKey] || [];
   let changed = false;
   for (const sel of booking.preferredTime) {
-    const idx = daySlots.findIndex((s: any) => s.startTime === sel.startTime && s.endTime === sel.endTime);
+    const idx = daySlots.findIndex((s) => s.startTime === sel.startTime && s.endTime === sel.endTime);
     if (idx !== -1 && daySlots[idx].booked) {
       daySlots[idx].booked = false;
       changed = true;
     }
   }
   if (changed) {
-    (pro as any).availability[dayKey] = daySlots;
+    proData.availability[dayKey] = daySlots;
     await pro.save();
   }
 }
@@ -64,13 +72,10 @@ export async function initSlotReleaseWorker() {
   worker = new Worker<SlotReleaseJobData>(
     QUEUE_NAME,
     async (job) => {
-      try {
-        if (!mongoose.connection.readyState) {
-        }
-        await freeSlotsForBooking(job.data.bookingId);
-      } catch (err) {
-        throw err;
+      if (!mongoose.connection.readyState) {
+        return;
       }
+      await freeSlotsForBooking(job.data.bookingId);
     },
     { connection: connection as IORedis }
   );
@@ -100,7 +105,8 @@ export async function cancelSlotRelease(bookingId: string) {
     if (job) {
       await job.remove();
     }
-  } catch (e) {
+  } catch {
+    // Job removal failed, continue execution
   }
 }
 
@@ -112,7 +118,7 @@ export async function resyncSlotReleaseJobs() {
     { _id: 1, slotReleaseAt: 1, slotReleaseJobId: 1 }
   ).lean();
   const now = Date.now();
-  for (const b of candidates as any[]) {
+  for (const b of candidates) {
     const runAt = b.slotReleaseAt ? new Date(b.slotReleaseAt) : null;
     const ts = runAt ? runAt.getTime() : 0;
     if (!runAt) {
@@ -120,7 +126,9 @@ export async function resyncSlotReleaseJobs() {
     }
     if (ts <= now) {
       await freeSlotsForBooking(b._id.toString());
-      try { await cancelSlotRelease(b._id.toString()); } catch {}
+      try { await cancelSlotRelease(b._id.toString()); } catch {
+        // Job cancellation failed, continue execution
+      }
       continue;
     }
     if (!queue) continue;
