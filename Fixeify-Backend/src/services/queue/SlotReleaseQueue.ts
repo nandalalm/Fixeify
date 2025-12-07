@@ -49,8 +49,7 @@ async function freeSlotsForBooking(bookingId: string) {
   const pro = await ApprovedProModel.findById(booking.proId);
   if (!pro) return;
   const dayKey = getDayKeyFromDateIST(new Date(booking.preferredDate));
-  const proData = pro as unknown as { availability: Record<string, Array<{ startTime: string; endTime: string; booked: boolean }>> };
-  const daySlots = proData.availability?.[dayKey] || [];
+  const daySlots = (pro as unknown as { availability: Record<string, Array<{ startTime: string; endTime: string; booked: boolean }>> }).availability?.[dayKey] || [];
   let changed = false;
   for (const sel of booking.preferredTime) {
     const idx = daySlots.findIndex((s) => s.startTime === sel.startTime && s.endTime === sel.endTime);
@@ -60,7 +59,8 @@ async function freeSlotsForBooking(bookingId: string) {
     }
   }
   if (changed) {
-    proData.availability[dayKey] = daySlots;
+    (pro as unknown as { availability: Record<string, Array<{ startTime: string; endTime: string; booked: boolean }>> }).availability[dayKey] = daySlots;
+    pro.markModified('availability');
     await pro.save();
   }
 }

@@ -417,6 +417,7 @@ const BookingForm = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <button
+                  type="button"
                   onClick={() => navigate(-1)}
                   className="inline-block mb-3 p-1 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
