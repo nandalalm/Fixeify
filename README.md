@@ -50,10 +50,8 @@ The backend is architected using **Repository–Service–Controller pattern**, 
 ## ⚙️ Background Jobs & Automation
 
 To prevent blocking API requests and ensure booking consistency:
-
-- Implemented **BullMQ with Redis** for background processing
 - **Automatic slot release**
-  - Frees provider availability if booking is not confirmed within a defined time window
+- Implemented **BullMQ with Redis** for background processing
 - Scheduled cleanup jobs to prevent stale bookings
 - Improved system responsiveness under concurrent booking scenarios
 
@@ -66,7 +64,6 @@ This design decouples time-based logic from request lifecycle and improves fault
 - Integrated **Stripe** for secure card payments
 - Webhook-driven payment confirmation
 - Booking state transitions handled after verified payment events
-- Razorpay supported for alternate payment flows
 - Idempotent webhook handling to prevent duplicate state updates
 
 ---
@@ -82,7 +79,7 @@ This design decouples time-based logic from request lifecycle and improves fault
 | Auth          | JWT (Access & Refresh), OTP via Redis            |
 | File Storage  | AWS S3                                           |
 | Maps          | Google Maps API                                  |
-| Payments      | Stripe, Razorpay                                 |
+| Payments      | Stripe                                           |
 | Architecture  | Repository–Service–Controller, DTOs, SOLID       |
 
 ---
