@@ -19,6 +19,7 @@ import createChatRoutes from "./routes/chatRoutes";
 import createNotificationRoutes from "./routes/notificationRoutes";
 import createRatingReviewRoutes from "./routes/ratingReviewRoutes";
 import createTicketRoutes from "./routes/ticketRoutes";
+import createUploadRoutes from "./routes/uploadRoutes";
 import { Container } from "inversify";
 import TransactionModel from "./models/transactionModel";
 import { TYPES } from "./types";
@@ -30,6 +31,7 @@ import { ChatController } from "./controllers/chatController";
 import { NotificationController } from "./controllers/notificationController";
 import { RatingReviewController } from "./controllers/ratingReviewController";
 import { TicketController } from "./controllers/ticketController";
+import { UploadController } from "./controllers/uploadController";
 import { AuthService } from "./services/AuthService";
 import { IAuthService } from "./services/IAuthService";
 import { AdminService } from "./services/AdminService";
@@ -40,6 +42,8 @@ import { NotificationService } from "./services/NotificationService";
 import { RatingReviewService } from "./services/RatingReviewService";
 import { ITicketService } from "./services/ITicketService";
 import { TicketService } from "./services/ticketService";
+import { UploadService } from "./services/UploadService";
+import { IUploadService } from "./services/IUploadService";
 import { IUserRepository } from "./repositories/IUserRepository";
 import { IAdminRepository } from "./repositories/IAdminRepository";
 import { IProRepository } from "./repositories/IProRepository";
@@ -104,6 +108,7 @@ container.bind<ChatService>(TYPES.IChatService).to(ChatService).inSingletonScope
 container.bind<NotificationService>(TYPES.INotificationService).to(NotificationService).inSingletonScope();
 container.bind<RatingReviewService>(TYPES.IRatingReviewService).to(RatingReviewService).inSingletonScope();
 container.bind<ITicketService>(TYPES.ITicketService).to(TicketService).inSingletonScope();
+container.bind<IUploadService>(TYPES.IUploadService).to(UploadService).inSingletonScope();
 container.bind<AuthController>(TYPES.AuthController).to(AuthController).inSingletonScope();
 container.bind<AdminController>(TYPES.AdminController).to(AdminController).inSingletonScope();
 container.bind<ProController>(TYPES.ProController).to(ProController).inSingletonScope();
@@ -112,6 +117,7 @@ container.bind<ChatController>(TYPES.ChatController).to(ChatController).inSingle
 container.bind<NotificationController>(TYPES.NotificationController).to(NotificationController).inSingletonScope();
 container.bind<RatingReviewController>(TYPES.RatingReviewController).to(RatingReviewController).inSingletonScope();
 container.bind<TicketController>(TYPES.TicketController).to(TicketController).inSingletonScope();
+container.bind<UploadController>(TYPES.UploadController).to(UploadController).inSingletonScope();
 container.bind<ChatGateway>(TYPES.ChatGateway).to(ChatGateway).inSingletonScope();
 
 const app = express();
@@ -146,6 +152,7 @@ app.use("/api/chat", express.json(), createChatRoutes(container));
 app.use("/api/notifications", express.json(), createNotificationRoutes(container));
 app.use("/api/rating-reviews", express.json(), createRatingReviewRoutes(container));
 app.use("/api/tickets", express.json(), createTicketRoutes(container));
+app.use("/api/upload", express.json(), createUploadRoutes(container));
 
 app.use(errorMiddleware);
 
@@ -160,7 +167,7 @@ const connectServices = async (): Promise<void> => {
   try {
     await dbConnector.connect();
     await redisConnector.connect();
-    
+
     try {
       const pipeline = [
         {
@@ -170,7 +177,7 @@ const connectServices = async (): Promise<void> => {
           $group: {
             _id: {
               bookingId: "$bookingId",
-              type: "$type", 
+              type: "$type",
               proId: "$proId",
               amount: "$amount",
               adminId: "$adminId"
@@ -183,25 +190,25 @@ const connectServices = async (): Promise<void> => {
           $match: { count: { $gt: 1 } }
         }
       ];
-      
+
       const duplicates = await TransactionModel.aggregate(pipeline);
-      
+
       for (const duplicate of duplicates) {
         const docsToRemove = duplicate.docs.slice(1);
         for (const doc of docsToRemove) {
           await TransactionModel.deleteOne({ _id: doc._id });
         }
       }
-    
-      
+
+
       await TransactionModel.syncIndexes();
     } catch (err) {
       logger.error("Failed to sync transaction indexes:", err);
     }
-    
+
     await initSlotReleaseWorker();
     await resyncSlotReleaseJobs();
-    
+
     server.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
     });

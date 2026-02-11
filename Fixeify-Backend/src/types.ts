@@ -31,4 +31,6 @@ export const TYPES = {
   ITransactionRepository: Symbol.for("ITransactionRepository"),
   IRatingReviewService: Symbol.for("IRatingReviewService"),
   RatingReviewController: Symbol.for("RatingReviewController"),
+  UploadController: Symbol.for("UploadController"),
+  IUploadService: Symbol.for("IUploadService"),
 };

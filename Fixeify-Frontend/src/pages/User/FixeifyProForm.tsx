@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { uploadFileToS3 } from "../../api/uploadApi";
 import api from "../../api/axios";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
@@ -15,13 +15,7 @@ import { getPendingProById } from "../../api/proApi";
 import { PendingProResponse } from "../../interfaces/fixeifyFormInterface";
 import { AxiosError } from 'axios';
 
-const s3Client = new S3Client({
-  region: import.meta.env.VITE_AWS_REGION,
-  credentials: {
-    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-  },
-});
+
 
 const convertTo12Hour = (time: string): { time: string; period: "AM" | "PM" } => {
   const [hour, minute] = time.split(":").map(Number);
@@ -375,17 +369,7 @@ const FixeifyProForm = () => {
   };
 
   const uploadToS3 = async (file: File, folder: string): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const params = {
-      Bucket: import.meta.env.VITE_S3_BUCKET_NAME as string,
-      Key: `${folder}/${Date.now()}-${file.name}`,
-      Body: uint8Array,
-      ContentType: file.type,
-    };
-    const command = new PutObjectCommand(params);
-    await s3Client.send(command);
-    return `https://${params.Bucket}.s3.${import.meta.env.VITE_AWS_REGION}.amazonaws.com/${params.Key}`;
+    return await uploadFileToS3(file, folder, true);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: "profilePhoto" | "idProof") => {
@@ -400,21 +384,39 @@ const FixeifyProForm = () => {
         setErrors((prev) => ({ ...prev, [field]: "Only images are allowed" }));
         return;
       }
+
+      // Optimistic UI: Show local preview immediately
+      if (field === "profilePhoto") {
+        const objectUrl = URL.createObjectURL(validFiles[0]);
+        setFormData((prev) => ({ ...prev, profilePhoto: validFiles[0], profilePhotoUrl: objectUrl }));
+        validateField("profilePhoto", validFiles[0]);
+      } else {
+        const objectUrls = validFiles.map(file => URL.createObjectURL(file));
+        setFormData((prev) => ({
+          ...prev,
+          idProof: [...prev.idProof, ...validFiles],
+          idProofUrls: [...prev.idProofUrls, ...objectUrls],
+        }));
+        validateField("idProof", [...formData.idProof, ...validFiles]);
+      }
+
       try {
         if (field === "profilePhoto") {
           setIsUploadingProfilePhoto(true);
           const url = await uploadToS3(validFiles[0], "profile-photos");
-          setFormData((prev) => ({ ...prev, profilePhoto: validFiles[0], profilePhotoUrl: url }));
-          validateField("profilePhoto", validFiles[0]);
+          setFormData((prev) => ({ ...prev, profilePhotoUrl: url }));
         } else {
           setIsUploadingIdProof(true);
           const urls = await Promise.all(validFiles.map((file) => uploadToS3(file, "id-proofs")));
-          setFormData((prev) => ({
-            ...prev,
-            idProof: [...prev.idProof, ...validFiles], // Keep Files for preview
-            idProofUrls: [...prev.idProofUrls, ...urls], // Keep URLs for API
-          }));
-          validateField("idProof", [...formData.idProof, ...validFiles]);
+          // Replace object URLs with real S3 URLs
+          setFormData((prev) => {
+            const newIdProofUrls = [...prev.idProofUrls];
+            const startIndex = newIdProofUrls.length - validFiles.length;
+            urls.forEach((url, idx) => {
+              newIdProofUrls[startIndex + idx] = url;
+            });
+            return { ...prev, idProofUrls: newIdProofUrls };
+          });
         }
       } catch {
         setErrors((prev) => ({ ...prev, [field]: "Failed to upload image(s)" }));
@@ -439,20 +441,37 @@ const FixeifyProForm = () => {
         return;
       }
       try {
+        // Optimistic UI: Show local preview immediately
+        if (field === "profilePhoto") {
+          const objectUrl = URL.createObjectURL(validFiles[0]);
+          setFormData((prev) => ({ ...prev, profilePhoto: validFiles[0], profilePhotoUrl: objectUrl }));
+          validateField("profilePhoto", validFiles[0]);
+        } else {
+          const objectUrls = validFiles.map(file => URL.createObjectURL(file));
+          setFormData((prev) => ({
+            ...prev,
+            idProof: [...prev.idProof, ...validFiles],
+            idProofUrls: [...prev.idProofUrls, ...objectUrls],
+          }));
+          validateField("idProof", [...formData.idProof, ...validFiles]);
+        }
+
         if (field === "profilePhoto") {
           setIsUploadingProfilePhoto(true);
           const url = await uploadToS3(validFiles[0], "profile-photos");
-          setFormData((prev) => ({ ...prev, profilePhoto: validFiles[0], profilePhotoUrl: url }));
-          validateField("profilePhoto", validFiles[0]);
+          setFormData((prev) => ({ ...prev, profilePhotoUrl: url }));
         } else {
           setIsUploadingIdProof(true);
           const urls = await Promise.all(validFiles.map((file) => uploadToS3(file, "id-proofs")));
-          setFormData((prev) => ({
-            ...prev,
-            idProof: [...prev.idProof, ...validFiles], // Keep Files for preview
-            idProofUrls: [...prev.idProofUrls, ...urls], // Keep URLs for API
-          }));
-          validateField("idProof", [...formData.idProof, ...validFiles]);
+          // Replace object URLs with real S3 URLs
+          setFormData((prev) => {
+            const newIdProofUrls = [...prev.idProofUrls];
+            const startIndex = newIdProofUrls.length - validFiles.length;
+            urls.forEach((url, idx) => {
+              newIdProofUrls[startIndex + idx] = url;
+            });
+            return { ...prev, idProofUrls: newIdProofUrls };
+          });
         }
       } catch {
         setErrors((prev) => ({ ...prev, [field]: "Failed to upload image(s)" }));
@@ -560,10 +579,10 @@ const FixeifyProForm = () => {
         ...prev.availability,
         [day]: updatedSlots,
       };
-      
+
       // Validate with the updated availability data
       setTimeout(() => validateField("availability", updatedAvailability), 0);
-      
+
       return {
         ...prev,
         availability: updatedAvailability,
@@ -589,10 +608,10 @@ const FixeifyProForm = () => {
         [day]: updatedSlots.length > 0 ? updatedSlots : undefined,
       };
       if (!updatedAvailability[day]?.length) delete updatedAvailability[day];
-      
+
       // Validate with the updated availability data
       setTimeout(() => validateField("availability", updatedAvailability), 0);
-      
+
       return { ...prev, availability: updatedAvailability };
     });
   };

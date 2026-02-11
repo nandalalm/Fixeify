@@ -1,7 +1,7 @@
 import { type FC, useState, useEffect, useCallback } from "react";
 import { updateCategory } from "../../api/adminApi";
 import { ICategory } from "../../interfaces/adminInterface";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { uploadFileToS3 } from "../../api/uploadApi";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import { ArrowLeft } from "lucide-react";
 import Cropper from "react-easy-crop";
@@ -15,13 +15,7 @@ interface EditCategoryProps {
 
 const nameRegex = /^[A-Za-z-]+$/;
 
-const s3Client = new S3Client({
-  region: import.meta.env.VITE_AWS_REGION,
-  credentials: {
-    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-  },
-});
+
 
 const formatName = (name: string): string => {
   if (!name) return name;
@@ -92,17 +86,7 @@ export const EditCategory: FC<EditCategoryProps> = ({ onClose, onSuccess, catego
   };
 
   const uploadToS3 = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const params = {
-      Bucket: import.meta.env.VITE_S3_BUCKET_NAME as string,
-      Key: `category-images/${Date.now()}-${file.name}`,
-      Body: uint8Array,
-      ContentType: file.type,
-    };
-    const command = new PutObjectCommand(params);
-    await s3Client.send(command);
-    return `https://${params.Bucket}.s3.${import.meta.env.VITE_AWS_REGION}.amazonaws.com/${params.Key}`;
+    return await uploadFileToS3(file, "category-images");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,19 +136,26 @@ export const EditCategory: FC<EditCategoryProps> = ({ onClose, onSuccess, catego
 
   const handleCropConfirm = async () => {
     if (!imageToCrop || !croppedAreaPixels) return;
+
     try {
-      setIsUploadingImage(true);
       const croppedImage = await getCroppedImg(imageToCrop, croppedAreaPixels);
+
+      // Optimistic UI: Show image immediately and close modal
+      const objectUrl = URL.createObjectURL(croppedImage);
+      setImage(objectUrl);
+      setErrors((prev) => ({ ...prev, image: undefined }));
+      setCropModalOpen(false);
+
+      // Upload in background
+      setIsUploadingImage(true);
       const url = await uploadToS3(croppedImage);
       setImage(url);
-      setErrors((prev) => ({ ...prev, image: undefined }));
     } catch (error) {
       console.error('Failed to upload category image:', error);
       setErrors((prev) => ({ ...prev, image: "Failed to upload image" }));
       setImage(category?.image);
     } finally {
       setIsUploadingImage(false);
-      setCropModalOpen(false);
       setImageToCrop(null);
       setCroppedAreaPixels(null);
       setCrop({ x: 0, y: 0 });
@@ -302,7 +293,7 @@ export const EditCategory: FC<EditCategoryProps> = ({ onClose, onSuccess, catego
             disabled={isProcessing || isUploadingImage}
             className="px-4 py-2 bg-blue-900 text-white rounded-md hover:bg-blue-800 transition-colors duration-200 disabled:opacity-50"
           >
-            {isProcessing ? "Updating..." : "Update Category"}
+            {isProcessing ? "Updating..." : isUploadingImage ? "Uploading Image..." : "Update Category"}
           </button>
         </div>
       </form>

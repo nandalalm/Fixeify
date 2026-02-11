@@ -6,18 +6,12 @@ import { LocateFixed } from "lucide-react";
 import { getProProfile, updateProProfile } from "../../api/proApi";
 import { ProProfile } from "../../interfaces/proInterface";
 import { updateUser } from "../../store/authSlice";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { uploadFileToS3 } from "../../api/uploadApi";
 import { z } from "zod";
 import { editProProfileSchema } from "../../Validation/editProProfileSchema";
 import { LocationData, EditProProfileFormData } from "../../interfaces/proInterface";
 
-const s3Client = new S3Client({
-  region: import.meta.env.VITE_AWS_REGION,
-  credentials: {
-    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-  },
-});
+
 
 interface EditProProfileProps {
   onCancel: () => void;
@@ -262,17 +256,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
   };
 
   const uploadToS3 = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const params = {
-      Bucket: import.meta.env.VITE_S3_BUCKET_NAME as string,
-      Key: `profile-photos/${Date.now()}-${file.name}`,
-      Body: uint8Array,
-      ContentType: file.type,
-    };
-    const command = new PutObjectCommand(params);
-    await s3Client.send(command);
-    return `https://${params.Bucket}.s3.${import.meta.env.VITE_AWS_REGION}.amazonaws.com/${params.Key}`;
+    return await uploadFileToS3(file, "profile-photos");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -284,18 +268,23 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
           ...prev,
           profilePhoto: "Only images are allowed",
         }));
-        validateField("profilePhoto", null);
         return;
       }
+
+      // Optimistic UI: Show local preview immediately
+      const objectUrl = URL.createObjectURL(file);
+      setFormData((prev) => ({ ...prev, profilePhoto: objectUrl }));
+
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.profilePhoto;
+        return newErrors;
+      });
+
       try {
         setIsUploadingProfilePhoto(true);
         const url = await uploadToS3(file);
         setFormData((prev) => ({ ...prev, profilePhoto: url }));
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors.profilePhoto;
-          return newErrors;
-        });
         validateField("profilePhoto", url);
       } catch (error) {
         console.error('Failed to upload profile photo:', error);
@@ -303,7 +292,6 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
           ...prev,
           profilePhoto: "Failed to upload image",
         }));
-        validateField("profilePhoto", null);
       } finally {
         setIsUploadingProfilePhoto(false);
       }
@@ -324,18 +312,23 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
           ...prev,
           profilePhoto: "Only images are allowed",
         }));
-        validateField("profilePhoto", null);
         return;
       }
+
+      // Optimistic UI: Show local preview immediately
+      const objectUrl = URL.createObjectURL(file);
+      setFormData((prev) => ({ ...prev, profilePhoto: objectUrl }));
+
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.profilePhoto;
+        return newErrors;
+      });
+
       try {
         setIsUploadingProfilePhoto(true);
         const url = await uploadToS3(file);
         setFormData((prev) => ({ ...prev, profilePhoto: url }));
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors.profilePhoto;
-          return newErrors;
-        });
         validateField("profilePhoto", url);
       } catch (error) {
         console.error('Failed to upload profile photo:', error);
@@ -343,7 +336,6 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
           ...prev,
           profilePhoto: "Failed to upload image",
         }));
-        validateField("profilePhoto", null);
       } finally {
         setIsUploadingProfilePhoto(false);
       }

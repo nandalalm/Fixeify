@@ -7,18 +7,12 @@ import { RootState, AppDispatch } from "../../store/store";
 import { updateUserProfile, getUserProfile } from "../../api/userApi";
 import { UserProfile } from "../../interfaces/userInterface";
 import { updateUser } from "../../store/authSlice";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { uploadFileToS3 } from "../../api/uploadApi";
 import { LocateFixed } from "lucide-react";
 import { z } from "zod";
 import { editProfileSchema } from "../../Validation/editProfileSchema";
 
-const s3Client = new S3Client({
-  region: import.meta.env.VITE_AWS_REGION,
-  credentials: {
-    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-  },
-});
+
 
 interface LocationData {
   address: string;
@@ -26,7 +20,7 @@ interface LocationData {
   state: string;
   coordinates: {
     type: "Point";
-    coordinates: [number, number]; 
+    coordinates: [number, number];
   };
 }
 
@@ -75,17 +69,17 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
           const lastName = nameParts.slice(1).join(" ") || "";
           const address: LocationData | null = fetchedUser.address
             ? {
-                address: fetchedUser.address.address,
-                city: fetchedUser.address.city,
-                state: fetchedUser.address.state,
-                coordinates: fetchedUser.address.coordinates,
-              }
+              address: fetchedUser.address.address,
+              city: fetchedUser.address.city,
+              state: fetchedUser.address.state,
+              coordinates: fetchedUser.address.coordinates,
+            }
             : null;
           setFormData({
             id: user.id,
             firstName,
             lastName,
-            email: fetchedUser.email, 
+            email: fetchedUser.email,
             phoneNo: fetchedUser.phoneNo || "",
             address,
             photo: fetchedUser.photo || "",
@@ -277,17 +271,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
   };
 
   const uploadToS3 = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const params = {
-      Bucket: import.meta.env.VITE_S3_BUCKET_NAME as string,
-      Key: `profile-photos/${Date.now()}-${file.name}`,
-      Body: uint8Array,
-      ContentType: file.type,
-    };
-    const command = new PutObjectCommand(params);
-    await s3Client.send(command);
-    return `https://${params.Bucket}.s3.${import.meta.env.VITE_AWS_REGION}.amazonaws.com/${params.Key}`;
+    return await uploadFileToS3(file, "profile-photos");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -299,15 +283,21 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
         // Don't call validateField for photo errors to avoid Zod validation
         return;
       }
+
+      // Optimistic UI: Show local preview immediately
+      const objectUrl = URL.createObjectURL(file);
+      setFormData((prev) => ({ ...prev, photo: objectUrl }));
+
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.photo;
+        return newErrors;
+      });
+
       try {
         setIsUploadingProfilePhoto(true);
         const url = await uploadToS3(file);
         setFormData((prev) => ({ ...prev, photo: url }));
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors.photo;
-          return newErrors;
-        });
         validateField("photo", url);
       } catch {
         setErrors((prev) => ({ ...prev, photo: "Failed to upload image" }));
@@ -332,15 +322,21 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
         // Don't call validateField for photo errors to avoid Zod validation
         return;
       }
+
+      // Optimistic UI: Show local preview immediately
+      const objectUrl = URL.createObjectURL(file);
+      setFormData((prev) => ({ ...prev, photo: objectUrl }));
+
+      setErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.photo;
+        return newErrors;
+      });
+
       try {
         setIsUploadingProfilePhoto(true);
         const url = await uploadToS3(file);
         setFormData((prev) => ({ ...prev, photo: url }));
-        setErrors((prev) => {
-          const newErrors = { ...prev };
-          delete newErrors.photo;
-          return newErrors;
-        });
         validateField("photo", url);
       } catch {
         setErrors((prev) => ({ ...prev, photo: "Failed to upload image" }));
@@ -625,11 +621,11 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
                     phoneNo: originalData?.phoneNo || "",
                     address: originalData?.address
                       ? {
-                          address: originalData.address.address,
-                          city: originalData.address.city,
-                          state: originalData.address.state,
-                          coordinates: originalData.address.coordinates,
-                        }
+                        address: originalData.address.address,
+                        city: originalData.address.city,
+                        state: originalData.address.state,
+                        coordinates: originalData.address.coordinates,
+                      }
                       : null,
                     photo: originalData?.photo || "",
                   });

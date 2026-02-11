@@ -6,15 +6,9 @@ import { Message, User } from "../../interfaces/messagesInterface";
 import { getSocket, isSocketConnected } from "../../services/socket";
 import { fetchConversationMessages, updateOnlineStatus, updateMessageStatus, addIncomingMessage, setConversationLastMessageStatus } from "../../store/chatSlice";
 import { sendNewMessage } from "../../api/chatApi";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { uploadFileToS3 } from "../../api/uploadApi";
 
-const s3Client = new S3Client({
-  region: import.meta.env.VITE_AWS_REGION,
-  credentials: {
-    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-  },
-});
+
 
 enum Role {
   USER = "user",
@@ -30,68 +24,68 @@ interface MessageBoxProps {
 }
 
 const Avatar: FC<{ src?: string | null; alt?: string; size?: number; className?: string }> = ({ src, alt = "", size = 40, className = "" }) => {
-    const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
-    const [errored, setErrored] = useState(false);
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const [errored, setErrored] = useState(false);
 
-    useEffect(() => {
-      if (!src) {
+  useEffect(() => {
+    if (!src) {
+      setLoadedSrc(null);
+      setErrored(true);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) {
+        setLoadedSrc(src);
+        setErrored(false);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) {
         setLoadedSrc(null);
         setErrored(true);
-        return;
       }
-      let cancelled = false;
-      const img = new Image();
-      img.onload = () => {
-        if (!cancelled) {
-          setLoadedSrc(src);
-          setErrored(false);
-        }
-      };
-      img.onerror = () => {
-        if (!cancelled) {
-          setLoadedSrc(null);
-          setErrored(true);
-        }
-      };
-      img.src = src;
-      return () => {
-        cancelled = true;
-      };
-    }, [src]);
+    };
+    img.src = src;
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
 
-    if (loadedSrc && !errored) {
-      return (
-        <img
-          src={loadedSrc}
-          alt={alt}
-          className={`rounded-full object-cover ${className}`}
-          style={{ width: size, height: size }}
-        />
-      );
-    }
-
+  if (loadedSrc && !errored) {
     return (
-      <div
-        className={`rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center overflow-hidden ${className}`}
+      <img
+        src={loadedSrc}
+        alt={alt}
+        className={`rounded-full object-cover ${className}`}
         style={{ width: size, height: size }}
-        aria-label={alt}
-        role="img"
-      >
-        <img
-          src="/placeholder-user.jpg"
-          alt="placeholder"
-          className="w-full h-full object-cover hidden"
-          onError={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = "none";
-          }}
-          onLoad={(e) => {
-            (e.currentTarget as HTMLImageElement).style.display = "block";
-          }}
-        />
-        <UserIcon className="w-1/2 h-1/2 text-white" />
-      </div>
+      />
     );
-  };
+  }
+
+  return (
+    <div
+      className={`rounded-full bg-gray-300 dark:bg-gray-700 flex items-center justify-center overflow-hidden ${className}`}
+      style={{ width: size, height: size }}
+      aria-label={alt}
+      role="img"
+    >
+      <img
+        src="/placeholder-user.jpg"
+        alt="placeholder"
+        className="w-full h-full object-cover hidden"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = "none";
+        }}
+        onLoad={(e) => {
+          (e.currentTarget as HTMLImageElement).style.display = "block";
+        }}
+      />
+      <UserIcon className="w-1/2 h-1/2 text-white" />
+    </div>
+  );
+};
 
 const MessageBox: FC<MessageBoxProps> = ({
   conversationId,
@@ -136,9 +130,9 @@ const MessageBox: FC<MessageBoxProps> = ({
     if (imageErrorTimeoutRef.current) {
       clearTimeout(imageErrorTimeoutRef.current);
     }
-    
+
     setImageError(errorMessage);
-    
+
     // Auto-dismiss after 5 seconds
     imageErrorTimeoutRef.current = setTimeout(() => {
       setImageError(null);
@@ -147,17 +141,7 @@ const MessageBox: FC<MessageBoxProps> = ({
 
   // S3 Upload function
   const uploadToS3 = async (file: File, folder: string): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const params = {
-      Bucket: import.meta.env.VITE_S3_BUCKET_NAME as string,
-      Key: `${folder}/${Date.now()}-${file.name}`,
-      Body: uint8Array,
-      ContentType: file.type,
-    };
-    const command = new PutObjectCommand(params);
-    await s3Client.send(command);
-    return `https://${params.Bucket}.s3.${import.meta.env.VITE_AWS_REGION}.amazonaws.com/${params.Key}`;
+    return await uploadFileToS3(file, folder);
   };
 
   // Handle image selection with better validation
@@ -166,7 +150,7 @@ const MessageBox: FC<MessageBoxProps> = ({
     if (file) {
       // Clear previous errors
       setImageError(null);
-      
+
       // Validate file type - only allow common image formats
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
       if (!allowedTypes.includes(file.type.toLowerCase())) {
@@ -177,7 +161,7 @@ const MessageBox: FC<MessageBoxProps> = ({
         }
         return;
       }
-      
+
       // Validate file size (5MB limit)
       if (file.size > 5 * 1024 * 1024) {
         setImageErrorWithTimeout('Image size must be less than 5MB');
@@ -187,14 +171,14 @@ const MessageBox: FC<MessageBoxProps> = ({
         }
         return;
       }
-      
+
       // Validate image dimensions and content
       const img = new Image();
       const objectUrl = URL.createObjectURL(file);
-      
+
       img.onload = () => {
         URL.revokeObjectURL(objectUrl);
-        
+
         // Check if image dimensions are reasonable (not too small or too large)
         if (img.width < 10 || img.height < 10) {
           setImageErrorWithTimeout('Image is too small. Minimum size is 10x10 pixels');
@@ -203,7 +187,7 @@ const MessageBox: FC<MessageBoxProps> = ({
           }
           return;
         }
-        
+
         if (img.width > 4000 || img.height > 4000) {
           setImageErrorWithTimeout('Image is too large. Maximum size is 4000x4000 pixels');
           if (fileInputRef.current) {
@@ -211,7 +195,7 @@ const MessageBox: FC<MessageBoxProps> = ({
           }
           return;
         }
-        
+
         // Image is valid, proceed with selection
         setSelectedImage(file);
         const reader = new FileReader();
@@ -220,7 +204,7 @@ const MessageBox: FC<MessageBoxProps> = ({
         };
         reader.readAsDataURL(file);
       };
-      
+
       img.onerror = () => {
         URL.revokeObjectURL(objectUrl);
         setImageErrorWithTimeout('Invalid or corrupted image file');
@@ -228,7 +212,7 @@ const MessageBox: FC<MessageBoxProps> = ({
           fileInputRef.current.value = '';
         }
       };
-      
+
       img.src = objectUrl;
     }
   };
@@ -299,7 +283,7 @@ const MessageBox: FC<MessageBoxProps> = ({
     // Use current state values to avoid stale closures
     const currentLoading = isLoadingMore ? loadingMore : loading;
     if (currentLoading || !hasMore) return;
-    
+
     const role = currentUser.role as Role;
     if (!isValidChatRole(role)) {
       setError("Admins cannot access chat functionality.");
@@ -533,11 +517,11 @@ const MessageBox: FC<MessageBoxProps> = ({
 
       setIsSending(true);
       setIsUploadingImage(!!selectedImage);
-      
+
       try {
         let attachments: { url: string; mime: string; size: number }[] = [];
         let messageType: "text" | "image" = "text";
-        
+
         // Upload image to S3 if selected
         if (selectedImage) {
           const imageUrl = await uploadToS3(selectedImage, "chat-images");
@@ -670,7 +654,7 @@ const MessageBox: FC<MessageBoxProps> = ({
           {message.content && (
             <p className="text-sm break-words break-all">{message.content}</p>
           )}
-          
+
           {/* Image attachments */}
           {message.attachments && message.attachments.length > 0 && (
             <div className="mt-2 space-y-2">
@@ -693,8 +677,8 @@ const MessageBox: FC<MessageBoxProps> = ({
           {/* Time + Read Receipts */}
           <div
             className={`flex items-center justify-end mt-1 space-x-1 ${isCurrentUser
-                ? "text-gray-300 dark:text-gray-300"
-                : "text-gray-500 dark:text-gray-300"
+              ? "text-gray-300 dark:text-gray-300"
+              : "text-gray-500 dark:text-gray-300"
               }`}
           >
             <span className="text-xs">{formatTime(message.timestamp)}</span>
@@ -806,7 +790,7 @@ const MessageBox: FC<MessageBoxProps> = ({
           </button>
         )}
       </div>
-      <div className={`p-4 border-t bg-gray-50 dark:bg-gray-700 ${isPro ? 'sticky bottom-0 z-10' : ''}`}> 
+      <div className={`p-4 border-t bg-gray-50 dark:bg-gray-700 ${isPro ? 'sticky bottom-0 z-10' : ''}`}>
         <div className="border-t border-gray-200 dark:border-gray-700">
           {/* Image Preview */}
           {imagePreview && (
@@ -826,7 +810,7 @@ const MessageBox: FC<MessageBoxProps> = ({
               </div>
             </div>
           )}
-          
+
           {/* Image Error Banner */}
           {imageError && (
             <div className="mx-4 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center justify-between">
@@ -845,7 +829,7 @@ const MessageBox: FC<MessageBoxProps> = ({
               </button>
             </div>
           )}
-          
+
           <div className="flex items-center space-x-2 p-4">
             {/* Hidden file input */}
             <input
@@ -855,7 +839,7 @@ const MessageBox: FC<MessageBoxProps> = ({
               onChange={handleImageSelect}
               className="hidden"
             />
-            
+
             {/* Image attachment button */}
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -865,7 +849,7 @@ const MessageBox: FC<MessageBoxProps> = ({
             >
               <ImageIcon className="w-5 h-5" />
             </button>
-            
+
             <textarea
               value={newMessage}
               onChange={(e) => {
@@ -878,7 +862,7 @@ const MessageBox: FC<MessageBoxProps> = ({
               className={`flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-800 dark:text-white rounded-full focus:outline-none focus:ring-2 focus:ring-[#032b44] dark:focus:ring-gray-50 focus:border-transparent disabled:opacity-50 resize-none ${isPro ? 'min-h-[40px] max-h-28 overflow-y-auto' : ''}`}
               rows={1}
             />
-            
+
             <button
               onClick={handleSendMessage}
               disabled={(!newMessage.trim() && !selectedImage) || isSending || isUploadingImage}
