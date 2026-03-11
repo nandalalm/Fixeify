@@ -1,6 +1,6 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { IBookingRepository,PopulatedUser,PopulatedPro,PopulatedCategory,PopulatedBookingDocument,PopulatedLeanBooking } from "./IBookingRepository";
+import { IBookingRepository, PopulatedUser, PopulatedPro, PopulatedCategory, PopulatedBookingDocument, PopulatedLeanBooking } from "./IBookingRepository";
 import Booking, { BookingDocument, ITimeSlot } from "../models/bookingModel";
 import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
 import mongoose from "mongoose";
@@ -21,7 +21,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
           { path: "proId", select: "firstName lastName profilePhoto" },
           { path: "categoryId", select: "name image" },
         ])
-      ) as PopulatedBookingDocument; 
+      ) as PopulatedBookingDocument;
 
     return this.mapToBookingResponse(booking as PopulatedBookingDocument);
   }
@@ -201,16 +201,16 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     };
   }
 
-async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, status?: string, sortBy: "latest" | "oldest" = "latest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
+  async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, status?: string, sortBy: "latest" | "oldest" = "latest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
     const skip = (page - 1) * limit;
-    
-  
+
+
     const query: Record<string, unknown> = {};
-    
+
     if (status) {
       query.status = status;
     }
-    
+
     const orClauses: Record<string, unknown>[] = [];
     if (search) {
       orClauses.push(
@@ -226,16 +226,16 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
     if (orClauses.length > 0) {
       query.$or = orClauses;
     }
-    
+
     const sort: Record<string, 1 | -1> = {};
     if (sortBy === "latest") {
       sort.createdAt = -1;
       (sort as Record<string, 1 | -1>)._id = -1;
     } else if (sortBy === "oldest") {
       sort.createdAt = 1;
-      (sort as Record<string, 1 | -1>)._id = 1; 
+      (sort as Record<string, 1 | -1>)._id = 1;
     }
-    
+
     const bookings = await this._model
       .find(query)
       .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
@@ -250,9 +250,9 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
       .exec() as PopulatedLeanBooking[];
 
     const total = await this._model.countDocuments(query).exec();
-    return { 
-      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)), 
-      total 
+    return {
+      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)),
+      total
     };
   }
 
@@ -686,7 +686,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
     lowestEarning: { proId: string; firstName: string; lastName: string; revenue: number } | null;
   }> {
     const [mostRated, leastRated, highestEarning, lowestEarning] = await Promise.all([
-    
+
       mongoose.model("RatingReview").aggregate([
         { $group: { _id: "$proId", averageRating: { $avg: "$rating" }, count: { $sum: 1 } } },
         { $match: { count: { $gte: 1 } } },
@@ -696,7 +696,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
         { $unwind: "$pro" },
         { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", rating: "$averageRating" } }
       ]),
-    
+
       mongoose.model("RatingReview").aggregate([
         { $group: { _id: "$proId", averageRating: { $avg: "$rating" }, count: { $sum: 1 } } },
         { $match: { count: { $gte: 2 } } },
@@ -706,7 +706,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
         { $unwind: "$pro" },
         { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", rating: "$averageRating" } }
       ]),
-     
+
       this._model.aggregate([
         { $match: { status: "completed", proRevenue: { $exists: true, $ne: null } } },
         { $group: { _id: "$proId", totalRevenue: { $sum: "$proRevenue" } } },
@@ -716,7 +716,7 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
         { $unwind: "$pro" },
         { $project: { proId: "$_id", firstName: "$pro.firstName", lastName: "$pro.lastName", revenue: "$totalRevenue" } }
       ]),
-     
+
       this._model.aggregate([
         { $match: { status: "completed", proRevenue: { $exists: true, $ne: null } } },
         { $group: { _id: "$proId", totalRevenue: { $sum: "$proRevenue" } } },
@@ -730,7 +730,6 @@ async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, sta
 
     const most = mostRated[0] || null;
     let least = leastRated[0] || null;
-    // Ensure the same pro isn't returned for both mostRated and leastRated
     if (most && least && String(most.proId) === String(least.proId)) {
       least = null;
     }

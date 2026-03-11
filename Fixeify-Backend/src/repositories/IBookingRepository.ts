@@ -1,5 +1,5 @@
 import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
-import { BookingDocument,ILocation } from "../models/bookingModel";
+import { BookingDocument, ILocation } from "../models/bookingModel";
 import { ITimeSlot } from "../models/bookingModel";
 import { Types } from "mongoose";
 
@@ -59,10 +59,10 @@ export interface PopulatedLeanBooking {
   preferredTime: ITimeSlot[];
   status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
   rejectedReason?: string;
-  cancelReason?:string;
+  cancelReason?: string;
   createdAt: Date;
   updatedAt: Date;
-  isRated?:boolean;
+  isRated?: boolean;
   hasComplaintRaisedByPro?: boolean;
   hasComplaintRaisedByUser?: boolean;
 }

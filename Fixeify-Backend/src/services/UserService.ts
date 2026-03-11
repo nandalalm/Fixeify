@@ -95,7 +95,7 @@ export class UserService implements IUserService {
     const updatedUser = await this._userRepository.updateUser(userId, updateData);
     if (!updatedUser) return null;
 
-   
+
     try {
       await this._notificationService.createNotification({
         type: "general",
@@ -131,7 +131,7 @@ export class UserService implements IUserService {
     const updatedUser = await this._userRepository.updateUser(userId, updateData);
     if (!updatedUser) return null;
 
-  
+
     try {
       await this._notificationService.createNotification({
         type: "general",
@@ -147,18 +147,18 @@ export class UserService implements IUserService {
   }
 
   async getNearbyPros(
-    categoryId: string, 
-    longitude: number, 
-    latitude: number, 
-    skip: number = 0, 
-    limit: number = 5, 
-    sortBy: string = 'nearest', 
+    categoryId: string,
+    longitude: number,
+    latitude: number,
+    skip: number = 0,
+    limit: number = 5,
+    sortBy: string = 'nearest',
     availabilityFilter?: string
   ): Promise<{ pros: ProResponse[]; total: number; hasMore: boolean }> {
     return this._proRepository.findNearbyPros(categoryId, longitude, latitude, skip, limit, sortBy, availabilityFilter);
   }
 
- async createBooking(
+  async createBooking(
     userId: string,
     proId: string,
     bookingData: {
@@ -224,7 +224,7 @@ export class UserService implements IUserService {
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.TIME_SLOT_ALREADY_BOOKED);
       }
     }
-   
+
     const updatedSlots = bookingData.preferredTime.map((slot) => ({
       startTime: slot.startTime,
       endTime: slot.endTime,
@@ -244,7 +244,7 @@ export class UserService implements IUserService {
       location: bookingData.location,
       phoneNumber: bookingData.phoneNumber,
       preferredDate,
-      preferredTime: bookingData.preferredTime, 
+      preferredTime: bookingData.preferredTime,
       status: "pending",
     };
 
@@ -252,7 +252,7 @@ export class UserService implements IUserService {
     try {
       createdBooking = await this._bookingRepository.createBooking(booking);
     } catch (error) {
-      
+
       try {
         const rollbackSlots = updatedSlots.map((s) => ({ ...s, booked: false }));
         await this._proRepository.updateAvailability(pro.id, dayOfWeek, rollbackSlots, false);
@@ -262,7 +262,7 @@ export class UserService implements IUserService {
       throw error;
     }
 
-   
+
     try {
       await this._notificationService.createNotification({
         type: "booking",
@@ -290,28 +290,28 @@ export class UserService implements IUserService {
     return createdBooking;
   }
 
- async fetchBookingDetails(
-  userId: string,
-  page: number = 1,
-  limit: number = 5,
-  search?: string,
-  status?: string,
-  sortBy: "latest" | "oldest" = "latest",
-  bookingId?: string
-): Promise<{ bookings: BookingResponse[]; total: number }> {
-  const { bookings, total } = await this._bookingRepository.fetchBookingDetails(
-    userId,
-    page,
-    limit,
-    search,
-    status,
-    sortBy,
-    bookingId
-  );
-  return { bookings, total };
-}
+  async fetchBookingDetails(
+    userId: string,
+    page: number = 1,
+    limit: number = 5,
+    search?: string,
+    status?: string,
+    sortBy: "latest" | "oldest" = "latest",
+    bookingId?: string
+  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+    const { bookings, total } = await this._bookingRepository.fetchBookingDetails(
+      userId,
+      page,
+      limit,
+      search,
+      status,
+      sortBy,
+      bookingId
+    );
+    return { bookings, total };
+  }
 
- async fetchBookingHistoryDetails(
+  async fetchBookingHistoryDetails(
     userId: string,
     page: number = 1,
     limit: number = 5,
@@ -331,7 +331,7 @@ export class UserService implements IUserService {
     );
     return { bookings, total };
   }
-  
+
   async createPaymentIntent(bookingId: string, amount: number): Promise<{ clientSecret: string }> {
     const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
     if (!quota) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.QUOTA_NOT_FOUND);
@@ -466,7 +466,7 @@ export class UserService implements IUserService {
           } catch (error) {
             logger.error(MESSAGES.FAILED_CREATE_ADMIN_REVENUE_TRANSACTION, { adminId: admin._id, amount: adminRevenue, bookingId: booking.id, error });
           }
-        } 
+        }
       }
     } catch (error) {
       logger.error(MESSAGES.FAILED_CREATE_ADMIN_REVENUE_TRANSACTION, { bookingId: booking.id, error });
@@ -497,7 +497,7 @@ export class UserService implements IUserService {
     } catch (error) {
       logger.error(MESSAGES.FAILED_CREATE_PAYMENT_COMPLETION_NOTIFICATION, { proId: booking.proId, amount: proAmount, walletId: wallet.id, quotaId: quota.id, error });
     }
-    
+
     try {
       if (locked && lockKey && redis.isConnected()) {
         await redis.getClient().del(lockKey);
@@ -507,7 +507,7 @@ export class UserService implements IUserService {
     }
   }
 
- async cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }> {
+  async cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }> {
     const booking = await this._bookingRepository.findBookingById(bookingId);
     if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
     if (booking.userId.toString() !== userId) throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.UNAUTHORIZED_CANCEL_BOOKING);
@@ -567,7 +567,7 @@ export class UserService implements IUserService {
 
     return { message: "Booking cancelled successfully" };
   }
-  
+
   async handlePaymentFailure(bookingId: string): Promise<void> {
     const booking = await this._bookingRepository.findBookingById(bookingId);
     if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
@@ -589,7 +589,7 @@ export class UserService implements IUserService {
             return;
           }
           if (quota.paymentIntentId && quota.paymentIntentId !== paymentIntent.id) {
-            return; 
+            return;
           }
           await this.completeBookingPayment(bookingId);
         }
@@ -616,11 +616,11 @@ export class UserService implements IUserService {
       phoneNo: user.phoneNo ?? null,
       address: user.address
         ? {
-            address: user.address.address,
-            city: user.address.city,
-            state: user.address.state,
-            coordinates: user.address.coordinates,
-          }
+          address: user.address.address,
+          city: user.address.city,
+          state: user.address.state,
+          coordinates: user.address.coordinates,
+        }
         : null,
       isBanned: user.isBanned,
     });
