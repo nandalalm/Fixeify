@@ -180,6 +180,11 @@ const AdminDashboard: FC = () => {
 
   const formatCurrency = (v: number | undefined | null) => `₹${Number(v ?? 0).toLocaleString()}`;
 
+  const formatTooltipRevenue = (value: string | number | readonly (string | number)[] | undefined) => {
+    const normalizedValue = Array.isArray(value) ? value[0] : value;
+    return [`₹${Number(normalizedValue ?? 0).toLocaleString()}`, "Revenue"] as [string, string];
+  };
+
   if (!user) {
     return null;
   }
@@ -389,7 +394,7 @@ const AdminDashboard: FC = () => {
                                   tick={{ fontSize: isSmall ? 10 : 12 }}
                                 />
                                 <Tooltip
-                                  formatter={(v?: number) => [`₹${Number(v ?? 0).toLocaleString()}`, "Revenue"]}
+                                  formatter={formatTooltipRevenue}
                                   contentStyle={{ fontSize: isSmall ? 12 : 14 }}
                                 />
                                 {!isSmall && <Legend />}

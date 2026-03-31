@@ -153,6 +153,10 @@ const ProDashboard: FC = () => {
   }, [selectedYear, series]);
 
   const formatCurrency = (v: number | undefined | null) => `₹${Number(v ?? 0).toLocaleString()}`;
+  const formatTooltipRevenue = (value: string | number | readonly (string | number)[] | undefined) => {
+    const normalizedValue = Array.isArray(value) ? value[0] : value;
+    return [`₹${Number(normalizedValue ?? 0).toLocaleString()}`, "Revenue"] as [string, string];
+  };
   // yearlyRevenue and dailyRevenue are now provided by backend
 
   if (!user ) {
@@ -347,7 +351,7 @@ const ProDashboard: FC = () => {
                                   tick={{ fontSize: isSmall ? 10 : 12 }}
                                 />
                                 <Tooltip
-                                  formatter={(v?: number) => [`₹${Number(v ?? 0).toLocaleString()}`, "Revenue"]}
+                                  formatter={formatTooltipRevenue}
                                   contentStyle={{ fontSize: isSmall ? 12 : 14 }}
                                 />
                                 {!isSmall && <Legend />}

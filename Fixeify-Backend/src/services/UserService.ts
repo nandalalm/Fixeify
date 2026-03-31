@@ -344,6 +344,12 @@ export class UserService implements IUserService {
         const existing = await this._stripe.paymentIntents.retrieve(quota.paymentIntentId);
         if (existing && existing.client_secret) {
           if (existing.status && !["succeeded", "canceled"].includes(existing.status)) {
+            logger.info("Reusing existing Stripe payment intent", {
+              bookingId,
+              quotaId: quota.id,
+              paymentIntentId: existing.id,
+              paymentIntentStatus: existing.status,
+            });
             return { clientSecret: existing.client_secret };
           }
         }
@@ -362,6 +368,13 @@ export class UserService implements IUserService {
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_CREATE_PAYMENT_INTENT);
     }
     await this._quotaRepository.updateQuota(quota.id, { paymentIntentId: paymentIntent.id });
+    logger.info("Created new Stripe payment intent", {
+      bookingId,
+      quotaId: quota.id,
+      paymentIntentId: paymentIntent.id,
+      paymentIntentStatus: paymentIntent.status,
+      amount,
+    });
     return { clientSecret: paymentIntent.client_secret };
   }
 
@@ -375,6 +388,7 @@ export class UserService implements IUserService {
         lockKey = `lock:booking:${bookingId}:payment`;
         const ok = await client.set(lockKey, "1", { NX: true, PX: 5 * 60 * 1000 });
         if (!ok) {
+          logger.warn("Payment completion skipped because lock already exists", { bookingId, lockKey });
           return;
         }
         locked = true;
@@ -389,8 +403,20 @@ export class UserService implements IUserService {
     const quotaExisting = await this._quotaRepository.findQuotaByBookingId(bookingId);
     if (!quotaExisting) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.QUOTA_NOT_FOUND);
 
+    logger.info("Completing booking payment", {
+      bookingId,
+      bookingStatusBefore: booking.status,
+      quotaId: quotaExisting.id,
+      quotaPaymentStatusBefore: quotaExisting.paymentStatus,
+      paymentIntentId: quotaExisting.paymentIntentId,
+    });
+
     const quota = await this._quotaRepository.markPaymentCompletedIfPending(quotaExisting.id);
     if (!quota) {
+      logger.warn("Quota payment was not marked completed because it was already updated", {
+        bookingId,
+        quotaId: quotaExisting.id,
+      });
       return;
     }
     const proAmount = Math.round(quota.totalCost * 0.7);
@@ -474,6 +500,14 @@ export class UserService implements IUserService {
 
     await this._bookingRepository.updateBooking(bookingId, {
       status: "completed",
+    });
+
+    logger.info("Booking payment completed successfully", {
+      bookingId,
+      quotaId: quota.id,
+      totalCost: quota.totalCost,
+      proAmount,
+      adminRevenue,
     });
 
     try {
@@ -575,6 +609,11 @@ export class UserService implements IUserService {
     const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
     if (quota) {
       await this._quotaRepository.updateQuota(quota.id, { paymentStatus: "failed" });
+      logger.warn("Payment marked as failed", {
+        bookingId,
+        quotaId: quota.id,
+        previousBookingStatus: booking.status,
+      });
     }
   }
 
@@ -584,25 +623,62 @@ export class UserService implements IUserService {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         if (paymentIntent.metadata?.bookingId) {
           const bookingId = paymentIntent.metadata.bookingId;
+          logger.info("Handling payment_intent.succeeded event", {
+            eventId: event.id,
+            bookingId,
+            paymentIntentId: paymentIntent.id,
+            stripeStatus: paymentIntent.status,
+          });
           const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
           if (!quota) {
+            logger.warn("Webhook payment_intent.succeeded ignored because quota was not found", {
+              eventId: event.id,
+              bookingId,
+              paymentIntentId: paymentIntent.id,
+            });
             return;
           }
           if (quota.paymentIntentId && quota.paymentIntentId !== paymentIntent.id) {
+            logger.warn("Webhook payment_intent.succeeded ignored because payment intent id does not match quota", {
+              eventId: event.id,
+              bookingId,
+              expectedPaymentIntentId: quota.paymentIntentId,
+              receivedPaymentIntentId: paymentIntent.id,
+            });
             return;
           }
           await this.completeBookingPayment(bookingId);
+        } else {
+          logger.warn("Webhook payment_intent.succeeded missing bookingId metadata", {
+            eventId: event.id,
+            paymentIntentId: paymentIntent.id,
+          });
         }
         break;
       }
       case "payment_intent.payment_failed": {
         const failedPaymentIntent = event.data.object as Stripe.PaymentIntent;
         if (failedPaymentIntent.metadata?.bookingId) {
+          logger.warn("Handling payment_intent.payment_failed event", {
+            eventId: event.id,
+            bookingId: failedPaymentIntent.metadata.bookingId,
+            paymentIntentId: failedPaymentIntent.id,
+            stripeStatus: failedPaymentIntent.status,
+          });
           await this.handlePaymentFailure(failedPaymentIntent.metadata.bookingId);
+        } else {
+          logger.warn("Webhook payment_intent.payment_failed missing bookingId metadata", {
+            eventId: event.id,
+            paymentIntentId: failedPaymentIntent.id,
+          });
         }
         break;
       }
       default:
+        logger.info("Stripe webhook event ignored", {
+          eventId: event.id,
+          eventType: event.type,
+        });
     }
   }
 

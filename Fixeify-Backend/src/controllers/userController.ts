@@ -8,6 +8,7 @@ import { AuthRequest } from "../middleware/authMiddleware";
 import Stripe from "stripe";
 import { HttpStatus } from "../enums/httpStatus";
 import PaymentEventModel from "../models/paymentEventModel";
+import logger from "../config/logger";
 
 declare const process: {
   env: {
@@ -169,6 +170,11 @@ export class UserController {
       const { bookingId, amount } = req.body;
       if (!bookingId || !amount) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKINGID_AMOUNT_REQUIRED);
 
+      logger.info("Create payment intent request received", {
+        bookingId,
+        amount,
+        requesterUserId: req.userId,
+      });
       const paymentIntent = await this._userService.createPaymentIntent(bookingId, amount);
       res.status(HttpStatus.OK).json(paymentIntent);
     } catch (error) {
@@ -217,6 +223,11 @@ export class UserController {
       const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
       if (!endpointSecret) throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED);
 
+      logger.info("Stripe webhook received", {
+        hasSignature: Boolean(sig),
+        contentType: req.headers["content-type"],
+      });
+
       let event;
       try {
         const rawBody = req.body;
@@ -227,18 +238,36 @@ export class UserController {
       } catch (err: unknown) {
         const error = err as Error;
         console.error(`${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
+        logger.error("Stripe webhook signature verification failed", {
+          error: error.message,
+        });
         throw new HttpError(HttpStatus.BAD_REQUEST, `${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
       }
+
+      logger.info("Stripe webhook verified", {
+        eventId: event.id,
+        eventType: event.type,
+      });
 
       if (event.type === "payment_intent.succeeded") {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const pid = paymentIntent.id;
         // Extract booking ID from payment intent metadata
+        logger.info("Processing succeeded payment intent webhook", {
+          eventId: event.id,
+          paymentIntentId: pid,
+          bookingId: paymentIntent.metadata?.bookingId,
+          stripeStatus: paymentIntent.status,
+        });
         try {
           await PaymentEventModel.create({ paymentIntentId: pid });
         } catch (e: unknown) {
           const error = e as { code?: number };
           if (error && error.code === 11000) {
+            logger.warn("Duplicate payment_intent.succeeded webhook ignored", {
+              eventId: event.id,
+              paymentIntentId: pid,
+            });
             res.status(HttpStatus.OK).json({ received: true, duplicate: true });
             return;
           }
@@ -247,6 +276,10 @@ export class UserController {
       }
 
       await this._userService.handleWebhookEvent(event);
+      logger.info("Stripe webhook processed successfully", {
+        eventId: event.id,
+        eventType: event.type,
+      });
       res.status(HttpStatus.OK).json({ received: true });
     } catch (error) {
       next(error);
