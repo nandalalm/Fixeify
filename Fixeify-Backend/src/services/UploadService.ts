@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { injectable } from "inversify";
+import type { Express } from "express";
 import { IUploadService } from "./IUploadService";
 
 @injectable()
