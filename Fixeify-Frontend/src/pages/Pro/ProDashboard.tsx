@@ -347,7 +347,7 @@ const ProDashboard: FC = () => {
                                   tick={{ fontSize: isSmall ? 10 : 12 }}
                                 />
                                 <Tooltip
-                                  formatter={(v: number) => [`₹${Number(v).toLocaleString()}`, "Revenue"]}
+                                  formatter={(v?: number) => [`₹${Number(v ?? 0).toLocaleString()}`, "Revenue"]}
                                   contentStyle={{ fontSize: isSmall ? 12 : 14 }}
                                 />
                                 {!isSmall && <Legend />}
