@@ -71,7 +71,9 @@ import { MongoRatingReviewRepository } from "./repositories/ratingReviewReposito
 import { MongoTransactionRepository } from "./repositories/TransactionRepository";
 import { MongoTicketRepository } from "./repositories/ticketRepository";
 import { ChatGateway } from "./chatGateway";
-import { errorMiddleware } from "./middleware/errorMiddleware";
+import { errorMiddleware, HttpError } from "./middleware/errorMiddleware";
+import { HttpStatus } from "./enums/httpStatus";
+import { MESSAGES } from "./constants/messages";
 import "./models/notificationModel";
 import "./models/chatModel";
 import "./models/messageModel";
@@ -153,6 +155,10 @@ app.use("/api/notifications", express.json(), createNotificationRoutes(container
 app.use("/api/rating-reviews", express.json(), createRatingReviewRoutes(container));
 app.use("/api/tickets", express.json(), createTicketRoutes(container));
 app.use("/api/upload", express.json(), createUploadRoutes(container));
+
+app.use((req, _res, next) => {
+  next(new HttpError(HttpStatus.NOT_FOUND, `${MESSAGES.NOT_FOUND}: ${req.originalUrl}`));
+});
 
 app.use(errorMiddleware);
 
