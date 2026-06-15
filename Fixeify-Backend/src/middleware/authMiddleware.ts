@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { MESSAGES } from "../constants/messages";
-import { HttpStatus } from "../constants/httpStatus";
+import { HttpStatus } from "../enums/httpStatus";
 import { HttpError } from "./errorMiddleware";
 import { verifyAccessToken } from "../utils/jwtUtils";
 
