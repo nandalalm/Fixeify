@@ -1,74 +1,10 @@
-import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
-import { BookingDocument, ILocation } from "../models/bookingModel";
-import { ITimeSlot } from "../models/bookingModel";
-import { Types } from "mongoose";
-
-export interface PopulatedUser {
-  _id: Types.ObjectId;
-  name: string;
-  email: string;
-  photo?: string;
-}
-
-export interface PopulatedPro {
-  _id: Types.ObjectId;
-  firstName: string;
-  lastName: string;
-  profilePhoto?: string;
-}
-
-export interface PopulatedCategory {
-  _id: Types.ObjectId;
-  name: string;
-  image?: string;
-}
-
-export interface PopulatedBookingDocument {
-  _id: Types.ObjectId;
-  bookingId: string;
-  userId: PopulatedUser;
-  proId: PopulatedPro;
-  categoryId: PopulatedCategory;
-  issueDescription: string;
-  location: ILocation;
-  phoneNumber: string;
-  preferredDate: Date;
-  preferredTime: ITimeSlot[];
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
-  rejectedReason?: string;
-  cancelReason?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isRated?: boolean;
-  hasComplaintRaisedByPro?: boolean;
-  hasComplaintRaisedByUser?: boolean;
-  adminRevenue?: number;
-  proRevenue?: number;
-}
-
-export interface PopulatedLeanBooking {
-  _id: Types.ObjectId;
-  bookingId: string;
-  userId: PopulatedUser;
-  proId: PopulatedPro;
-  categoryId: PopulatedCategory;
-  issueDescription: string;
-  location: ILocation;
-  phoneNumber: string;
-  preferredDate: Date;
-  preferredTime: ITimeSlot[];
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
-  rejectedReason?: string;
-  cancelReason?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isRated?: boolean;
-  hasComplaintRaisedByPro?: boolean;
-  hasComplaintRaisedByUser?: boolean;
-}
+import type { ClientSession } from "mongoose";
+import type { BookingDocument } from "../models/bookingModel";
+import type { BookingTimeSlot } from "../contracts/api/bookingTypes";
+import type { BookingCompleteRecord, BookingConflictQueryRecord, BookingListProjectionRecord, PopulatedBookingRecord } from "../contracts/repository/bookingRecords";
 
 export interface IBookingRepository {
-  createBooking(bookingData: Partial<BookingDocument>): Promise<BookingResponse>;
+  createBooking(bookingData: Partial<BookingDocument>, session?: ClientSession): Promise<PopulatedBookingRecord>;
   fetchBookingDetails(
     userId: string,
     page?: number,
@@ -77,7 +13,7 @@ export interface IBookingRepository {
     status?: string,
     sortBy?: "latest" | "oldest",
     bookingId?: string
-  ): Promise<{ bookings: BookingResponse[]; total: number }>;
+  ): Promise<{ bookings: BookingListProjectionRecord[]; total: number }>;
   fetchBookingHistoryDetails(
     userId: string,
     page?: number,
@@ -86,7 +22,7 @@ export interface IBookingRepository {
     status?: string,
     sortBy?: "latest" | "oldest",
     bookingId?: string
-  ): Promise<{ bookings: BookingResponse[]; total: number }>;
+  ): Promise<{ bookings: BookingListProjectionRecord[]; total: number }>;
   fetchProBookings(
     proId: string,
     page?: number,
@@ -95,27 +31,29 @@ export interface IBookingRepository {
     sortBy?: "latest" | "oldest",
     search?: string,
     bookingId?: string
-  ): Promise<{ bookings: BookingResponse[]; total: number }>;
-  fetchAllBookings(page?: number, limit?: number, search?: string, status?: string, sortBy?: "latest" | "oldest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }>; // supports filters and sorting, includes bookingId filter
-  updateBooking(bookingId: string, updateData: Partial<BookingDocument>): Promise<BookingDocument | null>;
-  findBookingById(bookingId: string): Promise<BookingDocument | null>;
-  findBookingByIdPopulated(bookingId: string): Promise<BookingResponse | null>;
-  findBookingByIdComplete(bookingId: string): Promise<BookingCompleteResponse | null>;
+  ): Promise<{ bookings: BookingListProjectionRecord[]; total: number }>;
+  fetchAllBookings(page?: number, limit?: number, search?: string, status?: string, sortBy?: "latest" | "oldest", bookingId?: string): Promise<{ bookings: BookingListProjectionRecord[]; total: number }>;
+  updateBooking(bookingId: string, updateData: Partial<BookingDocument>, session?: ClientSession): Promise<BookingDocument | null>;
+  findBookingById(bookingId: string, session?: ClientSession): Promise<BookingDocument | null>;
+  findBookingByIdPopulated(bookingId: string): Promise<PopulatedBookingRecord | null>;
+  findBookingByIdComplete(bookingId: string): Promise<BookingCompleteRecord | null>;
   cancelBooking(bookingId: string, updateData: { status: string; cancelReason: string }): Promise<void>;
   findBookingsByProAndDate(
     proId: string,
     preferredDate: Date,
-    timeSlots: ITimeSlot[],
+    timeSlots: BookingTimeSlot[],
     status: string,
-    excludeBookingId?: string
-  ): Promise<BookingResponse[]>;
+    excludeBookingId?: string,
+    session?: ClientSession
+  ): Promise<BookingConflictQueryRecord[]>;
   findBookingsByUserProDateTime(
     userId: string,
     proId: string,
     preferredDate: Date,
-    timeSlots: ITimeSlot[],
-    status: string
-  ): Promise<BookingDocument[]>;
+    timeSlots: BookingTimeSlot[],
+    status: string,
+    session?: ClientSession
+  ): Promise<BookingConflictQueryRecord[]>;
   getTrendingService(): Promise<{ categoryId: string; name: string; bookingCount: number } | null>;
   getTopCategoriesByCompleted(limit: number): Promise<Array<{ categoryId: string; name: string; image?: string; bookingCount: number }>>;
   getAdminRevenueMetrics(): Promise<{

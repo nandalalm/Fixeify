@@ -1,4 +1,5 @@
-import { NotificationResponse, CreateNotificationRequest } from "../dtos/response/notificationDtos";
+import type { CreateNotificationRequest } from "../dtos/request/notificationDtos";
+import type { NotificationResponse } from "../dtos/response/notificationDtos";
 
 export interface INotificationService {
   createNotification(data: CreateNotificationRequest): Promise<NotificationResponse>;

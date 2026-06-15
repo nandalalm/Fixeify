@@ -1,19 +1,14 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { PendingProModel, PendingProDocument } from "../models/pendingProModel";
-import { ApprovedProModel, ApprovedProDocument, ITimeSlot } from "../models/approvedProModel";
-import { CategoryDocument } from "../models/categoryModel";
-import { IProRepository } from "./IProRepository";
-import { ProResponse, ProProfileResponse } from "../dtos/response/proDtos";
-import { UserRole } from "../enums/roleEnum";
-import { Types, PipelineStage } from "mongoose";
+import { PendingProModel, type PendingProDocument } from "../models/pendingProModel";
+import { ApprovedProModel, type ApprovedProDocument, type ITimeSlot } from "../models/approvedProModel";
+import type { CategoryDocument } from "../models/categoryModel";
+import type { IProRepository } from "./IProRepository";
+import { type ClientSession, Types, type PipelineStage } from "mongoose";
+import type { NearbyProRecord, PopulatedApprovedProRecord, ProProfileRecord } from "../contracts/repository/proRecords";
 
 declare const console: {
   error: (message: string, error?: unknown) => void;
-};
-
-type PopulatedApprovedProDocument = Omit<ApprovedProDocument, "categoryId"> & {
-  categoryId: CategoryDocument;
 };
 
 @injectable()
@@ -49,16 +44,16 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     return this._model.countDocuments({}).exec();
   }
 
-  async findById(id: string): Promise<PendingProDocument | null> {
-    const pro = await this._model.findById(id).exec();
+  async findById(id: string, session?: ClientSession): Promise<PendingProDocument | null> {
+    const pro = await this._model.findById(id).session(session || null).exec();
     if (!pro) {
       throw new Error("Pro not found");
     }
     return pro;
   }
 
-  async approvePro(id: string, password: string, about: string): Promise<{ email: string; firstName: string; lastName: string; approvedProId: string }> {
-    const pendingPro = await this.findById(id);
+  async approvePro(id: string, password: string, about: string, session?: ClientSession): Promise<{ email: string; firstName: string; lastName: string; approvedProId: string }> {
+    const pendingPro = await this.findById(id, session);
     if (!pendingPro) throw new Error("Pending pro not found");
 
     const approvedProData = {
@@ -69,8 +64,9 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       about: about || null,
     };
 
-    const approvedPro = await ApprovedProModel.create(approvedProData);
-    await this.delete(id);
+    const approvedPros = await ApprovedProModel.create([approvedProData], { session });
+    const approvedPro = approvedPros[0];
+    await this._model.findByIdAndDelete(id).session(session || null).exec();
 
     return {
       email: approvedPro.email,
@@ -87,34 +83,32 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
   }
 
 
-  async getApprovedProsWithPagination(skip: number, limit: number, sortBy?: "latest" | "oldest"): Promise<ProResponse[]> {
+  async getApprovedProsWithPagination(skip: number, limit: number, sortBy?: "latest" | "oldest"): Promise<PopulatedApprovedProRecord[]> {
     const sortOrder = sortBy === "oldest" ? 1 : -1;
-    const pros = (await ApprovedProModel.find({}, { password: 0 })
+    return ApprovedProModel.find({}, { password: 0 })
       .sort({ createdAt: sortOrder })
       .populate<{ categoryId: CategoryDocument }>("categoryId")
       .skip(skip)
       .limit(limit)
-      .exec()) as PopulatedApprovedProDocument[];
-    return pros.map(this.mapToProResponse);
+      .exec() as Promise<PopulatedApprovedProRecord[]>;
   }
 
-  async findApprovedProById(id: string): Promise<ApprovedProDocument | null> {
-    return ApprovedProModel.findById(id).exec();
+  async findApprovedProById(id: string, session?: ClientSession): Promise<ApprovedProDocument | null> {
+    return ApprovedProModel.findById(id).session(session || null).exec();
   }
 
   async getTotalApprovedProsCount(): Promise<number> {
     return ApprovedProModel.countDocuments({}).exec();
   }
 
-  async findApprovedProByIdAsResponse(id: string): Promise<ProResponse | null> {
-    const pro = (await ApprovedProModel.findById(id, { password: 0 })
+  async findApprovedProByIdWithCategory(id: string): Promise<PopulatedApprovedProRecord | null> {
+    return ApprovedProModel.findById(id, { password: 0 })
       .populate<{ categoryId: CategoryDocument }>("categoryId")
-      .exec()) as PopulatedApprovedProDocument | null;
-    return pro ? this.mapToProResponse(pro) : null;
+      .exec() as Promise<PopulatedApprovedProRecord | null>;
   }
 
-  async findApprovedProByIdAsProfile(id: string): Promise<ProProfileResponse | null> {
-    const pro = await ApprovedProModel.findById(id, {
+  async findApprovedProProfileById(id: string): Promise<ProProfileRecord | null> {
+    return ApprovedProModel.findById(id, {
       _id: 1,
       firstName: 1,
       lastName: 1,
@@ -126,7 +120,6 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       isBanned: 1,
       isUnavailable: 1,
     }).exec();
-    return pro ? this.mapToProProfileResponse(pro) : null;
   }
 
    async updatePendingPro(id: string, data: Partial<PendingProDocument>): Promise<PendingProDocument | null> {
@@ -159,7 +152,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     limit: number = 5, 
     sortBy: string = 'nearest', 
     availabilityFilter?: string
-  ): Promise<{ pros: ProResponse[]; total: number; hasMore: boolean }> {
+  ): Promise<{ pros: NearbyProRecord[]; total: number; hasMore: boolean }> {
     try {
      
       let pipeline: PipelineStage[] = [
@@ -170,7 +163,7 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
               coordinates: [longitude, latitude],
             },
             distanceField: "distance",
-            maxDistance: 10000, // 10km in meters
+            maxDistance: 10000,
             spherical: true,
             query: {
               categoryId: new Types.ObjectId(categoryId),
@@ -262,65 +255,18 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
       pipeline.push(sortStage);
 
       const countPipeline = [...pipeline, { $count: "total" }];
-      const countResult = await ApprovedProModel.aggregate(countPipeline);
+      const countResult = await ApprovedProModel.aggregate<{ total: number }>(countPipeline);
       const total = countResult.length > 0 ? countResult[0].total : 0;
 
       pipeline.push({ $skip: skip });
       pipeline.push({ $limit: limit });
 
-      const pros = await ApprovedProModel.aggregate(pipeline);
-      
-      const prosWithRatings = pros.map((pro: unknown) => {
-        const proData = pro as Record<string, unknown>;
-        const categoryData = proData.category as Record<string, unknown>;
-        const locationData = proData.location as Record<string, unknown>;
-        const availabilityData = proData.availability as Record<string, unknown>;
-        
-        return new ProResponse({
-          _id: (proData._id as Record<string, unknown>).toString(),
-          firstName: proData.firstName as string,
-          role: UserRole.PRO,
-          lastName: proData.lastName as string,
-          email: proData.email as string,
-          phoneNumber: proData.phoneNumber as string,
-          category: {
-            id: (categoryData._id as Record<string, unknown>).toString(),
-            name: categoryData.name as string,
-            image: (categoryData.image as string) || "",
-          },
-          customService: (proData.customService as string) ?? null,
-          location: {
-            address: locationData.address as string,
-            city: locationData.city as string,
-            state: locationData.state as string,
-            coordinates: locationData.coordinates as { type: "Point"; coordinates: [number, number] },
-          },
-          profilePhoto: proData.profilePhoto as string,
-          idProof: proData.idProof as string[],
-          accountHolderName: proData.accountHolderName as string,
-          accountNumber: proData.accountNumber as string,
-          bankName: proData.bankName as string,
-          availability: {
-            monday: (availabilityData.monday as ITimeSlot[]) || [],
-            tuesday: (availabilityData.tuesday as ITimeSlot[]) || [],
-            wednesday: (availabilityData.wednesday as ITimeSlot[]) || [],
-            thursday: (availabilityData.thursday as ITimeSlot[]) || [],
-            friday: (availabilityData.friday as ITimeSlot[]) || [],
-            saturday: (availabilityData.saturday as ITimeSlot[]) || [],
-            sunday: (availabilityData.sunday as ITimeSlot[]) || [],
-          },
-          isBanned: proData.isBanned as boolean,
-          about: (proData.about as string) ?? null,
-          isUnavailable: proData.isUnavailable as boolean,
-          averageRating: (proData.averageRating as number) || 0,
-          totalRatings: (proData.totalRatings as number) || 0,
-        });
-      });
+      const pros = await ApprovedProModel.aggregate<NearbyProRecord>(pipeline);
 
       const hasMore = skip + limit < total;
 
       return {
-        pros: prosWithRatings,
+        pros,
         total,
         hasMore
       };
@@ -330,15 +276,11 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     }
   }
 
-  async updateAvailability(proId: string, dayOfWeek: string, timeSlots: ITimeSlot[], booked: boolean = true): Promise<ApprovedProDocument | null> {
+  async updateAvailability(proId: string, dayOfWeek: string, timeSlots: ITimeSlot[], booked: boolean = true, session?: ClientSession): Promise<ApprovedProDocument | null> {
     try {
-      try { 
-        // Debug logging removed
-      } catch {
-        // Debug logging failed
-      }
       const startTimes = timeSlots.map(slot => slot.startTime);
       const endTimes = timeSlots.map(slot => slot.endTime);
+      const availabilityDay = dayOfWeek as keyof ApprovedProDocument["availability"];
 
       const result = await ApprovedProModel.findOneAndUpdate(
         {
@@ -357,17 +299,17 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
         },
         {
           new: true,
-          arrayFilters: [{ "elem.startTime": { $in: startTimes }, "elem.endTime": { $in: endTimes } }]
+          arrayFilters: [{ "elem.startTime": { $in: startTimes }, "elem.endTime": { $in: endTimes } }],
+          session
         }
       ).exec();
 
       if (!result) {
-        const pro = await ApprovedProModel.findById(proId);
+        const pro = await ApprovedProModel.findById(proId).session(session || null);
         if (pro) {
           pro.availability = pro.availability || {};
-          // @ts-expect-error - Dynamic property assignment
-          pro.availability[dayOfWeek] = timeSlots.map(slot => ({ ...slot, booked }));
-          return await pro.save();
+          pro.availability[availabilityDay] = timeSlots.map(slot => ({ ...slot, booked }));
+          return await pro.save({ session });
         }
         return null;
       }
@@ -379,63 +321,4 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
     }
   }
 
-  private mapToProResponse(pro: PopulatedApprovedProDocument): ProResponse {
-    return new ProResponse({
-      _id: pro._id.toString(),
-      firstName: pro.firstName,
-      role: UserRole.PRO,
-      lastName: pro.lastName,
-      email: pro.email,
-      phoneNumber: pro.phoneNumber,
-      category: {
-        id: pro.categoryId._id.toString(),
-        name: pro.categoryId.name,
-        image: pro.categoryId.image || "",
-      },
-      customService: pro.customService ?? null,
-      location: {
-        address: pro.location.address,
-        city: pro.location.city,
-        state: pro.location.state,
-        coordinates: pro.location.coordinates,
-      },
-      profilePhoto: pro.profilePhoto,
-      idProof: pro.idProof,
-      accountHolderName: pro.accountHolderName,
-      accountNumber: pro.accountNumber,
-      bankName: pro.bankName,
-      availability: {
-        monday: pro.availability.monday || [],
-        tuesday: pro.availability.tuesday || [],
-        wednesday: pro.availability.wednesday || [],
-        thursday: pro.availability.thursday || [],
-        friday: pro.availability.friday || [],
-        saturday: pro.availability.saturday || [],
-        sunday: pro.availability.sunday || [],
-      },
-      isBanned: pro.isBanned,
-      about: pro.about ?? null,
-      isUnavailable: pro.isUnavailable,
-    });
-  }
-
-  private mapToProProfileResponse(pro: ApprovedProDocument): ProProfileResponse {
-    return new ProProfileResponse({
-      _id: pro._id.toString(),
-      firstName: pro.firstName,
-      lastName: pro.lastName,
-      email: pro.email,
-      phoneNumber: pro.phoneNumber,
-      location: {
-        address: pro.location.address,
-        city: pro.location.city,
-        state: pro.location.state,
-        coordinates: pro.location.coordinates,
-      },
-      profilePhoto: pro.profilePhoto,
-      about: pro.about ?? null,
-      isBanned: pro.isBanned,
-      isUnavailable: pro.isUnavailable,
-    });
-  }
 }

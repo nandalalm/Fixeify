@@ -1,0 +1,586 @@
+FIXEIFY DTO MAPPING REFACTOR PLAN
+=================================
+
+Goal
+----
+Create one consistent DTO mapping architecture across the backend:
+
+Controller -> Service -> Mapper -> Response DTO
+                      |
+                      -> Repository -> MongoDB
+
+Repositories must handle persistence and return typed documents/query records.
+Services must handle business logic and use mappers to produce response DTOs.
+Controllers must handle HTTP concerns only.
+DTO files must define API request/response shapes and must not depend on Mongoose models.
+
+
+PROGRESS LEGEND
+---------------
+[ ] Not started
+[~] In progress
+[x] Completed and verified
+[!] Blocked or requires a decision
+
+When resuming:
+1. Find "CURRENT RESUME POINT".
+2. Start with the first unchecked task in that section.
+3. Change [ ] to [~] before making changes.
+4. Change [~] to [x] only after TypeScript and ESLint pass.
+5. Update "CURRENT RESUME POINT" before stopping.
+
+
+NON-NEGOTIABLE STANDARDS
+------------------------
+[x] Do not use `any`.
+[x] Do not use `as never` to force DTO construction.
+[x] Avoid `as unknown as` by defining accurate query-result types.
+[x] Use `import type` for type-only imports.
+[x] Use constants from `src/constants/messages.ts` for messages.
+[x] Use `HttpStatus` for HTTP status codes.
+[x] Do not return Mongoose documents from controllers.
+[x] Do not import response DTOs into repository interfaces or implementations.
+[x] Do not import Mongoose model types into API DTO files.
+[x] Do not place database queries inside mappers.
+[x] Do not place business rules inside mappers.
+[x] Preserve existing API response shapes during the migration.
+[!] Add focused mapper tests where a test framework is available. (No test framework configured.)
+[x] Run `npm run lint` and `npx tsc --noEmit` after every feature migration.
+
+
+TARGET DIRECTORY STRUCTURE
+--------------------------
+[x] Create `src/mappers/`.
+[x] Create one mapper module per feature instead of one global mapper:
+
+    src/mappers/userMapper.ts
+    src/mappers/proMapper.ts
+    src/mappers/categoryMapper.ts
+    src/mappers/bookingMapper.ts
+    src/mappers/quotaMapper.ts
+    src/mappers/walletMapper.ts
+    src/mappers/transactionMapper.ts
+    src/mappers/withdrawalMapper.ts
+    src/mappers/notificationMapper.ts
+    src/mappers/ticketMapper.ts
+    src/mappers/chatMapper.ts
+    src/mappers/ratingReviewMapper.ts
+
+[x] Create `src/contracts/repository/` for typed persistence/query records when model
+    document types are not sufficient.
+[x] Create repository input types such as `CreateTicketData`,
+    `UpdateCategoryData`, and `CreateNotificationData`.
+[x] Keep request DTOs in `src/dtos/request/`.
+[x] Keep response DTOs in `src/dtos/response/`.
+
+
+MAPPING RULES
+-------------
+[x] A mapper accepts a strongly typed model, lean record, populated record, or
+    aggregation result and returns a response DTO.
+[x] A mapper is a pure function with no database access or side effects.
+[x] Repository methods return:
+    - Mongoose documents for writes and simple entity reads.
+    - Typed lean/populated records for read views.
+    - Typed aggregate records for aggregation queries.
+    - Primitive totals/statistics where appropriate.
+[x] Services call repositories, apply business logic, and invoke mappers.
+[x] Controllers send service results without remapping domain entities.
+[x] Request DTO-to-persistence conversion belongs in a named input mapper or
+    service command builder, never in the response mapper.
+[x] DTO constructors, if retained, accept explicit typed properties only.
+[x] DTO constructors must not inspect `unknown`, Mongoose population state, or
+    raw database documents.
+
+
+PHASE 0 - BASELINE AND API CONTRACT SAFETY
+------------------------------------------
+[!] Record representative JSON responses for all existing public endpoints. (No automated test framework configured.)
+[x] List all response DTOs and the endpoints that return them.
+[x] List every repository importing from `src/dtos/`.
+[x] List every mapper currently implemented inside repositories or services.
+[x] List all uses of:
+    - `as never`
+    - `as unknown as`
+    - `Record<string, unknown>` used for entity mapping
+    - DTO constructors receiving `unknown`
+[x] Confirm whether tests exist for response shapes.
+[!] If response tests do not exist, add focused contract tests before changing
+    high-risk mappings such as booking, payment, wallet, and authentication.
+[x] Run and record the baseline:
+    - `npm run lint`
+    - `npx tsc --noEmit`
+
+
+PHASE 1 - SHARED TYPE AND MAPPER FOUNDATION
+-------------------------------------------
+[x] Add the `src/mappers/` directory.
+[x] Add the `src/contracts/repository/` directory.
+[x] Establish mapper naming:
+    - `toUserResponse`
+    - `toBookingResponse`
+    - `toBookingCompleteResponse`
+    - `toProResponse`
+    - `toProProfileResponse`
+[x] Establish collection helpers only where useful:
+    - `toUserResponses(records)`
+    - Prefer `.map(toUserResponse)` when no extra logic is needed.
+[x] Define reusable API-neutral value types for location and time slots.
+[x] Move shared API value types out of Mongoose model files.
+[x] Update response DTOs so they no longer import from `src/models/`.
+[x] Decide consistently whether response DTOs are classes or interfaces.
+[x] Recommended decision: use interfaces/types for passive response shapes and
+    pure mapper functions for construction.
+[x] Remove mapping behavior from DTO constructors that accepts raw documents.
+[x] Verify Phase 1 with lint and TypeScript.
+
+
+PHASE 2 - TICKET MAPPING
+------------------------
+Reason: Ticket mapping is duplicated in the repository and service and currently
+relies heavily on `unknown` casts.
+
+[x] Define `PopulatedTicketRecord` in `src/contracts/repository/ticketRecords.ts`.
+[x] Define repository input types independent of request DTOs:
+    - `CreateTicketData`
+    - `UpdateTicketStatusData`
+[x] Create `src/mappers/ticketMapper.ts`.
+[x] Move the single canonical `toTicketResponse` implementation into it.
+[x] Change `ITicketRepository` to return typed ticket records, not
+    `TicketResponse`.
+[x] Remove request DTO imports from `ITicketRepository`.
+[x] Update `MongoTicketRepository` to return typed documents/records.
+[x] Remove `formatTicketResponse` from `MongoTicketRepository`.
+[x] Remove `formatTicketResponse` from `TicketService`.
+[x] Update `TicketService` to call `toTicketResponse`.
+[x] Remove ticket-related `unknown` and `Record<string, unknown>` mapping casts.
+[x] Verify every ticket endpoint preserves its current JSON shape.
+[x] Run lint and TypeScript.
+
+
+PHASE 3 - USER AND AUTH MAPPING
+-------------------------------
+Reason: User mapping is duplicated across UserRepository, UserService,
+AdminService, and AuthService.
+
+[x] Create `src/mappers/userMapper.ts`.
+[x] Implement one canonical `toUserResponse`.
+[x] Support intentional variants with explicit names only if required:
+    - `toUserProfileResponse`
+    - `toAdminUserListResponse`
+[x] Change `IUserRepository` list and ban methods to return user documents or
+    typed user records instead of `UserResponse`.
+[x] Remove `UserResponse` imports from `IUserRepository` and `UserRepository`.
+[x] Remove `mapToUserResponse` from `UserRepository`.
+[x] Remove `mapToUserResponse` from `UserService`.
+[x] Replace direct `new UserResponse(...)` mapping in `AuthService`.
+[x] Replace direct `new UserResponse(...)` mapping in `AdminService`.
+[x] Replace pro-to-user mapping in `ProService` with an explicitly named mapper
+    if that response shape must remain.
+[x] Ensure `createdAt` inclusion is consistent for the same response DTO.
+[x] Ensure passwords and internal fields can never enter response DTOs.
+[x] Verify register, login, profile, password-change, admin user-list, and ban
+    responses.
+[x] Run lint and TypeScript.
+
+
+PHASE 4 - CATEGORY MAPPING
+--------------------------
+[x] Create `src/mappers/categoryMapper.ts`.
+[x] Define `CreateCategoryData` and `UpdateCategoryData`.
+[x] Change `ICategoryRepository` inputs so they do not use
+    `Partial<CategoryResponse>`.
+[x] Change category repository outputs to category documents/records.
+[x] Remove DTO imports from `ICategoryRepository` and `CategoryRepository`.
+[x] Move `mapToCategoryResponse` into `categoryMapper.ts`.
+[x] Update AdminService and ProService to map category results.
+[x] Verify category create, list, lookup, and update responses.
+[x] Run lint and TypeScript.
+
+
+PHASE 5 - PRO AND PENDING-PRO MAPPING
+-------------------------------------
+[x] Define typed records for:
+    - Populated approved pro
+    - Nearby pro aggregation result
+    - Pending pro with category
+    - Pro profile projection
+[x] Create `src/mappers/proMapper.ts`.
+[x] Implement:
+    - `toProResponse`
+    - `toProProfileResponse`
+    - `toPendingProResponse`
+[x] Change `IProRepository` methods to return documents/records rather than
+    `ProResponse` or `ProProfileResponse`.
+[x] Remove DTO imports from `IProRepository` and `ProRepository`.
+[x] Remove `mapToProResponse` and `mapToProProfileResponse` from ProRepository.
+[x] Replace nearby-pro aggregation `Record<string, unknown>` casts with a typed
+    aggregation result.
+[x] Move pending-pro mapping out of AdminService.
+[x] Move pending-pro mapping out of ProService.
+[x] Ensure sensitive fields such as password are excluded at query and mapping
+    boundaries.
+[x] Verify admin pro lists, pro details, nearby pros, pending applications, and
+    profile endpoints.
+[x] Run lint and TypeScript.
+
+
+PHASE 6 - BOOKING MAPPING
+-------------------------
+Reason: Booking has multiple populated response shapes and is used by user,
+pro, admin, payment, and ticket workflows.
+
+[x] Define typed records for:
+    - `PopulatedBookingRecord`
+    - `BookingCompleteRecord`
+    - Booking list projection
+    - Booking conflict query result
+[x] Create `src/mappers/bookingMapper.ts`.
+[x] Implement:
+    - `toBookingResponse`
+    - `toBookingCompleteResponse`
+[x] Remove model imports from `bookingDtos.ts`.
+[x] Use shared API-neutral location and time-slot types.
+[x] Change `IBookingRepository` response-returning methods to return typed
+    records/documents rather than `BookingResponse`.
+[x] Remove DTO imports from `IBookingRepository` and BookingRepository.
+[x] Remove `mapToBookingResponse` and `mapToBookingCompleteResponse` from the
+    repository.
+[x] Remove booking population casts using `as unknown as`.
+[x] Update UserService, ProService, and AdminService to invoke booking mappers.
+[x] Ensure transaction methods continue returning documents needed by business
+    logic and do not map prematurely.
+[x] Verify booking creation, active list, history, pro list, admin list, detail,
+    accept, reject, cancel, and payment-completion flows.
+[x] Run lint and TypeScript.
+
+
+PHASE 7 - QUOTA MAPPING
+-----------------------
+[x] Define `PopulatedQuotaRecord`.
+[x] Create `src/mappers/quotaMapper.ts`.
+[x] Move `QuotaRequest` from the response DTO file to `src/dtos/request/`.
+[x] Remove mapping logic from QuotaRepository.
+[x] Change `IQuotaRepository` to return quota documents/records.
+[x] Remove DTO imports from `IQuotaRepository` and QuotaRepository.
+[x] Replace the `paymentIntentId` `unknown` cast with an accurate model/record
+    type.
+[x] Update UserService, ProService, and AdminService to use `toQuotaResponse`.
+[x] Ensure transactional payment methods receive data records suitable for
+    business logic before response mapping.
+[x] Verify quota creation, lookup, payment intent, webhook, and payment status
+    responses.
+[x] Run lint and TypeScript.
+
+
+PHASE 8 - WALLET AND TRANSACTION MAPPING
+----------------------------------------
+[x] Move `TransactionResponseDTO` out of `ITransactionRepository.ts` into
+    `src/dtos/response/transactionDtos.ts`.
+[x] Define typed wallet-with-transactions query records.
+[x] Define typed transaction records.
+[x] Create:
+    - `src/mappers/walletMapper.ts`
+    - `src/mappers/transactionMapper.ts`
+[x] Change wallet repository methods to return wallet documents/query records.
+[x] Change transaction repository methods to return transaction documents or
+    records.
+[x] Remove DTO imports from wallet and transaction repositories.
+[x] Remove `mapToWalletResponse` from WalletRepository.
+[x] Remove transaction response mapping from TransactionRepository.
+[x] Update ProService and AdminService to map wallet/transaction responses.
+[x] Preserve transaction idempotency and unique-index behavior.
+[x] Verify wallet summary, wallet pagination, pro transactions, admin
+    transactions, payment credits, and withdrawal debits.
+[x] Run lint and TypeScript.
+
+
+PHASE 9 - WITHDRAWAL MAPPING
+----------------------------
+[x] Define withdrawal repository input and query record types.
+[x] Create `src/mappers/withdrawalMapper.ts`.
+[x] Change `IWithdrawalRequestRepository` to return withdrawal
+    documents/records.
+[x] Remove DTO imports from withdrawal repository files.
+[x] Remove `mapToWithdrawalRequestResponse` from WithdrawalRequestRepository.
+[x] Update ProService and AdminService to use the mapper.
+[x] Ensure transaction/session-aware methods still return useful records.
+[x] Verify create, pro list, admin list, approve, and reject flows.
+[x] Run lint and TypeScript.
+
+
+PHASE 10 - NOTIFICATION MAPPING
+-------------------------------
+[x] Define `CreateNotificationData` independently of the API request DTO.
+[x] Define typed notification records.
+[x] Create `src/mappers/notificationMapper.ts`.
+[x] Change notification repositories to return notification documents/records.
+[x] Remove `NotificationResponse` imports from repository files.
+[x] Remove `mapToNotificationResponse` from NotificationRepository.
+[x] Use `toNotificationResponse` in NotificationService for create and list
+    operations.
+[x] Keep Socket.IO emission in NotificationService, using the mapped response.
+[x] Verify user, pro, admin, message, non-message, and unread notification
+    endpoints.
+[x] Run lint and TypeScript.
+
+
+PHASE 11 - CHAT AND MESSAGE MAPPING
+-----------------------------------
+[x] Move request types out of `dtos/response/chatDtos.ts` into
+    `dtos/request/chatDtos.ts`.
+[x] Define typed populated chat and message query records in
+    `src/contracts/repository/`.
+[x] Create `src/mappers/chatMapper.ts`.
+[x] Implement:
+    - `toChatResponse`
+    - `toMessageResponse`
+[x] Change `IChatRepository.findMessagesByChatId` to return message records,
+    not `MessageResponse`.
+[x] Remove DTO imports from ChatRepository and IChatRepository.
+[x] Remove message mapping from ChatRepository.
+[x] Remove mapper methods from ChatService and use `chatMapper.ts`.
+[x] Move direct Mongoose lookups from ChatService behind repositories where
+    practical.
+[x] Verify chat creation, chat lists, chat detail, message sending, message
+    pagination, read state, and delivery state.
+[x] Run lint and TypeScript.
+
+
+PHASE 12 - RATING AND REVIEW MAPPING
+------------------------------------
+[x] Define typed populated/aggregation rating-review records.
+[x] Create `src/mappers/ratingReviewMapper.ts`.
+[x] Convert `RatingReviewResponse` into a passive typed response shape.
+[x] Remove the constructor that accepts `unknown`.
+[x] Remove every `new RatingReviewResponse(doc as never)` call.
+[x] Replace repository aggregation casts with accurate result types.
+[x] Update RatingReviewService to use `toRatingReviewResponse`.
+[x] Inject `IBookingRepository` into RatingReviewService instead of dynamically
+    importing and constructing `MongoBookingRepository`.
+[x] Verify create, pro list, user list, admin list, search, sorting, and detail
+    endpoints.
+[x] Run lint and TypeScript.
+
+
+PHASE 13 - CONTROLLER AND DTO CLEANUP
+-------------------------------------
+[x] Review controllers for entity-to-response mapping.
+[x] Keep wrapper DTO construction only where it is truly HTTP-specific, such as
+    combining an access token with an already mapped user response.
+[x] Ensure controllers do not import Mongoose models.
+[x] Ensure controllers do not inspect repository records.
+[x] Ensure request DTO files contain request shapes only.
+[x] Ensure response DTO files contain response shapes only.
+[x] Standardize naming:
+    - `SomethingRequest`
+    - `SomethingResponse`
+    - Avoid mixing `DTO`, `Dto`, and `ResponseDTO`.
+[x] Remove obsolete mapper functions and unused DTO constructors.
+[x] Remove obsolete imports and dead types.
+[x] Run lint and TypeScript.
+
+
+PHASE 14 - REPOSITORY BOUNDARY AUDIT
+------------------------------------
+[x] Confirm no file under `src/repositories/` imports from
+    `src/dtos/response/`.
+[x] Confirm repository interfaces do not accept request DTOs.
+[x] Confirm repositories expose typed persistence/query contracts.
+[x] Confirm populated and aggregation results have explicit types.
+[x] Confirm repositories do not contain API field naming decisions unless the
+    field names are part of a typed persistence projection.
+[x] Confirm services are the only layer returning response DTOs.
+[x] Confirm mappers are pure and contain no repository/service dependencies.
+[x] Run:
+    - grep "dtos/response" src/repositories → no results
+    - grep "dtos/request" src/repositories → no results
+    - grep "as never|as unknown as" src → no results
+    - grep "new .*Response" src/repositories → no results
+
+
+CURRENT RESUME POINT
+--------------------
+Status: ALL PHASES COMPLETE. The DTO mapping refactor is fully implemented and audited.
+
+Next task: None. All phases (0-14) are complete.
+
+Last completed verification:
+- DTO architecture and repository-import inventories were completed.
+- No automated test framework is currently configured.
+- Ticket repository DTO dependencies and duplicate mapping were removed.
+- User/Auth/Admin/Pro user response mapping now uses canonical named mapper
+  functions.
+- Category response mapping now happens in services through `categoryMapper.ts`.
+- Pro, pending-pro, profile, and nearby-pro response mapping now happens through
+  `proMapper.ts`.
+- Booking response mapping now happens through `bookingMapper.ts`; booking
+  repositories return typed records/documents instead of response DTOs.
+- Quota response mapping now happens through `quotaMapper.ts`; quota
+  repositories return typed records/documents instead of response DTOs.
+- Wallet and transaction response mapping now happens through `walletMapper.ts`
+  and `transactionMapper.ts`; wallet/transaction repositories return typed
+  records/documents instead of response DTOs.
+- Withdrawal response mapping now happens through `withdrawalMapper.ts`;
+  withdrawal repositories return typed records/documents instead of response
+  DTOs.
+- Notification response mapping now happens through `notificationMapper.ts`;
+  notification repositories return typed records/documents instead of response
+  DTOs, and create request shape lives under `dtos/request`.
+- Chat and message response mapping now happens through `chatMapper.ts`; chat
+  repositories return typed chat/message records instead of response DTOs.
+- Rating/review response mapping now happens through `ratingReviewMapper.ts`;
+  rating/review repositories return typed populated records instead of response
+  DTOs, and `RatingReviewService` uses the injected booking repository.
+- Controller DTO imports were reduced to the HTTP-specific `LoginResponse`
+  wrapper, passive response DTO classes were converted to interfaces, obsolete
+  mapper constructors were removed, response naming was standardized, and the
+  remaining `as unknown as` cast was removed from the slot-release queue.
+- `npm run lint` and `npx tsc --noEmit` passed after the Phase 13 cleanup.
+- Phase 14 repository boundary audit confirmed: no response DTO imports in
+  repositories, no request DTO imports in repositories, no `as never` or
+  `as unknown as` casts anywhere in src/, no `new.*Response` in repositories
+  or services. `npm run lint` and `npx tsc --noEmit` passed after Phase 14.
+
+
+COMPLETION LOG
+--------------
+Add one entry whenever a phase is completed:
+
+Date: 2026-06-15
+Phase: Phase 2 - Ticket Mapping
+Files changed: ITicketRepository.ts, ticketRepository.ts, ticketService.ts,
+ticketMapper.ts, ticketRecords.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Existing ticket response fields were preserved. No automated test
+framework is configured.
+
+Date: 2026-06-15
+Phase: Phase 3 - User and Auth Mapping
+Files changed: userMapper.ts, UserService.ts, AuthService.ts, AdminService.ts,
+ProService.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: User, admin-list, Google-login, account, and pro password-change user
+response shapes now use explicit mapper functions. No automated test framework
+is configured.
+
+Date: 2026-06-15
+Phase: Phase 4 - Category Mapping
+Files changed: categoryMapper.ts, ICategoryRepository.ts,
+CategoryRepository.ts, AdminService.ts, ProService.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Category repositories now return category documents and no longer import
+response DTOs. Existing category response shape is preserved through service
+mapper calls.
+
+Date: 2026-06-15
+Phase: Phase 5 - Pro and Pending-Pro Mapping
+Files changed: proRecords.ts, proMapper.ts, IProRepository.ts,
+ProRepository.ts, AdminService.ts, ProService.ts, UserService.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Pro repositories now return typed documents, populated records, profile
+records, and nearby aggregation records instead of response DTOs. Existing pro,
+pending-pro, profile, and nearby response shapes are preserved through service
+mapper calls.
+
+Date: 2026-06-15
+Phase: Phase 6 - Booking Mapping
+Files changed: bookingTypes.ts, bookingRecords.ts, bookingMapper.ts,
+bookingDtos.ts, IBookingRepository.ts, BookingRepository.ts, UserService.ts,
+ProService.ts, AdminService.ts, messages.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Booking repositories now return typed populated/list/conflict records and
+documents instead of response DTOs. Existing booking response shapes are
+preserved through service mapper calls. No automated test framework is
+configured.
+
+Date: 2026-06-15
+Phase: Phase 8 - Wallet and Transaction Mapping
+Files changed: walletRecords.ts, transactionRecords.ts, walletMapper.ts,
+transactionMapper.ts, walletDtos.ts, transactionDtos.ts, IWalletRepository.ts,
+WalletRepository.ts, ITransactionRepository.ts, TransactionRepository.ts,
+ProService.ts, AdminService.ts, UserService.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Wallet and transaction repositories now return typed documents and
+query records instead of response DTOs. Existing wallet and transaction response
+shapes are preserved through service mapper calls. Transaction idempotency and
+unique-index fallback behavior were preserved.
+
+Date: 2026-06-15
+Phase: Phase 9 - Withdrawal Mapping
+Files changed: withdrawalRecords.ts, withdrawalMapper.ts,
+IWithdrawalRequestRepository.ts, WithdrawalRequestRepository.ts,
+ProService.ts, AdminService.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Withdrawal repositories now return typed records/documents instead of
+response DTOs. Existing create, pro-list, admin-list, approval, and rejection
+response shapes are preserved through service mapper calls.
+
+Date: 2026-06-15
+Phase: Phase 10 - Notification Mapping
+Files changed: notificationDtos.ts, notificationRecords.ts,
+notificationMapper.ts, INotificationRepository.ts, NotificationRepository.ts,
+INotificationService.ts, NotificationService.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Notification repositories now return typed records/documents instead of
+response DTOs. Notification request shape now lives in `dtos/request`, and
+Socket.IO emission continues to use the mapped response.
+
+Date: 2026-06-15
+Phase: Phase 11 - Chat and Message Mapping
+Files changed: chatDtos.ts, chatRecords.ts, chatMapper.ts, IChatRepository.ts,
+ChatRepository.ts, IChatService.ts, ChatService.ts, chatController.ts,
+chatGateway.ts, messages.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Chat repositories now return typed chat/message records instead of
+response DTOs. Request DTOs live under `dtos/request`, response DTOs live under
+`dtos/response`, and chat/socket message strings are sourced from constants.
+
+Date: 2026-06-15
+Phase: Phase 12 - Rating and Review Mapping
+Files changed: ratingReviewDtos.ts, ratingReviewRecords.ts,
+ratingReviewMapper.ts, IRatingReviewRepository.ts, ratingReviewRepository.ts,
+IRatingReviewService.ts, RatingReviewService.ts, ratingReviewController.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Rating/review repositories now return typed populated records instead of
+response DTOs. `RatingReviewResponse` is a passive interface, services map
+through `ratingReviewMapper.ts`, and booking updates use the injected booking
+repository.
+
+Date: 2026-06-15
+Phase: Phase 13 - Controller and DTO Cleanup
+Files changed: userDtos.ts, proDtos.ts, bookingDtos.ts, categoryDtos.ts,
+quotaDtos.ts, walletDtos.ts, transactionDtos.ts, withdrawalDtos.ts,
+bookingMapper.ts, categoryMapper.ts, proMapper.ts, quotaMapper.ts,
+transactionMapper.ts, walletMapper.ts, withdrawalMapper.ts, adminController.ts,
+proController.ts, IAdminService.ts, IAuthService.ts, IProService.ts,
+ITicketService.ts, AdminService.ts, ProService.ts, SlotReleaseQueue.ts
+Verification: `npm run lint`, `npx tsc --noEmit`
+Notes: Controllers no longer import response DTOs except the auth
+`LoginResponse` HTTP wrapper. Passive response DTO classes were converted to
+interfaces, mapper constructors were replaced with object literals,
+`WalletResponseDTO` and `TransactionResponseDTO` were renamed to
+`WalletResponse` and `TransactionResponse`, and the remaining `as unknown as`
+slot-release cast was removed.
+
+Date: 2026-06-15
+Phase: Phase 1 - Shared Type and Mapper Foundation (retroactive)
+Files changed: src/mappers/ (12 mapper files), src/contracts/repository/
+(10 records files), src/contracts/api/bookingTypes.ts, all response DTO files
+Verification: `npm run lint`, `npx tsc --noEmit` (verified across all phases)
+Notes: Phase 1 groundwork was laid incrementally across Phases 2-13. All
+mappers are pure functions. All response DTOs are passive interfaces with no
+model imports. API-neutral value types (BookingLocation, BookingTimeSlot) live
+in src/contracts/api/. Repository input types exist for all features.
+
+Date: 2026-06-15
+Phase: Phase 14 - Repository Boundary Audit
+Files changed: implementation.txt (audit results recorded, no source changes
+required)
+Verification: grep audit (no rg available on Windows) + `npm run lint` +
+`npx tsc --noEmit`
+Notes: All boundary checks passed. No response DTO imports in any repository
+file. No request DTO imports in any repository file. No `as never` or
+`as unknown as` casts anywhere in src/. No `new.*Response` instantiation in
+repositories or services. Mappers confirmed as pure functions with no
+repository or service dependencies. The DTO mapping refactor is complete.

@@ -3,6 +3,7 @@ import IORedis from 'ioredis';
 import mongoose from 'mongoose';
 import Booking from '../../models/bookingModel';
 import ApprovedProModel from '../../models/approvedProModel';
+import type { IAvailability } from '../../models/pendingProModel';
 
 declare const process: {
   env: {
@@ -37,10 +38,9 @@ function ensureRedisAndQueue(): { ok: boolean } {
   }
   return { ok: true };
 }
-const getDayKeyFromDateIST = (date: Date): string => {
+const getDayKeyFromDateIST = (date: Date): keyof IAvailability => {
   const ist = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-  const day = ist.toLocaleString('en-US', { weekday: 'long' }).toLowerCase();
-  return day;
+  return ist.toLocaleString('en-US', { weekday: 'long' }).toLowerCase() as keyof IAvailability;
 };
 
 async function freeSlotsForBooking(bookingId: string) {
@@ -49,7 +49,7 @@ async function freeSlotsForBooking(bookingId: string) {
   const pro = await ApprovedProModel.findById(booking.proId);
   if (!pro) return;
   const dayKey = getDayKeyFromDateIST(new Date(booking.preferredDate));
-  const daySlots = (pro as unknown as { availability: Record<string, Array<{ startTime: string; endTime: string; booked: boolean }>> }).availability?.[dayKey] || [];
+  const daySlots = pro.availability[dayKey] || [];
   let changed = false;
   for (const sel of booking.preferredTime) {
     const idx = daySlots.findIndex((s) => s.startTime === sel.startTime && s.endTime === sel.endTime);
@@ -59,7 +59,7 @@ async function freeSlotsForBooking(bookingId: string) {
     }
   }
   if (changed) {
-    (pro as unknown as { availability: Record<string, Array<{ startTime: string; endTime: string; booked: boolean }>> }).availability[dayKey] = daySlots;
+    pro.availability[dayKey] = daySlots;
     pro.markModified('availability');
     await pro.save();
   }
@@ -82,9 +82,9 @@ export async function initSlotReleaseWorker() {
   return worker;
 }
 
-export async function scheduleSlotRelease(bookingId: string, runAt: Date) {
+export async function scheduleSlotRelease(bookingId: string, runAt: Date): Promise<boolean> {
   const ok = ensureRedisAndQueue().ok;
-  if (!ok || !queue) return;
+  if (!ok || !queue) return false;
   const delay = Math.max(0, runAt.getTime() - Date.now());
   const opts: JobsOptions = {
     jobId: bookingId, 
@@ -95,6 +95,7 @@ export async function scheduleSlotRelease(bookingId: string, runAt: Date) {
     backoff: { type: 'exponential', delay: 30000 },
   };
   await queue.add('release', { bookingId }, opts);
+  return true;
 }
 
 export async function cancelSlotRelease(bookingId: string) {
@@ -134,8 +135,10 @@ export async function resyncSlotReleaseJobs() {
     if (!queue) continue;
     const job = await queue.getJob(b._id.toString());
     if (!job) {
-      await scheduleSlotRelease(b._id.toString(), runAt);
-      await Booking.findByIdAndUpdate(b._id, { slotReleaseJobId: b._id.toString() }).exec();
+      const scheduled = await scheduleSlotRelease(b._id.toString(), runAt);
+      if (scheduled) {
+        await Booking.findByIdAndUpdate(b._id, { slotReleaseJobId: b._id.toString() }).exec();
+      }
     }
   }
 }

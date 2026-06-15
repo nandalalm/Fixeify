@@ -1,16 +1,20 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
-import { IProService } from "../services/IProService";
+import type { IProService } from "../services/IProService";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "../middleware/errorMiddleware";
-import { ProResponse } from "../dtos/response/proDtos";
 import { HttpStatus } from "../enums/httpStatus";
 
 type AvailabilitySlot = {
   startTime: string;
   endTime: string;
   booked: boolean;
+};
+
+type AvailabilityRequest = {
+  availability: Record<string, AvailabilitySlot[] | undefined>;
+  isUnavailable: boolean;
 };
 
 @injectable()
@@ -73,7 +77,7 @@ export class ProController {
   async updateAvailability(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const proId = req.params.id;
-      const { availability, isUnavailable } = req.body as { availability: ProResponse['availability']; isUnavailable: boolean };
+      const { availability, isUnavailable } = req.body as AvailabilityRequest;
 
       if (isUnavailable) {
         const hasBookedSlots = Object.values(availability).some(
@@ -115,7 +119,7 @@ export class ProController {
       const proId = req.params.id;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
-      const status = req.query.status as string; // New status filter
+      const status = req.query.status as string;
       const sortBy = (req.query.sortBy as "latest" | "oldest") || undefined;
       const search = (req.query.search as string) || undefined;
       const bookingId = (req.query.bookingId as string) || undefined;
@@ -202,7 +206,7 @@ export class ProController {
       res.status(HttpStatus.OK).json({ wallet, total });
     } catch (error: unknown) {
       const errorObj = error as { status?: number; message: string };
-      res.status(errorObj.status || 500).json({ message: errorObj.message });
+      res.status(errorObj.status || HttpStatus.INTERNAL_SERVER_ERROR).json({ message: errorObj.message });
     }
   }
 

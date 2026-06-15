@@ -1,14 +1,16 @@
 import { injectable, inject } from "inversify";
-import { IChatService,PopulatedUser,PopulatedPro,PopulatedChat } from "./IChatService";
-import { IChatRepository } from "../repositories/IChatRepository";
-import { INotificationService } from "./INotificationService";
-import { ChatResponse, MessageResponse, CreateChatRequest, SendMessageRequest } from "../dtos/response/chatDtos";
+import type { IChatService } from "./IChatService";
+import type { IChatRepository } from "../repositories/IChatRepository";
+import type { INotificationService } from "./INotificationService";
+import type { CreateChatRequest, SendMessageRequest } from "../dtos/request/chatDtos";
+import type { ChatResponse, MessageResponse } from "../dtos/response/chatDtos";
 import { TYPES } from "../types";
 import mongoose from "mongoose";
-import { IMessage } from "../models/messageModel";
 import { HttpError } from "../middleware/errorMiddleware";
 import { HttpStatus } from "../enums/httpStatus";
 import { MESSAGES } from "../constants/messages";
+import { toChatResponse, toMessageResponse, toMessageResponses } from "../mappers/chatMapper";
+import type { CreateMessageData, PopulatedChatRecord } from "../contracts/repository/chatRecords";
 
 @injectable()
 export class ChatService implements IChatService {
@@ -26,18 +28,7 @@ export class ChatService implements IChatService {
     if (!chat) {
       return null;
     }
-    const user = await mongoose.model("User").findById(chat.participants.userId._id, "name photo").exec();
-    const pro = await mongoose.model("ApprovedPro").findById(chat.participants.proId._id, "firstName lastName profilePhoto").exec();
-    if (!user || !pro) {
-      throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.NOT_FOUND);
-    }
-    const response = this.mapToChatResponse(chat, participantModel === "User" ? userId : proId, participantModel, {
-      userName: user.name,
-      userPhoto: user.photo || null,
-      proName: `${pro.firstName} ${pro.lastName || ""}`.trim(),
-      proPhoto: pro.profilePhoto || null,
-    });
-    return response;
+    return toChatResponse(chat, participantModel === "User" ? userId : proId, participantModel);
   }
 
   async createChat(data: CreateChatRequest): Promise<ChatResponse> {
@@ -46,19 +37,9 @@ export class ChatService implements IChatService {
     if (!mongoose.Types.ObjectId.isValid(data.userId) || !mongoose.Types.ObjectId.isValid(data.proId)) {
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     }
-    const user = await mongoose.model("User").findById(data.userId, "name photo").exec();
-    const pro = await mongoose.model("ApprovedPro").findById(data.proId, "firstName lastName profilePhoto").exec();
-    if (!user) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
-    if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
-
-    let chat: PopulatedChat | null = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
+    let chat: PopulatedChatRecord | null = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
     if (chat) {
-      return this.mapToChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro", {
-        userName: user.name,
-        userPhoto: user.photo || null,
-        proName: `${pro.firstName} ${pro.lastName || ""}`.trim(),
-        proPhoto: pro.profilePhoto || null,
-      });
+      return toChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro");
     }
 
     try {
@@ -68,22 +49,12 @@ export class ChatService implements IChatService {
         throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_TO_FETCH_CHAT);
       }
 
-      return this.mapToChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro", {
-        userName: user.name,
-        userPhoto: user.photo || null,
-        proName: `${pro.firstName} ${pro.lastName || ""}`.trim(),
-        proPhoto: pro.profilePhoto || null,
-      });
+      return toChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro");
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error && (error as { code: number; message: string }).code === 11000 && (error as { message: string }).message.includes('participants.userId')) {
         chat = await this._chatRepository.findChatByParticipants(data.userId, data.proId);
         if (chat) {
-          return this.mapToChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro", {
-            userName: user.name,
-            userPhoto: user.photo || null,
-            proName: `${pro.firstName} ${pro.lastName || ""}`.trim(),
-            proPhoto: pro.profilePhoto || null,
-          });
+          return toChatResponse(chat, data.userId, data.role === "user" ? "User" : "ApprovedPro");
         }
       }
       throw error; 
@@ -96,18 +67,7 @@ export class ChatService implements IChatService {
     const chats = await (participantModel === "User"
       ? this._chatRepository.findChatsByUser(participantId)
       : this._chatRepository.findChatsByPro(participantId));
-    return Promise.all(
-      chats.map(async (chat) => {
-        const user = await mongoose.model("User").findById(chat.participants.userId._id, "name photo").exec();
-        const pro = await mongoose.model("ApprovedPro").findById(chat.participants.proId._id, "firstName lastName profilePhoto").exec();
-        return this.mapToChatResponse(chat, participantId, participantModel, {
-          userName: user?.name || "Unknown User",
-          userPhoto: user?.photo || null,
-          proName: pro ? `${pro.firstName} ${pro.lastName || ""}`.trim() : "Unknown Pro",
-          proPhoto: pro?.profilePhoto || null,
-        });
-      })
-    );
+    return chats.map((chat) => toChatResponse(chat, participantId, participantModel));
   }
 
   async sendMessage(data: SendMessageRequest): Promise<MessageResponse> {
@@ -131,11 +91,8 @@ export class ChatService implements IChatService {
     }
 
     if (data.senderModel === "ApprovedPro") {
-      const userMessages = await mongoose.model("Message").findOne({
-        chatId: new mongoose.Types.ObjectId(data.chatId),
-        senderModel: "User",
-      }).exec();
-      if (!userMessages) {
+      const hasUserMessage = await this._chatRepository.hasUserMessage(data.chatId);
+      if (!hasUserMessage) {
         throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.SENDER_NOT_AUTHORIZED_IN_CHAT);
       }
     }
@@ -143,7 +100,7 @@ export class ChatService implements IChatService {
     const receiverId = data.senderId === userId ? proId : userId;
     const receiverModel = data.senderModel === "User" ? "ApprovedPro" : "User";
 
-    const messageData: Partial<IMessage> = {
+    const messageData: CreateMessageData = {
       chatId: new mongoose.Types.ObjectId(data.chatId),
       senderId: new mongoose.Types.ObjectId(data.senderId),
       senderModel: data.senderModel,
@@ -160,36 +117,26 @@ export class ChatService implements IChatService {
     await this._chatRepository.updateChatLastMessage(data.chatId, message);
     await this._chatRepository.updateUnreadCount(data.chatId, receiverId, receiverModel, true);
 
-    const receiver = await (receiverModel === "User"
-      ? mongoose.model("User").findById(receiverId, "name").exec()
-      : mongoose.model("ApprovedPro").findById(receiverId, "firstName lastName").exec());
-    if (!receiver) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.NOT_FOUND);
-
-    const sender = await (data.senderModel === "User"
-      ? mongoose.model("User").findById(data.senderId, "name").exec()
-      : mongoose.model("ApprovedPro").findById(data.senderId, "firstName lastName").exec());
-    if (!sender) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.NOT_FOUND);
-
     const senderName =
       data.senderModel === "User"
-        ? (sender as PopulatedUser).name
-        : `${(sender as PopulatedPro).firstName} ${(sender as PopulatedPro).lastName || ""}`.trim();
+        ? chat.participants.userId.name
+        : `${chat.participants.proId.firstName} ${chat.participants.proId.lastName || ""}`.trim();
 
     let description: string;
     if (data.body && data.body.trim()) {
       description = data.body.slice(0, 100);
     } else if (data.attachments && data.attachments.length > 0) {
-      description = "📷 Image";
+      description = MESSAGES.IMAGE_MESSAGE_DESCRIPTION;
     } else {
-      description = "New message";
+      description = MESSAGES.NEW_MESSAGE_DESCRIPTION;
     }
 
     await this._notificationService.createNotification({
       userId: receiverModel === "User" ? receiverId : undefined,
       proId: receiverModel === "ApprovedPro" ? receiverId : undefined,
-      title: `New message from ${senderName}`,
+      title: `${MESSAGES.NEW_MESSAGE_FROM_PREFIX} ${senderName}`,
       description,
-      type: "message",
+      type: MESSAGES.NOTIFICATION_TYPE_MESSAGE,
       chatId: data.chatId,
       messageId: message._id.toString(),
     });
@@ -199,7 +146,7 @@ export class ChatService implements IChatService {
       globalIo.emit("newNotification", { receiverId, receiverModel });
     }
 
-    return this.mapToMessageResponse(message);
+    return toMessageResponse(message);
   }
 
   async getMessages(
@@ -224,7 +171,7 @@ export class ChatService implements IChatService {
     }
 
     const result = await this._chatRepository.findMessagesByChatId(chatId, page, limit);
-    return result;
+    return { messages: toMessageResponses(result.messages), total: result.total };
   }
 
   async markMessagesAsRead(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
@@ -271,14 +218,7 @@ export class ChatService implements IChatService {
     if (!chat) {
       return null;
     }
-    const user = await mongoose.model("User").findById(chat.participants.userId._id, "name photo").exec();
-    const pro = await mongoose.model("ApprovedPro").findById(chat.participants.proId._id, "firstName lastName profilePhoto").exec();
-    return this.mapToChatResponse(chat, chat.participants.userId._id.toString(), "User", {
-      userName: user?.name || "Unknown User",
-      userPhoto: user?.photo || null,
-      proName: pro ? `${pro.firstName} ${pro.lastName || ""}`.trim() : "Unknown Pro",
-      proPhoto: pro?.profilePhoto || null,
-    });
+    return toChatResponse(chat, chat.participants.userId._id.toString(), "User");
   }
 
   async getChatForParticipant(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<ChatResponse | null> {
@@ -289,66 +229,6 @@ export class ChatService implements IChatService {
     if (!chat) {
       return null;
     }
-    const user = await mongoose.model("User").findById(chat.participants.userId._id, "name photo").exec();
-    const pro = await mongoose.model("ApprovedPro").findById(chat.participants.proId._id, "firstName lastName profilePhoto").exec();
-    return this.mapToChatResponse(chat, participantId, participantModel, {
-      userName: user?.name || "Unknown User",
-      userPhoto: user?.photo || null,
-      proName: pro ? `${pro.firstName} ${pro.lastName || ""}`.trim() : "Unknown Pro",
-      proPhoto: pro?.profilePhoto || null,
-    });
-  }
-
-  private mapToChatResponse(
-    chat: PopulatedChat,
-    participantId: string,
-    participantModel: "User" | "ApprovedPro",
-    names: { userName: string; userPhoto?: string | null; proName: string; proPhoto?: string | null }
-  ): ChatResponse {
-    const unread = chat.unreadCount?.find(
-      (uc) => uc.participantId.toString() === participantId && uc.participantModel === participantModel
-    );
-
-    return {
-      id: chat._id.toString(),
-      participants: {
-        userId: chat.participants.userId._id.toString(),
-        userName: names.userName,
-        userPhoto: names.userPhoto,
-        proId: chat.participants.proId._id.toString(),
-        proName: names.proName,
-        proPhoto: names.proPhoto,
-      },
-      lastMessage: chat.lastMessage
-        ? {
-            id: chat.lastMessage._id.toString(),
-            body: chat.lastMessage.body,
-            content: chat.lastMessage.body,
-            senderId: chat.lastMessage.senderId.toString(),
-            senderModel: chat.lastMessage.senderModel,
-            timestamp: chat.lastMessage.createdAt.toISOString(),
-            status: chat.lastMessage.isRead ? "read" : chat.lastMessage.status,
-          }
-        : undefined,
-      unreadCount: unread ? unread.count : 0,
-      createdAt: chat.createdAt,
-    };
-  }
-
-  private mapToMessageResponse(message: IMessage): MessageResponse {
-    return {
-      id: message._id.toString(),
-      chatId: message.chatId.toString(),
-      senderId: message.senderId.toString(),
-      senderModel: message.senderModel,
-      receiverId: message.receiverId.toString(),
-      receiverModel: message.receiverModel,
-      content: message.body,
-      attachments: message.attachments,
-      type: message.type,
-      isRead: message.isRead,
-      status: message.isRead ? "read" : message.status,
-      timestamp: message.createdAt.toISOString(),
-    };
+    return toChatResponse(chat, participantId, participantModel);
   }
 }

@@ -1,19 +1,23 @@
 import { inject, injectable } from "inversify";
 import mongoose from "mongoose";
 import { TYPES } from "../types";
-import { IRatingReviewRepository } from "../repositories/IRatingReviewRepository";
-import { IRatingReviewService } from "./IRatingReviewService";
-import { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
-import { RatingReviewResponse } from "../dtos/response/ratingReviewDtos";
+import type { IRatingReviewRepository } from "../repositories/IRatingReviewRepository";
+import type { IBookingRepository } from "../repositories/IBookingRepository";
+import type { IRatingReviewService } from "./IRatingReviewService";
+import type { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
+import type { RatingReviewResponse } from "../dtos/response/ratingReviewDtos";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
+import { toRatingReviewResponse, toRatingReviewResponses } from "../mappers/ratingReviewMapper";
 
 @injectable()
 export class RatingReviewService implements IRatingReviewService {
   constructor(
     @inject(TYPES.IRatingReviewRepository)
-    private _ratingReviewRepository: IRatingReviewRepository
+    private _ratingReviewRepository: IRatingReviewRepository,
+    @inject(TYPES.IBookingRepository)
+    private _bookingRepository: IBookingRepository
   ) { }
 
   async createRatingReview(
@@ -32,7 +36,7 @@ export class RatingReviewService implements IRatingReviewService {
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALREADY_REVIEWED);
     }
 
-    const saved = await this._ratingReviewRepository.create({
+    const saved = await this._ratingReviewRepository.createRatingReview({
       userId: new mongoose.Types.ObjectId(data.userId),
       proId: new mongoose.Types.ObjectId(data.proId),
       categoryId: new mongoose.Types.ObjectId(data.categoryId),
@@ -43,12 +47,10 @@ export class RatingReviewService implements IRatingReviewService {
     });
 
     if (data.bookingId) {
-      const { MongoBookingRepository } = await import("../repositories/BookingRepository");
-      const repoInstance = new MongoBookingRepository();
-      await repoInstance.updateBooking(data.bookingId, { isRated: true });
+      await this._bookingRepository.updateBooking(data.bookingId, { isRated: true });
     }
 
-    return new RatingReviewResponse(saved as never);
+    return toRatingReviewResponse(saved);
   }
 
   async getRatingReviewsByPro(
@@ -66,7 +68,7 @@ export class RatingReviewService implements IRatingReviewService {
     const { items, total } = await this._ratingReviewRepository.findByProId(proId, page, limit, sortBy, search);
 
     return {
-      items: items.map((doc) => new RatingReviewResponse(doc as never)),
+      items: toRatingReviewResponses(items),
       total, page, limit,
     };
   }
@@ -81,10 +83,10 @@ export class RatingReviewService implements IRatingReviewService {
     page: number;
     limit: number;
   }> {
-    const { items, total } = await this._ratingReviewRepository.findByUserId(userId,page,limit);
+    const { items, total } = await this._ratingReviewRepository.findByUserId(userId, page, limit);
     return {
-      items: items.map((doc) => new RatingReviewResponse(doc as never)),
-      total,page,limit,
+      items: toRatingReviewResponses(items),
+      total, page, limit,
     };
   }
 
@@ -96,13 +98,13 @@ export class RatingReviewService implements IRatingReviewService {
   ): Promise<{ items: RatingReviewResponse[]; total: number; page: number; limit: number }> {
     const { items, total } = await this._ratingReviewRepository.findAll(page, limit, sortBy, search);
     return {
-      items: items.map((doc) => new RatingReviewResponse(doc as never)),
-      total,page,limit,
+      items: toRatingReviewResponses(items),
+      total, page, limit,
     };
   }
 
   async getRatingReviewById(id: string): Promise<RatingReviewResponse | null> {
     const doc = await this._ratingReviewRepository.findById(id);
-    return doc ? new RatingReviewResponse(doc as never) : null;
+    return doc ? toRatingReviewResponse(doc) : null;
   }
 }

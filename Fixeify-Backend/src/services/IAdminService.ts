@@ -1,9 +1,10 @@
-import { UserResponse } from "../dtos/response/userDtos";
-import { ProResponse, PendingProResponse } from "../dtos/response/proDtos";
-import { CategoryResponse } from "../dtos/response/categoryDtos";
-import { BookingResponse } from "../dtos/response/bookingDtos";
-import { QuotaResponse } from "../dtos/response/quotaDtos";
-import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
+import type { UserResponse } from "../dtos/response/userDtos";
+import type { ProResponse, PendingProResponse } from "../dtos/response/proDtos";
+import type { CategoryResponse } from "../dtos/response/categoryDtos";
+import type { BookingResponse } from "../dtos/response/bookingDtos";
+import type { QuotaResponse } from "../dtos/response/quotaDtos";
+import type { WithdrawalResponse } from "../dtos/response/withdrawalDtos";
+import type { TransactionResponse } from "../dtos/response/transactionDtos";
 
 export interface IAdminService {
   getUsers(page: number, limit: number, sortBy?: "latest" | "oldest"): Promise<{ users: UserResponse[]; total: number }>;
@@ -25,26 +26,11 @@ export interface IAdminService {
     limit: number,
     sortBy?: "latest" | "oldest",
     status?: "pending" | "approved" | "rejected"
-  ): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number; pros: ProResponse[] }>;
+  ): Promise<{ withdrawals: WithdrawalResponse[]; total: number; pros: ProResponse[] }>;
   acceptWithdrawalRequest(withdrawalId: string): Promise<void>;
   rejectWithdrawalRequest(withdrawalId: string, reason: string): Promise<void>;
   getTrendingService(): Promise<{ categoryId: string; name: string; bookingCount: number } | null>;
-  getAdminTransactions(adminId: string, page: number, limit: number): Promise<{
-    transactions: Array<{
-      id: string;
-      proId: string;
-      walletId?: string;
-      amount: number;
-      type: "credit" | "debit";
-      date: Date;
-      description?: string;
-      bookingId?: string;
-      quotaId?: string;
-      adminId?: string;
-      createdAt: Date;
-      updatedAt: Date;
-    }>; total: number
-  }>;
+  getAdminTransactions(adminId: string, page: number, limit: number): Promise<{ transactions: TransactionResponse[]; total: number }>;
   getDashboardMetrics(adminId: string): Promise<{
     userCount: number;
     proCount: number;

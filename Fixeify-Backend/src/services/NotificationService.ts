@@ -1,12 +1,15 @@
 import { injectable, inject } from "inversify";
-import { INotificationService } from "./INotificationService";
-import { INotificationRepository } from "../repositories/INotificationRepository";
-import { NotificationResponse, CreateNotificationRequest } from "../dtos/response/notificationDtos";
+import type { INotificationService } from "./INotificationService";
+import type { INotificationRepository } from "../repositories/INotificationRepository";
+import type { CreateNotificationRequest } from "../dtos/request/notificationDtos";
+import type { NotificationResponse } from "../dtos/response/notificationDtos";
 import { TYPES } from "../types";
 import mongoose from "mongoose";
 import { HttpError } from "../middleware/errorMiddleware";
 import { HttpStatus } from "../enums/httpStatus";
 import { MESSAGES } from "../constants/messages";
+import { toNotificationResponse, toNotificationResponses } from "../mappers/notificationMapper";
+import type { NotificationListRecord } from "../contracts/repository/notificationRecords";
 
 @injectable()
 export class NotificationService implements INotificationService {
@@ -17,22 +20,7 @@ export class NotificationService implements INotificationService {
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     }
     const notification = await this._notificationRepository.createNotification(data);
-    const response = {
-      id: notification._id.toString(),
-      type: notification.type,
-      title: notification.title,
-      description: notification.description,
-      userId: notification.userId?.toString(),
-      proId: notification.proId?.toString(),
-      adminId: notification.adminId?.toString(),
-      chatId: notification.chatId?.toString(),
-      bookingId: notification.bookingId?.toString(),
-      quotaId: notification.quotaId?.toString(),
-      walletId: notification.walletId?.toString(),
-      messageId: notification.messageId?.toString(),
-      isRead: notification.isRead,
-      timestamp: notification.createdAt.toISOString(),
-    };
+    const response = toNotificationResponse(notification);
 
     const recipientId = response.userId || response.proId || response.adminId;
     const receiverModel = response.userId ? 'User' : response.proId ? 'ApprovedPro' : 'Admin';
@@ -65,13 +53,15 @@ export class NotificationService implements INotificationService {
   ): Promise<{ notifications: NotificationResponse[]; total: number }> {
     if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
+    let result: NotificationListRecord;
     if (participantModel === "User") {
-      return this._notificationRepository.findNotificationsByUser(participantId, page, limit, filter);
+      result = await this._notificationRepository.findNotificationsByUser(participantId, page, limit, filter);
     } else if (participantModel === "ApprovedPro") {
-      return this._notificationRepository.findNotificationsByPro(participantId, page, limit, filter);
+      result = await this._notificationRepository.findNotificationsByPro(participantId, page, limit, filter);
     } else {
-      return this._notificationRepository.findNotificationsByAdmin(participantId, page, limit, filter);
+      result = await this._notificationRepository.findNotificationsByAdmin(participantId, page, limit, filter);
     }
+    return { notifications: toNotificationResponses(result.notifications), total: result.total };
   }
 
   async getMessageNotifications(
@@ -83,13 +73,15 @@ export class NotificationService implements INotificationService {
   ): Promise<{ notifications: NotificationResponse[]; total: number }> {
     if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
+    let result: NotificationListRecord;
     if (participantModel === "User") {
-      return this._notificationRepository.findMessageNotificationsByUser(participantId, page, limit, filter);
+      result = await this._notificationRepository.findMessageNotificationsByUser(participantId, page, limit, filter);
     } else if (participantModel === "ApprovedPro") {
-      return this._notificationRepository.findMessageNotificationsByPro(participantId, page, limit, filter);
+      result = await this._notificationRepository.findMessageNotificationsByPro(participantId, page, limit, filter);
     } else {
-      return this._notificationRepository.findMessageNotificationsByAdmin(participantId, page, limit, filter);
+      result = await this._notificationRepository.findMessageNotificationsByAdmin(participantId, page, limit, filter);
     }
+    return { notifications: toNotificationResponses(result.notifications), total: result.total };
   }
 
   async getNonMessageNotifications(
@@ -101,13 +93,15 @@ export class NotificationService implements INotificationService {
   ): Promise<{ notifications: NotificationResponse[]; total: number }> {
     if (!participantId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
+    let result: NotificationListRecord;
     if (participantModel === "User") {
-      return this._notificationRepository.findNonMessageNotificationsByUser(participantId, page, limit, filter);
+      result = await this._notificationRepository.findNonMessageNotificationsByUser(participantId, page, limit, filter);
     } else if (participantModel === "ApprovedPro") {
-      return this._notificationRepository.findNonMessageNotificationsByPro(participantId, page, limit, filter);
+      result = await this._notificationRepository.findNonMessageNotificationsByPro(participantId, page, limit, filter);
     } else {
-      return this._notificationRepository.findNonMessageNotificationsByAdmin(participantId, page, limit, filter);
+      result = await this._notificationRepository.findNonMessageNotificationsByAdmin(participantId, page, limit, filter);
     }
+    return { notifications: toNotificationResponses(result.notifications), total: result.total };
   }
 
   async markNotificationAsRead(notificationId: string): Promise<void> {

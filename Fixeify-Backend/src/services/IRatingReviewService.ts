@@ -1,5 +1,5 @@
-import { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
-import { RatingReviewResponse } from "../dtos/response/ratingReviewDtos";
+import type { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
+import type { RatingReviewResponse } from "../dtos/response/ratingReviewDtos";
 
 export interface IRatingReviewService {
   createRatingReview(data: CreateRatingReviewRequest): Promise<RatingReviewResponse>;

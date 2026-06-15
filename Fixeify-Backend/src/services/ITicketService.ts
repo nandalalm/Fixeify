@@ -1,5 +1,5 @@
-import { TicketResponse, TicketListResponse } from "../dtos/response/ticketDto";
-import { CreateTicketRequest, UpdateTicketStatusRequest } from "../dtos/request/ticketDtos";
+import type { TicketResponse, TicketListResponse } from "../dtos/response/ticketDto";
+import type { CreateTicketRequest, UpdateTicketStatusRequest } from "../dtos/request/ticketDtos";
 
 export interface ITicketService {
   createTicket(ticketData: CreateTicketRequest): Promise<TicketResponse>;

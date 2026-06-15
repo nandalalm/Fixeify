@@ -1,8 +1,8 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { inject, injectable } from "inversify";
 import { TYPES } from "../types";
-import { IRatingReviewService } from "../services/IRatingReviewService";
-import { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
+import type { IRatingReviewService } from "../services/IRatingReviewService";
+import type { CreateRatingReviewRequest } from "../dtos/request/ratingReviewDtos";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
 

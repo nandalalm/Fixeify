@@ -1,24 +1,10 @@
-import { TransactionDocument } from "../models/transactionModel";
-
-export interface TransactionResponseDTO {
-  id: string;
-  transactionId: string;
-  proId: string;
-  walletId?: string;
-  amount: number;
-  type: "credit" | "debit";
-  date: Date;
-  description?: string;
-  bookingId?: string;
-  quotaId?: string;
-  adminId?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import type { ClientSession } from "mongoose";
+import type { TransactionDocument } from "../models/transactionModel";
+import type { FindTransactionByKeysFilter, TransactionRecord } from "../contracts/repository/transactionRecords";
 
 export interface ITransactionRepository {
-  createTransaction(data: Partial<TransactionDocument>): Promise<TransactionResponseDTO>;
-  findByProIdPaginated(proId: string, page: number, limit: number): Promise<{ transactions: TransactionResponseDTO[]; total: number }>;
-  findByAdminIdPaginated(adminId: string, page: number, limit: number): Promise<{ transactions: TransactionResponseDTO[]; total: number }>;
-  findOneByKeys(filter: { bookingId: string; type: "credit" | "debit"; proId: string; amount: number; adminId?: string }): Promise<TransactionResponseDTO | null>;
+  createTransaction(data: Partial<TransactionDocument>, session?: ClientSession): Promise<TransactionRecord>;
+  findByProIdPaginated(proId: string, page: number, limit: number): Promise<{ transactions: TransactionRecord[]; total: number }>;
+  findByAdminIdPaginated(adminId: string, page: number, limit: number): Promise<{ transactions: TransactionRecord[]; total: number }>;
+  findOneByKeys(filter: FindTransactionByKeysFilter, session?: ClientSession): Promise<TransactionRecord | null>;
 }

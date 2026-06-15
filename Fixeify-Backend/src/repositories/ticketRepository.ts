@@ -1,18 +1,21 @@
 import mongoose from "mongoose";
-import Ticket, { TicketDocument } from "../models/ticketModel";
-import { TicketResponse } from "../dtos/response/ticketDto";
-import { CreateTicketRequest, UpdateTicketStatusRequest } from "../dtos/request/ticketDtos";
+import Ticket from "../models/ticketModel";
 import { ITicketRepository } from "./ITicketRepository";
 import { injectable } from "inversify";
+import type {
+  CreateTicketData,
+  TicketRecord,
+  UpdateTicketStatusData,
+} from "../contracts/repository/ticketRecords";
 
 @injectable()
 export class MongoTicketRepository implements ITicketRepository {
-  async create(ticketData: CreateTicketRequest): Promise<TicketDocument> {
+  async create(ticketData: CreateTicketData): Promise<TicketRecord> {
     const ticket = new Ticket(ticketData);
     return await ticket.save();
   }
 
-  async findById(id: string): Promise<TicketDocument | null> {
+  async findById(id: string): Promise<TicketRecord | null> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return null;
     }
@@ -20,18 +23,22 @@ export class MongoTicketRepository implements ITicketRepository {
       .populate('complainantId', 'name firstName lastName')
       .populate('againstId', 'name firstName lastName')
       .populate('bookingId', 'issueDescription preferredDate status')
-      .populate('resolvedBy', 'name');
+      .populate('resolvedBy', 'name')
+      .lean<TicketRecord>()
+      .exec();
   }
 
-  async findByTicketId(ticketId: string): Promise<TicketDocument | null> {
+  async findByTicketId(ticketId: string): Promise<TicketRecord | null> {
     return await Ticket.findOne({ ticketId })
       .populate('complainantId', 'name firstName lastName')
       .populate('againstId', 'name firstName lastName')
       .populate('bookingId', 'issueDescription preferredDate status')
-      .populate('resolvedBy', 'name');
+      .populate('resolvedBy', 'name')
+      .lean<TicketRecord>()
+      .exec();
   }
 
-  async findByComplainant(complainantId: string, page: number = 1, limit: number = 10): Promise<{ tickets: TicketResponse[]; total: number }> {
+  async findByComplainant(complainantId: string, page: number = 1, limit: number = 10): Promise<{ tickets: TicketRecord[]; total: number }> {
     const skip = (page - 1) * limit;
     
     const [tickets, total] = await Promise.all([
@@ -42,17 +49,16 @@ export class MongoTicketRepository implements ITicketRepository {
         .populate('resolvedBy', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean<TicketRecord[]>()
+        .exec(),
       Ticket.countDocuments({ complainantId })
     ]);
 
-    return {
-      tickets: tickets.map(this.formatTicketResponse),
-      total
-    };
+    return { tickets, total };
   }
 
-  async findByAgainst(againstId: string, page: number = 1, limit: number = 10): Promise<{ tickets: TicketResponse[]; total: number }> {
+  async findByAgainst(againstId: string, page: number = 1, limit: number = 10): Promise<{ tickets: TicketRecord[]; total: number }> {
     const skip = (page - 1) * limit;
     
     const [tickets, total] = await Promise.all([
@@ -63,17 +69,16 @@ export class MongoTicketRepository implements ITicketRepository {
         .populate('resolvedBy', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean<TicketRecord[]>()
+        .exec(),
       Ticket.countDocuments({ againstId })
     ]);
 
-    return {
-      tickets: tickets.map(this.formatTicketResponse),
-      total
-    };
+    return { tickets, total };
   }
 
-  async findAll(page: number = 1, limit: number = 10, status?: string): Promise<{ tickets: TicketResponse[]; total: number }> {
+  async findAll(page: number = 1, limit: number = 10, status?: string): Promise<{ tickets: TicketRecord[]; total: number }> {
     const skip = (page - 1) * limit;
     const filter = status ? { status } : {};
     
@@ -85,17 +90,16 @@ export class MongoTicketRepository implements ITicketRepository {
         .populate('resolvedBy', 'name')
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit),
+        .limit(limit)
+        .lean<TicketRecord[]>()
+        .exec(),
       Ticket.countDocuments(filter)
     ]);
 
-    return {
-      tickets: tickets.map(this.formatTicketResponse),
-      total
-    };
+    return { tickets, total };
   }
 
-  async updateStatus(id: string, updateData: UpdateTicketStatusRequest): Promise<TicketDocument | null> {
+  async updateStatus(id: string, updateData: UpdateTicketStatusData): Promise<TicketRecord | null> {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return null;
     }
@@ -120,10 +124,12 @@ export class MongoTicketRepository implements ITicketRepository {
       .populate('complainantId', 'name firstName lastName')
       .populate('againstId', 'name firstName lastName')
       .populate('bookingId', 'issueDescription preferredDate status')
-      .populate('resolvedBy', 'name');
+      .populate('resolvedBy', 'name')
+      .lean<TicketRecord>()
+      .exec();
   }
 
-  async updateBanStatus(ticketId: string, isUserBanned?: boolean, isProBanned?: boolean): Promise<TicketDocument | null> {
+  async updateBanStatus(ticketId: string, isUserBanned?: boolean, isProBanned?: boolean): Promise<TicketRecord | null> {
     const updateFields: Record<string, boolean> = {};
     if (isUserBanned !== undefined) updateFields.isUserBanned = isUserBanned;
     if (isProBanned !== undefined) updateFields.isProBanned = isProBanned;
@@ -132,7 +138,9 @@ export class MongoTicketRepository implements ITicketRepository {
       .populate('complainantId', 'name firstName lastName')
       .populate('againstId', 'name firstName lastName')
       .populate('bookingId', 'issueDescription preferredDate status')
-      .populate('resolvedBy', 'name');
+      .populate('resolvedBy', 'name')
+      .lean<TicketRecord>()
+      .exec();
   }
 
   async getTicketStats(): Promise<{ pending: number; underReview: number; resolved: number; total: number }> {
@@ -144,35 +152,5 @@ export class MongoTicketRepository implements ITicketRepository {
     ]);
 
     return { pending, underReview, resolved, total };
-  }
-
-  private formatTicketResponse(ticket: TicketDocument & {
-    complainantId: { _id: mongoose.Types.ObjectId; name?: string; firstName?: string; lastName?: string };
-    againstId: { _id: mongoose.Types.ObjectId; name?: string; firstName?: string; lastName?: string };
-    bookingId: { _id: mongoose.Types.ObjectId };
-    resolvedBy?: { _id: mongoose.Types.ObjectId };
-  }): TicketResponse {
-    return {
-      _id: ticket._id.toString(),
-      ticketId: ticket.ticketId,
-      complainantType: ticket.complainantType,
-      complainantId: ticket.complainantId._id.toString(),
-      complainantName: ticket.complainantId.name || `${ticket.complainantId.firstName || ''} ${ticket.complainantId.lastName || ''}`.trim(),
-      againstType: ticket.againstType,
-      againstId: ticket.againstId._id.toString(),
-      againstName: ticket.againstId.name || `${ticket.againstId.firstName || ''} ${ticket.againstId.lastName || ''}`.trim(),
-      bookingId: ticket.bookingId._id.toString(),
-      subject: ticket.subject,
-      description: ticket.description,
-      status: ticket.status,
-      priority: ticket.priority,
-      adminComment: ticket.adminComment,
-      resolvedBy: ticket.resolvedBy?._id.toString(),
-      resolvedAt: ticket.resolvedAt,
-      isUserBanned: ticket.isUserBanned,
-      isProBanned: ticket.isProBanned,
-      createdAt: ticket.createdAt,
-      updatedAt: ticket.updatedAt
-    };
   }
 }

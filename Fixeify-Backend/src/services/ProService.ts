@@ -1,31 +1,38 @@
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
 import logger from "../config/logger";
-import { IProRepository } from "../repositories/IProRepository";
-import { ICategoryRepository } from "../repositories/ICategoryRepository";
-import { IBookingRepository } from "../repositories/IBookingRepository";
-import { IWithdrawalRequestRepository } from "../repositories/IWithdrawalRequestRepository";
-import { IPendingPro, PendingProDocument } from "../models/pendingProModel";
-import { IProService, IAvailability } from "./IProService";
-import { ProProfileResponse, ProResponse, PendingProResponse } from "../dtos/response/proDtos";
-import { UserResponse } from "../dtos/response/userDtos";
-import { CategoryResponse } from "../dtos/response/categoryDtos";
-import { BookingResponse } from "../dtos/response/bookingDtos";
+import type { IProRepository } from "../repositories/IProRepository";
+import type { ICategoryRepository } from "../repositories/ICategoryRepository";
+import type { IBookingRepository } from "../repositories/IBookingRepository";
+import type { IWithdrawalRequestRepository } from "../repositories/IWithdrawalRequestRepository";
+import type { IPendingPro, PendingProDocument } from "../models/pendingProModel";
+import type { IProService, IAvailability } from "./IProService";
+import type { ProProfileResponse, ProResponse, PendingProResponse } from "../dtos/response/proDtos";
+import type { UserResponse } from "../dtos/response/userDtos";
+import type { CategoryResponse } from "../dtos/response/categoryDtos";
+import type { BookingResponse } from "../dtos/response/bookingDtos";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
-import { ApprovedProDocument } from "../models/approvedProModel";
-import { UserRole } from "../enums/roleEnum";
+import type { ApprovedProDocument } from "../models/approvedProModel";
 import bcrypt from "bcryptjs";
-import { IQuotaRepository } from "../repositories/IQuotaRepository";
-import { QuotaRequest, QuotaResponse } from "../dtos/response/quotaDtos";
+import type { IQuotaRepository } from "../repositories/IQuotaRepository";
+import type { QuotaResponse } from "../dtos/response/quotaDtos";
+import type { QuotaRequest } from "../dtos/request/quotaDtos";
 import mongoose from "mongoose";
-import { IWalletRepository } from "../repositories/IWalletRepository";
-import { IAdminRepository } from "../repositories/IAdminRepository";
-import { WalletResponseDTO } from "../dtos/response/walletDtos";
-import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
-import { INotificationService } from "./INotificationService";
+import type { IWalletRepository } from "../repositories/IWalletRepository";
+import type { IAdminRepository } from "../repositories/IAdminRepository";
+import type { WalletResponse } from "../dtos/response/walletDtos";
+import type { WithdrawalResponse } from "../dtos/response/withdrawalDtos";
+import type { INotificationService } from "./INotificationService";
 import { scheduleSlotRelease, cancelSlotRelease } from "./queue/SlotReleaseQueue";
+import { toProUserResponse } from "../mappers/userMapper";
+import { toCategoryResponses } from "../mappers/categoryMapper";
+import { toPendingProResponse, toProProfileResponse } from "../mappers/proMapper";
+import { toBookingResponse } from "../mappers/bookingMapper";
+import { toQuotaResponse } from "../mappers/quotaMapper";
+import { toWalletResponse } from "../mappers/walletMapper";
+import { toWithdrawalResponse, toWithdrawalResponses } from "../mappers/withdrawalMapper";
 
 @injectable()
 export class ProService implements IProService {
@@ -72,9 +79,9 @@ export class ProService implements IProService {
       const admin = await this._adminRepository.find();
       if (admin) {
         await this._notificationService.createNotification({
-          type: "general",
-          title: "New Pro Application Received",
-          description: `${proData.firstName ?? ""} ${proData.lastName ?? ""} (${proData.email ?? "unknown email"}) has applied to become a Fixeify Pro.`,
+          type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+          title: MESSAGES.NOTIFICATION_TITLE_NEW_PRO_APPLICATION_RECEIVED,
+          description: `${proData.firstName ?? ""} ${proData.lastName ?? ""} (${proData.email ?? MESSAGES.NOTIFICATION_DESC_NEW_PRO_APPLICATION_EMAIL_FALLBACK}) ${MESSAGES.NOTIFICATION_DESC_NEW_PRO_APPLICATION_SUFFIX}`,
           adminId: admin.id,
         });
       }
@@ -86,9 +93,9 @@ export class ProService implements IProService {
   }
 
   async getProfile(proId: string): Promise<ProProfileResponse> {
-    const pro = await this._proRepository.findApprovedProByIdAsProfile(proId);
+    const pro = await this._proRepository.findApprovedProProfileById(proId);
     if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
-    return pro;
+    return toProProfileResponse(pro);
   }
 
   async updateProfile(proId: string, data: Partial<ProProfileResponse>): Promise<ProProfileResponse> {
@@ -106,21 +113,21 @@ export class ProService implements IProService {
     const updatedPro = await this._proRepository.updateApprovedPro(proId, updateData);
     if (!updatedPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
-    const profile = await this._proRepository.findApprovedProByIdAsProfile(proId);
+    const profile = await this._proRepository.findApprovedProProfileById(proId);
     if (!profile) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     try {
       await this._notificationService.createNotification({
-        type: "general",
-        title: "Profile Updated",
-        description: "Your professional profile has been updated successfully. Your changes are now visible to customers.",
+        type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+        title: MESSAGES.NOTIFICATION_TITLE_PROFILE_UPDATED,
+        description: MESSAGES.NOTIFICATION_DESC_PRO_PROFILE_UPDATED,
         proId: proId
       });
     } catch (error) {
       logger.error(MESSAGES.FAILED_CREATE_PRO_PROFILE_UPDATE_NOTIFICATION, { proId, error });
     }
 
-    return profile;
+    return toProProfileResponse(profile);
   }
 
   async changePassword(
@@ -146,16 +153,16 @@ export class ProService implements IProService {
 
     try {
       await this._notificationService.createNotification({
-        type: "general",
-        title: "Password Changed",
-        description: "Your password has been changed successfully. If you didn't make this change, please contact support immediately.",
+        type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+        title: MESSAGES.NOTIFICATION_TITLE_PASSWORD_CHANGED,
+        description: MESSAGES.NOTIFICATION_DESC_PASSWORD_CHANGED,
         proId: proId
       });
     } catch (error) {
       logger.error(MESSAGES.FAILED_CREATE_PRO_PASSWORD_CHANGE_NOTIFICATION, { proId, error });
     }
 
-    return this.mapToUserResponse(updatedPro);
+    return toProUserResponse(updatedPro);
   }
 
   async getAvailability(proId: string): Promise<{ availability: IAvailability; isUnavailable: boolean }> {
@@ -184,7 +191,8 @@ export class ProService implements IProService {
   }
 
   async getAllCategories(): Promise<CategoryResponse[]> {
-    return this._categoryRepository.getCategoriesWithPagination(0, 100);
+    const categories = await this._categoryRepository.getCategoriesWithPagination(0, 100);
+    return toCategoryResponses(categories);
   }
 
   async fetchProBookings(
@@ -198,20 +206,22 @@ export class ProService implements IProService {
   ): Promise<{ bookings: BookingResponse[]; total: number }> {
     const pro = await this._proRepository.findApprovedProById(proId);
     if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
-    return this._bookingRepository.fetchProBookings(proId, page, limit, status, sortBy, search, bookingId);
+    const { bookings, total } = await this._bookingRepository.fetchProBookings(proId, page, limit, status, sortBy, search, bookingId);
+    return { bookings: bookings.map(toBookingResponse), total };
   }
 
   async getBookingById(id: string): Promise<BookingResponse> {
-    const booking = await this._bookingRepository.findBookingById(id);
+    const booking = await this._bookingRepository.findBookingByIdPopulated(id);
     if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
-    return booking as unknown as BookingResponse;
+    return toBookingResponse(booking);
   }
 
   async acceptBooking(bookingId: string): Promise<{ message: string }> {
     const session = await mongoose.startSession();
-    session.startTransaction();
+    let acceptedBooking: { userId: string; slotReleaseAt: Date } | null = null;
     try {
-      const booking = await this._bookingRepository.findBookingById(bookingId);
+      session.startTransaction();
+      const booking = await this._bookingRepository.findBookingById(bookingId, session);
       if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
       if (booking.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_NOT_PENDING);
 
@@ -239,7 +249,7 @@ export class ProService implements IProService {
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_PREFERRED_SLOTS_PASSED);
       }
 
-      const pro = await this._proRepository.findApprovedProById(booking.proId.toString());
+      const pro = await this._proRepository.findApprovedProById(booking.proId.toString(), session);
       if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
       const dayOfWeek = preferredDateIST.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
@@ -260,7 +270,7 @@ export class ProService implements IProService {
         booked: true,
       }));
 
-      const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, true);
+      const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, true, session);
       if (!availabilityUpdate) {
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
       }
@@ -270,20 +280,21 @@ export class ProService implements IProService {
         preferredDate,
         booking.preferredTime,
         "pending",
-        bookingId
+        bookingId,
+        session
       );
 
       for (const conflictingBooking of conflictingBookings) {
-        await this._bookingRepository.updateBooking(conflictingBooking.id, {
+        await this._bookingRepository.updateBooking(conflictingBooking._id.toString(), {
           status: "rejected",
-          rejectedReason: "Schedule conflict",
-        });
+          rejectedReason: MESSAGES.SCHEDULE_CONFLICT,
+        }, session);
       }
 
       await this._bookingRepository.updateBooking(bookingId, {
         status: "accepted",
         preferredTime: updatedSlots.map((slot) => ({ ...slot })),
-      });
+      }, session);
 
       const toMinutes = (t: string) => {
         const [h, m] = t.split(":").map(Number);
@@ -297,29 +308,56 @@ export class ProService implements IProService {
       const preferredDateIST2 = new Date(preferredDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
       preferredDateIST2.setHours(endH, endM, 0, 0);
       const runAt = new Date(preferredDateIST2.toISOString());
-      await scheduleSlotRelease(bookingId, runAt);
-      await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: bookingId, slotReleaseAt: runAt });
+      await this._bookingRepository.updateBooking(
+        bookingId,
+        { slotReleaseJobId: null, slotReleaseAt: runAt },
+        session
+      );
 
-      try {
-        await this._notificationService.createNotification({
-          type: "booking",
-          title: "Booking Accepted",
-          description: `Great news! Your booking has been accepted by the professional. They will contact you soon to discuss the details.`,
-          userId: booking.userId.toString(),
-          bookingId: bookingId
-        });
-      } catch (error) {
-        logger.error(MESSAGES.FAILED_CREATE_BOOKING_ACCEPTANCE_NOTIFICATION, { bookingId, userId: booking.userId.toString(), error });
-      }
-
+      acceptedBooking = {
+        userId: booking.userId.toString(),
+        slotReleaseAt: runAt,
+      };
       await session.commitTransaction();
-      return { message: MESSAGES.BOOKING_ACCEPTED_SUCCESSFULLY };
     } catch (error) {
       await session.abortTransaction();
       throw error;
     } finally {
       session.endSession();
     }
+
+    if (!acceptedBooking) {
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.SERVER_ERROR);
+    }
+
+    try {
+      const scheduled = await scheduleSlotRelease(bookingId, acceptedBooking.slotReleaseAt);
+      if (scheduled) {
+        await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: bookingId });
+      } else {
+        logger.error(MESSAGES.FAILED_SCHEDULE_SLOT_RELEASE, { bookingId });
+      }
+    } catch (error) {
+      logger.error(MESSAGES.FAILED_SCHEDULE_SLOT_RELEASE, { bookingId, error });
+    }
+
+    try {
+      await this._notificationService.createNotification({
+        type: MESSAGES.NOTIFICATION_TYPE_BOOKING,
+        title: MESSAGES.NOTIFICATION_TITLE_BOOKING_ACCEPTED,
+        description: MESSAGES.NOTIFICATION_DESC_BOOKING_ACCEPTED,
+        userId: acceptedBooking.userId,
+        bookingId
+      });
+    } catch (error) {
+      logger.error(MESSAGES.FAILED_CREATE_BOOKING_ACCEPTANCE_NOTIFICATION, {
+        bookingId,
+        userId: acceptedBooking.userId,
+        error
+      });
+    }
+
+    return { message: MESSAGES.BOOKING_ACCEPTED_SUCCESSFULLY };
   }
 
   async rejectBooking(bookingId: string, reason: string): Promise<{ message: string }> {
@@ -356,9 +394,9 @@ export class ProService implements IProService {
 
     try {
       await this._notificationService.createNotification({
-        type: "booking",
-        title: "Booking Request Declined",
-        description: `Unfortunately, your booking request has been declined. Reason: ${reason}. Please try booking with another professional.`,
+        type: MESSAGES.NOTIFICATION_TYPE_BOOKING,
+        title: MESSAGES.NOTIFICATION_TITLE_BOOKING_REQUEST_DECLINED,
+        description: `${MESSAGES.NOTIFICATION_DESC_BOOKING_REJECTED_PREFIX} ${reason}. ${MESSAGES.NOTIFICATION_DESC_BOOKING_REJECTED_SUFFIX}`,
         userId: booking.userId.toString(),
         bookingId: bookingId
       });
@@ -387,30 +425,32 @@ export class ProService implements IProService {
     };
 
     const quota = await this._quotaRepository.createQuota(quotaData);
+    const quotaResponse = toQuotaResponse(quota);
 
     try {
       await this._notificationService.createNotification({
-        type: "booking",
-        title: "Quota Generated",
-        description: `A quota has been generated for your booking. Please review and proceed with payment to confirm your service.`,
+        type: MESSAGES.NOTIFICATION_TYPE_BOOKING,
+        title: MESSAGES.NOTIFICATION_TITLE_QUOTA_GENERATED,
+        description: MESSAGES.NOTIFICATION_DESC_QUOTA_GENERATED,
         userId: booking.userId.toString(),
-        quotaId: quota.id,
+        quotaId: quota._id.toString(),
         bookingId: bookingId
       });
     } catch (error) {
-      logger.error(MESSAGES.FAILED_CREATE_QUOTA_GENERATION_NOTIFICATION, { bookingId, quotaId: quota.id, userId: booking.userId.toString(), error });
+      logger.error(MESSAGES.FAILED_CREATE_QUOTA_GENERATION_NOTIFICATION, { bookingId, quotaId: quota._id.toString(), userId: booking.userId.toString(), error });
     }
 
-    return quota;
+    return quotaResponse;
   }
 
   async fetchQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null> {
     const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
-    return quota;
+    return quota ? toQuotaResponse(quota) : null;
   }
 
-  async getWallet(proId: string): Promise<WalletResponseDTO | null> {
-    return this._walletRepository.findWalletByProId(proId);
+  async getWallet(proId: string): Promise<WalletResponse | null> {
+    const wallet = await this._walletRepository.findWalletByProId(proId);
+    return wallet ? toWalletResponse(wallet) : null;
   }
 
   async getWalletWithPagination(
@@ -419,14 +459,15 @@ export class ProService implements IProService {
     limit: number,
     sortBy?: "latest" | "oldest" | "credit" | "debit",
     search?: string
-  ): Promise<{ wallet: WalletResponseDTO | null; total: number }> {
-    return this._walletRepository.findWalletByProIdAndPagination(proId, page, limit, sortBy, search);
+  ): Promise<{ wallet: WalletResponse | null; total: number }> {
+    const { wallet, total } = await this._walletRepository.findWalletByProIdAndPagination(proId, page, limit, sortBy, search);
+    return { wallet: wallet ? toWalletResponse(wallet) : null, total };
   }
 
   async requestWithdrawal(
     proId: string,
     data: { amount: number; paymentMode: "bank" | "upi"; bankName?: string; accountNumber?: string; ifscCode?: string; branchName?: string; upiCode?: string; bookingId?: string }
-  ): Promise<WithdrawalRequestResponse> {
+  ): Promise<WithdrawalResponse> {
     const wallet = await this._walletRepository.findWalletByProId(proId);
     if (!wallet) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WALLET_NOT_FOUND);
     if (wallet.balance < data.amount) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INSUFFICIENT_BALANCE);
@@ -437,7 +478,7 @@ export class ProService implements IProService {
       bookingObjectId = new mongoose.Types.ObjectId(data.bookingId);
       try {
         const quota = await this._quotaRepository.findQuotaByBookingId(data.bookingId);
-        if (quota?.id) quotaObjectId = new mongoose.Types.ObjectId(quota.id);
+        if (quota?._id) quotaObjectId = new mongoose.Types.ObjectId(quota._id);
       } catch (error) {
         logger.error(MESSAGES.FAILED_LOOKUP_QUOTA_FOR_WITHDRAWAL, { bookingId: data.bookingId, error });
       }
@@ -461,9 +502,9 @@ export class ProService implements IProService {
 
     try {
       await this._notificationService.createNotification({
-        type: "wallet",
-        title: "Withdrawal Request Submitted",
-        description: `Your withdrawal request of ₹${data.amount} has been sent to the admin for review.`,
+        type: MESSAGES.NOTIFICATION_TYPE_WALLET,
+        title: MESSAGES.NOTIFICATION_TITLE_WITHDRAWAL_REQUEST_SUBMITTED,
+        description: `${MESSAGES.NOTIFICATION_DESC_WITHDRAWAL_SUBMITTED_PREFIX} ${MESSAGES.CURRENCY_INR}${data.amount} ${MESSAGES.NOTIFICATION_DESC_WITHDRAWAL_SUBMITTED_SUFFIX}`,
         proId: proId,
       });
     } catch (error) {
@@ -474,9 +515,9 @@ export class ProService implements IProService {
       const admin = await this._adminRepository.find();
       if (admin) {
         await this._notificationService.createNotification({
-          type: "wallet",
-          title: "New Withdrawal Request",
-          description: `Pro has requested a withdrawal of ₹${data.amount}. Payment mode: ${data.paymentMode.toUpperCase()}.`,
+          type: MESSAGES.NOTIFICATION_TYPE_WALLET,
+          title: MESSAGES.NOTIFICATION_TITLE_NEW_WITHDRAWAL_REQUEST,
+          description: `${MESSAGES.NOTIFICATION_DESC_ADMIN_WITHDRAWAL_REQUEST_PREFIX} ${MESSAGES.CURRENCY_INR}${data.amount}. ${MESSAGES.NOTIFICATION_DESC_ADMIN_WITHDRAWAL_REQUEST_PAYMENT_MODE_PREFIX} ${data.paymentMode.toUpperCase()}.`,
           adminId: admin.id,
         });
       }
@@ -484,11 +525,12 @@ export class ProService implements IProService {
       logger.error(MESSAGES.FAILED_CREATE_ADMIN_WITHDRAWAL_NOTIFICATION, { proId, amount: data.amount, paymentMode: data.paymentMode, error });
     }
 
-    return withdrawalRequest;
+    return toWithdrawalResponse(withdrawalRequest);
   }
 
-  async getWithdrawalRequestsByProId(proId: string): Promise<WithdrawalRequestResponse[]> {
-    return this._withdrawalRequestRepository.findWithdrawalRequestsByProId(proId);
+  async getWithdrawalRequestsByProId(proId: string): Promise<WithdrawalResponse[]> {
+    const withdrawals = await this._withdrawalRequestRepository.findWithdrawalRequestsByProId(proId);
+    return toWithdrawalResponses(withdrawals);
   }
 
   async getWithdrawalRequestsByProIdPaginated(
@@ -497,13 +539,13 @@ export class ProService implements IProService {
     limit: number,
     sortBy?: "latest" | "oldest",
     status?: "pending" | "approved" | "rejected"
-  ): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number }> {
+  ): Promise<{ withdrawals: WithdrawalResponse[]; total: number }> {
     const skip = (page - 1) * limit;
     const withdrawals = await this._withdrawalRequestRepository.findWithdrawalRequestsByProIdPaginated(proId, skip, limit, sortBy, status);
     const total = status
-      ? (await this._withdrawalRequestRepository.getAllWithdrawalRequests(0, 0, sortBy, status)).filter(w => w.proId === proId).length
+      ? (await this._withdrawalRequestRepository.getAllWithdrawalRequests(0, 0, sortBy, status)).filter(w => w.proId.toString() === proId).length
       : await this._withdrawalRequestRepository.getTotalWithdrawalRequestsCountByProId(proId);
-    return { withdrawals, total };
+    return { withdrawals: toWithdrawalResponses(withdrawals), total };
   }
 
   private mapToApprovedProDocument(
@@ -524,53 +566,12 @@ export class ProService implements IProService {
       categoryId: existingPro.categoryId,
     };
   }
-
-  private mapToUserResponse(pro: ApprovedProDocument): UserResponse {
-    return new UserResponse({
-      id: pro.id,
-      name: `${pro.firstName} ${pro.lastName}`,
-      email: pro.email,
-      role: UserRole.PRO,
-      photo: pro.profilePhoto ?? null,
-      phoneNo: pro.phoneNumber ?? null,
-      address: pro.location
-        ? {
-          address: pro.location.address,
-          city: pro.location.city,
-          state: pro.location.state,
-          coordinates: pro.location.coordinates,
-        }
-        : null,
-      isBanned: pro.isBanned,
-    });
-  }
-
   async getPendingProById(pendingProId: string): Promise<PendingProResponse> {
     const pendingPro = await this._proRepository.findById(pendingProId);
     if (!pendingPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
     const category = await this._categoryRepository.findCategoryById(pendingPro.categoryId.toString());
     if (!category) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
-    return {
-      _id: pendingPro._id.toString(),
-      firstName: pendingPro.firstName,
-      lastName: pendingPro.lastName,
-      email: pendingPro.email,
-      phoneNumber: pendingPro.phoneNumber,
-      category: {
-        id: category.id,
-        name: category.name,
-        image: category.image || "",
-      },
-      customService: pendingPro.customService,
-      location: pendingPro.location,
-      profilePhoto: pendingPro.profilePhoto,
-      idProof: pendingPro.idProof,
-      accountHolderName: pendingPro.accountHolderName,
-      accountNumber: pendingPro.accountNumber,
-      bankName: pendingPro.bankName,
-      availability: pendingPro.availability,
-      createdAt: pendingPro.createdAt,
-    };
+    return toPendingProResponse(pendingPro, category);
   }
 
   async getDashboardMetrics(proId: string): Promise<{

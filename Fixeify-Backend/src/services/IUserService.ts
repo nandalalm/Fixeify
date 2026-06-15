@@ -1,8 +1,9 @@
-import { UserResponse } from "../dtos/response/userDtos";
-import { ProResponse } from "../dtos/response/proDtos";
-import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
-import { ITimeSlot } from "../models/bookingModel";
-import { Stripe } from "stripe";
+import type { UserResponse } from "../dtos/response/userDtos";
+import type { ProResponse } from "../dtos/response/proDtos";
+import type { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
+import type { QuotaResponse } from "../dtos/response/quotaDtos";
+import type { ITimeSlot } from "../models/bookingModel";
+import type { Stripe } from "stripe";
 
 export interface IUserService {
   getUserProfile(userId: string): Promise<UserResponse | null>;
@@ -71,8 +72,9 @@ export interface IUserService {
   ): Promise<{ bookings: BookingResponse[]; total: number }>;
   cancelBooking(userId: string, bookingId: string, cancelReason: string): Promise<{ message: string }>;
   createPaymentIntent(bookingId: string, amount: number): Promise<{ clientSecret: string }>;
+  recordPaymentEvent(paymentIntentId: string): Promise<boolean>;
   handlePaymentFailure(bookingId: string): Promise<void>;
   handleWebhookEvent(event: Stripe.Event): Promise<void>;
   getBookingById(bookingId: string): Promise<BookingCompleteResponse | null>;
-  getQuotaByBookingId(bookingId: string): Promise<{ id: string; totalCost: number; paymentStatus: string } | null>;
+  getQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null>;
 }

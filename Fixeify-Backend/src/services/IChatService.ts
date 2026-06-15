@@ -1,26 +1,5 @@
-import { ChatResponse, MessageResponse, CreateChatRequest, SendMessageRequest } from "../dtos/response/chatDtos";
-import { IChat } from "../models/chatModel";
-import mongoose from "mongoose";
-import { IMessage } from "../models/messageModel";
-
-export interface PopulatedUser {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-}
-
-export interface PopulatedPro {
-  _id: mongoose.Types.ObjectId;
-  firstName: string;
-  lastName: string;
-}
-
-export type PopulatedChat = Omit<IChat, "participants" | "lastMessage"> & {
-  participants: {
-    userId: PopulatedUser;
-    proId: PopulatedPro;
-  };
-  lastMessage?: IMessage;
-};
+import type { CreateChatRequest, SendMessageRequest } from "../dtos/request/chatDtos";
+import type { ChatResponse, MessageResponse } from "../dtos/response/chatDtos";
 
 export interface IChatService {
   getExistingChat(userId: string, proId: string, participantModel: "User" | "ApprovedPro"): Promise<ChatResponse | null>;

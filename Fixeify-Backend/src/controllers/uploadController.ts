@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { inject, injectable } from "inversify";
 import { TYPES } from "../types";
-import { IUploadService } from "../services/IUploadService";
+import type { IUploadService } from "../services/IUploadService";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
 

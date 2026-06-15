@@ -1,7 +1,8 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { MESSAGES } from "../constants/messages";
+import { HttpStatus } from "../constants/httpStatus";
 import { HttpError } from "./errorMiddleware";
-import {  verifyAccessToken } from "../utils/jwtUtils";
+import { verifyAccessToken } from "../utils/jwtUtils";
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -12,29 +13,29 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
   try {
     const authHeader = req.header("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new HttpError(401, MESSAGES.ACCESS_DENIED);
+      throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.ACCESS_DENIED);
     }
 
     const token = authHeader.split(" ")[1];
-    if (!token) throw new HttpError(401, MESSAGES.ACCESS_DENIED);
+    if (!token) throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.ACCESS_DENIED);
 
     const decoded = verifyAccessToken(token);
     req.userId = decoded.userId;
     req.userRole = decoded.role;
     next();
   } catch (err) {
-    next(err instanceof HttpError ? err : new HttpError(403, MESSAGES.INVALID_TOKEN));
+    next(err instanceof HttpError ? err : new HttpError(HttpStatus.FORBIDDEN, MESSAGES.INVALID_TOKEN));
   }
 };
 
 export const requireRole = (...allowedRoles: ("user" | "pro" | "admin")[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.userRole) {
-      return next(new HttpError(401, "Authentication required"));
+      return next(new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.AUTHENTICATION_REQUIRED));
     }
 
     if (!allowedRoles.includes(req.userRole)) {
-      return next(new HttpError(403, `Access denied. Required roles: ${allowedRoles.join(", ")}`));
+      return next(new HttpError(HttpStatus.FORBIDDEN, `${MESSAGES.ACCESS_DENIED_REQUIRED_ROLES} ${allowedRoles.join(", ")}`));
     }
 
     next();

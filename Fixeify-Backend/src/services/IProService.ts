@@ -1,12 +1,12 @@
-import { ProProfileResponse } from "../dtos/response/proDtos";
-import { IPendingPro } from "../models/pendingProModel";
-import { UserResponse } from "../dtos/response/userDtos";
-import { CategoryResponse } from "../dtos/response/categoryDtos";
-import { BookingResponse } from "../dtos/response/bookingDtos";
-import { QuotaResponse, QuotaRequest } from "../dtos/response/quotaDtos";
-import { WalletResponseDTO } from "../dtos/response/walletDtos";
-import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
-import { PendingProResponse } from "../dtos/response/proDtos";
+import type { PendingProResponse, ProProfileResponse } from "../dtos/response/proDtos";
+import type { IPendingPro } from "../models/pendingProModel";
+import type { UserResponse } from "../dtos/response/userDtos";
+import type { CategoryResponse } from "../dtos/response/categoryDtos";
+import type { BookingResponse } from "../dtos/response/bookingDtos";
+import type { QuotaResponse } from "../dtos/response/quotaDtos";
+import type { QuotaRequest } from "../dtos/request/quotaDtos";
+import type { WalletResponse } from "../dtos/response/walletDtos";
+import type { WithdrawalResponse } from "../dtos/response/withdrawalDtos";
 
 export interface IAvailability {
   monday?: ITimeSlot[];
@@ -49,14 +49,14 @@ export interface IProService {
   rejectBooking(bookingId: string, rejectedReason: string): Promise<{ message: string }>;
   generateQuota(bookingId: string, data: QuotaRequest): Promise<QuotaResponse>;
   fetchQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null>;
-  getWallet(proId: string): Promise<WalletResponseDTO | null>;
+  getWallet(proId: string): Promise<WalletResponse | null>;
   getWalletWithPagination(
     proId: string,
     page: number,
     limit: number,
     sortBy?: "latest" | "oldest" | "credit" | "debit",
     search?: string
-  ): Promise<{ wallet: WalletResponseDTO | null; total: number }>;
+  ): Promise<{ wallet: WalletResponse | null; total: number }>;
   requestWithdrawal(
     proId: string,
     data: {
@@ -69,15 +69,15 @@ export interface IProService {
       upiCode?: string;
       bookingId?: string;
     }
-  ): Promise<WithdrawalRequestResponse>;
-  getWithdrawalRequestsByProId(proId: string): Promise<WithdrawalRequestResponse[]>;
+  ): Promise<WithdrawalResponse>;
+  getWithdrawalRequestsByProId(proId: string): Promise<WithdrawalResponse[]>;
   getWithdrawalRequestsByProIdPaginated(
     proId: string,
     page: number,
     limit: number,
     sortBy?: "latest" | "oldest",
     status?: "pending" | "approved" | "rejected"
-  ): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number }>;
+  ): Promise<{ withdrawals: WithdrawalResponse[]; total: number }>;
   getPendingProById(pendingProId: string): Promise<PendingProResponse>;
   getDashboardMetrics(proId: string): Promise<{
     totalRevenue: number;

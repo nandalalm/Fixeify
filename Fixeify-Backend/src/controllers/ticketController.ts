@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from "express";
-import { ITicketService } from "../services/ITicketService";
-import { CreateTicketRequest, UpdateTicketStatusRequest } from "../dtos/request/ticketDtos";
+import type { Request, Response, NextFunction } from "express";
+import type { ITicketService } from "../services/ITicketService";
+import type { CreateTicketRequest, UpdateTicketStatusRequest } from "../dtos/request/ticketDtos";
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
 import { MESSAGES } from "../constants/messages";
@@ -152,7 +152,7 @@ export class TicketController {
       }
       res.status(HttpStatus.OK).json({
         success: true,
-        message: "Ban status updated successfully",
+        message: MESSAGES.TICKET_BAN_STATUS_UPDATED_SUCCESS,
         data: ticket
       });
     } catch (error) {

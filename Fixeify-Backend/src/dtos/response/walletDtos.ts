@@ -1,4 +1,4 @@
-export interface WalletResponseDTO {
+export interface WalletResponse {
   id: string;
   proId: string;
   balance: number;

@@ -1,7 +1,6 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { injectable } from "inversify";
-import type { Express } from "express";
-import { IUploadService } from "./IUploadService";
+import { IUploadService, UploadFile } from "./IUploadService";
 
 @injectable()
 export class UploadService implements IUploadService {
@@ -17,7 +16,7 @@ export class UploadService implements IUploadService {
     });
   }
 
-  async uploadFile(file: Express.Multer.File, folder: string): Promise<string> {
+  async uploadFile(file: UploadFile, folder: string): Promise<string> {
     const key = `${folder}/${Date.now()}-${file.originalname}`;
 
     const command = new PutObjectCommand({
@@ -29,7 +28,6 @@ export class UploadService implements IUploadService {
 
     await this.s3Client.send(command);
 
-    // Return the public URL
     return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
   }
 }

@@ -1,7 +1,7 @@
 import { injectable, inject } from "inversify";
-import { Request, Response } from "express";
-import { IChatService } from "../services/IChatService";
-import { CreateChatRequest, SendMessageRequest } from "../dtos/response/chatDtos";
+import type { Request, Response } from "express";
+import type { IChatService } from "../services/IChatService";
+import type { CreateChatRequest, SendMessageRequest } from "../dtos/request/chatDtos";
 import { TYPES } from "../types";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { UserRole } from "../enums/roleEnum";

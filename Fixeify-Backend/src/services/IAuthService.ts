@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { UserResponse } from "../dtos/response/userDtos";
+import type { UserResponse } from "../dtos/response/userDtos";
 import { UserRole } from "../enums/roleEnum";
 
 export interface IAuthService {

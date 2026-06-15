@@ -1,4 +1,38 @@
 import { injectable, inject } from "inversify";
+import { TYPES } from "../types";
+import logger from "../config/logger";
+import type { IUserRepository } from "../repositories/IUserRepository";
+import type { IProRepository } from "../repositories/IProRepository";
+import type { ICategoryRepository } from "../repositories/ICategoryRepository";
+import type { IBookingRepository } from "../repositories/IBookingRepository";
+import type { IQuotaRepository } from "../repositories/IQuotaRepository";
+import type { IWalletRepository } from "../repositories/IWalletRepository";
+import type { IWithdrawalRequestRepository } from "../repositories/IWithdrawalRequestRepository";
+import type { ITransactionRepository } from "../repositories/ITransactionRepository";
+import type { UserResponse } from "../dtos/response/userDtos";
+import type { IAdminService } from "./IAdminService";
+import type { ProResponse, PendingProResponse } from "../dtos/response/proDtos";
+import type { CategoryResponse } from "../dtos/response/categoryDtos";
+import type { BookingResponse } from "../dtos/response/bookingDtos";
+import type { QuotaResponse } from "../dtos/response/quotaDtos";
+import type { WithdrawalResponse } from "../dtos/response/withdrawalDtos";
+import type { TransactionResponse } from "../dtos/response/transactionDtos";
+import nodemailer from "nodemailer";
+import bcrypt from "bcryptjs";
+import { getApprovalEmailTemplate, getRejectionEmailTemplate } from "../utils/emailTemplates";
+import RedisConnector from "../config/redisConnector";
+import { MESSAGES } from "../constants/messages";
+import { HttpError } from "../middleware/errorMiddleware";
+import { HttpStatus } from "../enums/httpStatus";
+import type { INotificationService } from "./INotificationService";
+import mongoose from "mongoose";
+import { toAdminUserListResponse, toUserResponse } from "../mappers/userMapper";
+import { toCategoryResponse, toCategoryResponses } from "../mappers/categoryMapper";
+import { toPendingProResponse, toPopulatedProResponse, toProResponse } from "../mappers/proMapper";
+import { toBookingResponse } from "../mappers/bookingMapper";
+import { toQuotaResponse } from "../mappers/quotaMapper";
+import { toTransactionResponse } from "../mappers/transactionMapper";
+import { toWithdrawalResponses } from "../mappers/withdrawalMapper";
 
 declare const process: {
   env: {
@@ -8,33 +42,6 @@ declare const process: {
     [key: string]: string | undefined;
   };
 };
-import { TYPES } from "../types";
-import logger from "../config/logger";
-import { IUserRepository } from "../repositories/IUserRepository";
-import { IProRepository } from "../repositories/IProRepository";
-import { ICategoryRepository } from "../repositories/ICategoryRepository";
-import { IBookingRepository } from "../repositories/IBookingRepository";
-import { IQuotaRepository } from "../repositories/IQuotaRepository";
-import { IWalletRepository } from "../repositories/IWalletRepository";
-import { IWithdrawalRequestRepository } from "../repositories/IWithdrawalRequestRepository";
-import { ITransactionRepository } from "../repositories/ITransactionRepository";
-import { UserResponse } from "../dtos/response/userDtos";
-import { IAdminService } from "./IAdminService";
-import { UserRole } from "../enums/roleEnum";
-import { PendingProDocument } from "../models/pendingProModel";
-import { ProResponse, PendingProResponse } from "../dtos/response/proDtos";
-import { CategoryResponse } from "../dtos/response/categoryDtos";
-import { BookingResponse } from "../dtos/response/bookingDtos";
-import { QuotaResponse } from "../dtos/response/quotaDtos";
-import { WithdrawalRequestResponse } from "../dtos/response/withdrawalDtos";
-import nodemailer from "nodemailer";
-import bcrypt from "bcryptjs";
-import { getApprovalEmailTemplate, getRejectionEmailTemplate } from "../utils/emailTemplates";
-import RedisConnector from "../config/redisConnector";
-import { MESSAGES } from "../constants/messages";
-import { HttpError } from "../middleware/errorMiddleware";
-import { HttpStatus } from "../enums/httpStatus";
-import { INotificationService } from "./INotificationService";
 
 @injectable()
 export class AdminService implements IAdminService {
@@ -57,34 +64,20 @@ export class AdminService implements IAdminService {
     this._quotaRepository = quotaRepository;
   }
 
-  async getAdminTransactions(adminId: string, page: number, limit: number): Promise<{
-    transactions: Array<{
-      id: string;
-      proId: string;
-      walletId?: string;
-      amount: number;
-      type: "credit" | "debit";
-      date: Date;
-      description?: string;
-      bookingId?: string;
-      quotaId?: string;
-      adminId?: string;
-      createdAt: Date;
-      updatedAt: Date;
-    }>; total: number
-  }> {
-    return this._transactionRepository.findByAdminIdPaginated(adminId, page, limit);
+  async getAdminTransactions(adminId: string, page: number, limit: number): Promise<{ transactions: TransactionResponse[]; total: number }> {
+    const { transactions, total } = await this._transactionRepository.findByAdminIdPaginated(adminId, page, limit);
+    return { transactions: transactions.map(toTransactionResponse), total };
   }
 
 
   async getBookings(page: number, limit: number, search?: string, status?: string, sortBy?: "latest" | "oldest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
     const { bookings, total } = await this._bookingRepository.fetchAllBookings(page, limit, search, status, sortBy, bookingId);
-    return { bookings, total };
+    return { bookings: bookings.map(toBookingResponse), total };
   }
 
   async getQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null> {
     const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
-    return quota;
+    return quota ? toQuotaResponse(quota) : null;
   }
 
   async getUsers(page: number, limit: number, sortBy?: "latest" | "oldest"): Promise<{ users: UserResponse[]; total: number }> {
@@ -94,19 +87,7 @@ export class AdminService implements IAdminService {
       this._userRepository.getTotalUsersCount(),
     ]);
     return {
-      users: users.map((user) =>
-        new UserResponse({
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: UserRole.USER,
-          isBanned: user.isBanned,
-          phoneNo: user.phoneNo ?? null,
-          address: user.address ?? null,
-          photo: user.photo ?? null,
-          createdAt: user.createdAt,
-        })
-      ),
+      users: users.map(toAdminUserListResponse),
       total,
     };
   }
@@ -119,9 +100,9 @@ export class AdminService implements IAdminService {
       await this._redisConnector.getClient().del(`refresh:${userId}`);
       try {
         await this._notificationService.createNotification({
-          type: "general",
-          title: "Account Banned",
-          description: "Your account has been banned by the admin. Please contact support if you believe this is a mistake.",
+          type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+          title: MESSAGES.NOTIFICATION_TITLE_ACCOUNT_BANNED,
+          description: MESSAGES.NOTIFICATION_DESC_USER_ACCOUNT_BANNED,
           userId: userId,
         });
       } catch (error) {
@@ -130,9 +111,9 @@ export class AdminService implements IAdminService {
     } else {
       try {
         await this._notificationService.createNotification({
-          type: "general",
-          title: "Account Unbanned",
-          description: "Good news! Your account has been unbanned. You can now continue using Fixeify.",
+          type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+          title: MESSAGES.NOTIFICATION_TITLE_ACCOUNT_UNBANNED,
+          description: MESSAGES.NOTIFICATION_DESC_USER_ACCOUNT_UNBANNED,
           userId: userId,
         });
       } catch (error) {
@@ -140,16 +121,7 @@ export class AdminService implements IAdminService {
       }
     }
 
-    return new UserResponse({
-      id: updatedUser.id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      role: UserRole.USER,
-      isBanned: updatedUser.isBanned,
-      phoneNo: updatedUser.phoneNo ?? null,
-      address: updatedUser.address ?? null,
-      photo: updatedUser.photo ?? null,
-    });
+    return toUserResponse(updatedUser);
   }
 
   async banPro(proId: string, isBanned: boolean): Promise<ProResponse | null> {
@@ -160,9 +132,9 @@ export class AdminService implements IAdminService {
       await this._redisConnector.getClient().del(`refresh:${proId}`);
       try {
         await this._notificationService.createNotification({
-          type: "general",
-          title: "Account Banned",
-          description: "Your professional account has been banned by the admin. Please contact support for assistance.",
+          type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+          title: MESSAGES.NOTIFICATION_TITLE_ACCOUNT_BANNED,
+          description: MESSAGES.NOTIFICATION_DESC_PRO_ACCOUNT_BANNED,
           proId: proId,
         });
       } catch (error) {
@@ -171,9 +143,9 @@ export class AdminService implements IAdminService {
     } else {
       try {
         await this._notificationService.createNotification({
-          type: "general",
-          title: "Account Unbanned",
-          description: "Good news! Your professional account has been unbanned. You can now continue offering services on Fixeify.",
+          type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+          title: MESSAGES.NOTIFICATION_TITLE_ACCOUNT_UNBANNED,
+          description: MESSAGES.NOTIFICATION_DESC_PRO_ACCOUNT_UNBANNED,
           proId: proId,
         });
       } catch (error) {
@@ -184,43 +156,7 @@ export class AdminService implements IAdminService {
     const category = await this._categoryRepository.findCategoryById(updatedPro.categoryId.toString());
     if (!category) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
 
-    return new ProResponse({
-      _id: updatedPro._id.toString(),
-      firstName: updatedPro.firstName,
-      role: UserRole.PRO,
-      lastName: updatedPro.lastName,
-      email: updatedPro.email,
-      phoneNumber: updatedPro.phoneNumber,
-      category: {
-        id: category.id,
-        name: category.name,
-        image: category.image || "",
-      },
-      customService: updatedPro.customService ?? null,
-      location: {
-        address: updatedPro.location.address,
-        city: updatedPro.location.city,
-        state: updatedPro.location.state,
-        coordinates: updatedPro.location.coordinates,
-      },
-      profilePhoto: updatedPro.profilePhoto,
-      idProof: updatedPro.idProof,
-      accountHolderName: updatedPro.accountHolderName,
-      accountNumber: updatedPro.accountNumber,
-      bankName: updatedPro.bankName,
-      availability: {
-        monday: updatedPro.availability.monday || [],
-        tuesday: updatedPro.availability.tuesday || [],
-        wednesday: updatedPro.availability.wednesday || [],
-        thursday: updatedPro.availability.thursday || [],
-        friday: updatedPro.availability.friday || [],
-        saturday: updatedPro.availability.saturday || [],
-        sunday: updatedPro.availability.sunday || [],
-      },
-      isBanned: updatedPro.isBanned,
-      about: updatedPro.about ?? null,
-      isUnavailable: updatedPro.isUnavailable,
-    });
+    return toProResponse(updatedPro, category);
   }
 
   async getPendingPros(page: number, limit: number, sortBy?: "latest" | "oldest"): Promise<{ pros: PendingProResponse[]; total: number }> {
@@ -229,31 +165,10 @@ export class AdminService implements IAdminService {
     const total = await this._proRepository.getTotalPendingProsCount();
     return {
       pros: await Promise.all(
-        pros.map(async (doc: PendingProDocument) => {
+        pros.map(async (doc) => {
           const category = await this._categoryRepository.findCategoryById(doc.categoryId.toString());
           if (!category) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
-          return {
-            _id: doc._id.toString(),
-            firstName: doc.firstName,
-            lastName: doc.lastName,
-            email: doc.email,
-            phoneNumber: doc.phoneNumber,
-            category: {
-              id: category.id,
-              name: category.name,
-              image: category.image || "",
-            },
-            customService: doc.customService,
-            location: doc.location,
-            profilePhoto: doc.profilePhoto,
-            idProof: doc.idProof,
-            accountHolderName: doc.accountHolderName,
-            accountNumber: doc.accountNumber,
-            bankName: doc.bankName,
-            availability: doc.availability,
-            createdAt: doc.createdAt,
-            isRejected: doc.isRejected,
-          } as PendingProResponse;
+          return toPendingProResponse(doc, category);
         })
       ),
       total,
@@ -267,40 +182,36 @@ export class AdminService implements IAdminService {
     }
     const category = await this._categoryRepository.findCategoryById(proDoc.categoryId.toString());
     if (!category) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.CATEGORY_NOT_FOUND);
-    return {
-      _id: proDoc._id.toString(),
-      firstName: proDoc.firstName,
-      lastName: proDoc.lastName,
-      email: proDoc.email,
-      phoneNumber: proDoc.phoneNumber,
-      category: {
-        id: category.id,
-        name: category.name,
-        image: category.image || "",
-      },
-      customService: proDoc.customService,
-      location: proDoc.location,
-      profilePhoto: proDoc.profilePhoto,
-      idProof: proDoc.idProof,
-      accountHolderName: proDoc.accountHolderName,
-      accountNumber: proDoc.accountNumber,
-      bankName: proDoc.bankName,
-      availability: proDoc.availability,
-      createdAt: proDoc.createdAt,
-      isRejected: proDoc.isRejected,
-    } as PendingProResponse;
+    return toPendingProResponse(proDoc, category);
   }
 
   async approvePro(id: string, about: string | null): Promise<void> {
     const { plainPassword, hashedPassword } = await this.generatePassword();
-    const { email, firstName, lastName, approvedProId } = await this._proRepository.approvePro(id, hashedPassword, about || "");
+    const session = await mongoose.startSession();
+    let approvedPro: { email: string; firstName: string; lastName: string; approvedProId: string } | null = null;
+    try {
+      session.startTransaction();
+      approvedPro = await this._proRepository.approvePro(id, hashedPassword, about || "", session);
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+
+    if (!approvedPro) {
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.SERVER_ERROR);
+    }
+
+    const { email, firstName, lastName, approvedProId } = approvedPro;
     await this.sendApprovalEmail(email, `${firstName} ${lastName}`, plainPassword);
 
     try {
       await this._notificationService.createNotification({
-        type: "general",
-        title: "🎉 Welcome to Fixeify Pro!",
-        description: `Congratulations ${firstName}! Your professional application has been approved. You can now start receiving bookings and grow your business with Fixeify.`,
+        type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+        title: MESSAGES.NOTIFICATION_TITLE_WELCOME_FIXEIFY_PRO,
+        description: `${MESSAGES.NOTIFICATION_DESC_PRO_APPROVED_PREFIX} ${firstName}! ${MESSAGES.NOTIFICATION_DESC_PRO_APPROVED_SUFFIX}`,
         proId: approvedProId
       });
     } catch (error) {
@@ -314,15 +225,15 @@ export class AdminService implements IAdminService {
       this._proRepository.getApprovedProsWithPagination(skip, limit, sortBy),
       this._proRepository.getTotalApprovedProsCount(),
     ]);
-    return { pros, total };
+    return { pros: pros.map(toPopulatedProResponse), total };
   }
 
   async getApprovedProById(id: string): Promise<ProResponse> {
-    const proDoc = await this._proRepository.findApprovedProByIdAsResponse(id);
+    const proDoc = await this._proRepository.findApprovedProByIdWithCategory(id);
     if (!proDoc) {
       throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
     }
-    return proDoc;
+    return toPopulatedProResponse(proDoc);
   }
 
   async createCategory(name: string, image: string): Promise<CategoryResponse> {
@@ -331,7 +242,8 @@ export class AdminService implements IAdminService {
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CATEGORY_NAME_EXISTS);
     }
     const categoryData = { name, image };
-    return this._categoryRepository.createCategory(categoryData);
+    const category = await this._categoryRepository.createCategory(categoryData);
+    return toCategoryResponse(category);
   }
 
   async getCategories(page: number, limit: number): Promise<{ categories: CategoryResponse[]; total: number }> {
@@ -340,7 +252,7 @@ export class AdminService implements IAdminService {
       this._categoryRepository.getCategoriesWithPagination(skip, limit),
       this._categoryRepository.getTotalCategoriesCount(),
     ]);
-    return { categories, total };
+    return { categories: toCategoryResponses(categories), total };
   }
 
   async updateCategory(categoryId: string, data: { name?: string; image?: string }): Promise<CategoryResponse | null> {
@@ -350,7 +262,8 @@ export class AdminService implements IAdminService {
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CATEGORY_NAME_EXISTS);
       }
     }
-    return this._categoryRepository.updateCategory(categoryId, data);
+    const updatedCategory = await this._categoryRepository.updateCategory(categoryId, data);
+    return updatedCategory ? toCategoryResponse(updatedCategory) : null;
   }
 
   async getWithdrawalRequests(
@@ -358,53 +271,76 @@ export class AdminService implements IAdminService {
     limit: number,
     sortBy: "latest" | "oldest" = "latest",
     status?: "pending" | "approved" | "rejected"
-  ): Promise<{ withdrawals: WithdrawalRequestResponse[]; total: number; pros: ProResponse[] }> {
+  ): Promise<{ withdrawals: WithdrawalResponse[]; total: number; pros: ProResponse[] }> {
     const skip = (page - 1) * limit;
     const [withdrawals, total] = await Promise.all([
       this._withdrawalRequestRepository.getAllWithdrawalRequests(skip, limit, sortBy, status),
       this._withdrawalRequestRepository.getTotalWithdrawalRequestsCount(status),
     ]);
-    const proIds = [...new Set(withdrawals.map((w) => w.proId))];
-    const pros = await Promise.all(proIds.map((id) => this._proRepository.findApprovedProByIdAsResponse(id)));
-    return { withdrawals, total, pros: pros.filter((p): p is ProResponse => p !== null) };
+    const proIds = [...new Set(withdrawals.map((w) => w.proId.toString()))];
+    const pros = await Promise.all(proIds.map((id) => this._proRepository.findApprovedProByIdWithCategory(id)));
+    return {
+      withdrawals: toWithdrawalResponses(withdrawals),
+      total,
+      pros: pros
+        .filter((pro): pro is NonNullable<typeof pro> => pro !== null)
+        .map(toPopulatedProResponse),
+    };
   }
 
   async acceptWithdrawalRequest(withdrawalId: string): Promise<void> {
-    const withdrawal = await this._withdrawalRequestRepository.findWithdrawalRequestById(withdrawalId);
-    if (!withdrawal) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WITHDRAWAL_NOT_FOUND);
-    if (withdrawal.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.WITHDRAWAL_NOT_PENDING);
-
-    const wallet = await this._walletRepository.findWalletByProId(withdrawal.proId, false);
-    if (!wallet) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WALLET_NOT_FOUND);
-    if (wallet.balance < withdrawal.amount) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INSUFFICIENT_BALANCE);
-
-    await this._walletRepository.decreaseWalletBalance(wallet.id, withdrawal.amount);
-    await this._withdrawalRequestRepository.updateWithdrawalRequest(withdrawalId, { status: "approved" });
-
-    // Record a debit transaction in the pro's wallet for this withdrawal approval
+    const session = await mongoose.startSession();
+    let approvedWithdrawal: { proId: string; amount: number } | null = null;
     try {
-      const mongoose = await import("mongoose");
-      await this._transactionRepository.createTransaction({
-        proId: new mongoose.Types.ObjectId(withdrawal.proId),
-        walletId: new mongoose.Types.ObjectId(wallet.id),
-        amount: withdrawal.amount,
-        type: "debit",
-        date: new Date(),
-        description: `Withdrawal approved (Request #${withdrawalId.slice(-6)})`,
-      });
+      session.startTransaction();
+      const withdrawal = await this._withdrawalRequestRepository.findWithdrawalRequestById(withdrawalId, session);
+      if (!withdrawal) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WITHDRAWAL_NOT_FOUND);
+      if (withdrawal.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.WITHDRAWAL_NOT_PENDING);
+
+      const withdrawalProId = withdrawal.proId.toString();
+      const wallet = await this._walletRepository.findWalletByProId(withdrawalProId, false, session);
+      if (!wallet) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.WALLET_NOT_FOUND);
+      if (wallet.balance < withdrawal.amount) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INSUFFICIENT_BALANCE);
+
+      await this._walletRepository.decreaseWalletBalance(wallet._id.toString(), withdrawal.amount, session);
+      await this._withdrawalRequestRepository.updateWithdrawalRequest(withdrawalId, { status: "approved" }, session);
+
+      try {
+        await this._transactionRepository.createTransaction({
+          proId: new mongoose.Types.ObjectId(withdrawal.proId),
+          walletId: new mongoose.Types.ObjectId(wallet._id),
+          amount: withdrawal.amount,
+          type: "debit",
+          date: new Date(),
+          description: `${MESSAGES.TRANSACTION_DESC_WITHDRAWAL_APPROVED_PREFIX}${withdrawalId.slice(-6)})`,
+        }, session);
+      } catch (error) {
+        logger.error(MESSAGES.FAILED_CREATE_TRANSACTION_WITHDRAWAL_APPROVAL, { withdrawalId, proId: withdrawalProId, amount: withdrawal.amount, error });
+        throw error;
+      }
+
+      approvedWithdrawal = { proId: withdrawalProId, amount: withdrawal.amount };
+      await session.commitTransaction();
     } catch (error) {
-      logger.error(MESSAGES.FAILED_CREATE_TRANSACTION_WITHDRAWAL_APPROVAL, { withdrawalId, proId: withdrawal.proId, amount: withdrawal.amount, error });
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+
+    if (!approvedWithdrawal) {
+      throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.SERVER_ERROR);
     }
 
     try {
       await this._notificationService.createNotification({
-        type: "wallet",
-        title: "Withdrawal Approved",
-        description: `Good news! Your withdrawal request of ₹${withdrawal.amount} has been approved and is being processed.`,
-        proId: withdrawal.proId,
+        type: MESSAGES.NOTIFICATION_TYPE_WALLET,
+        title: MESSAGES.NOTIFICATION_TITLE_WITHDRAWAL_APPROVED,
+        description: `${MESSAGES.NOTIFICATION_DESC_WITHDRAWAL_APPROVED_PREFIX} ${MESSAGES.CURRENCY_INR}${approvedWithdrawal.amount} ${MESSAGES.NOTIFICATION_DESC_WITHDRAWAL_APPROVED_SUFFIX}`,
+        proId: approvedWithdrawal.proId,
       });
     } catch (error) {
-      logger.error(MESSAGES.FAILED_CREATE_WITHDRAWAL_APPROVAL_NOTIFICATION, { withdrawalId, proId: withdrawal.proId, amount: withdrawal.amount, error });
+      logger.error(MESSAGES.FAILED_CREATE_WITHDRAWAL_APPROVAL_NOTIFICATION, { withdrawalId, proId: approvedWithdrawal.proId, amount: approvedWithdrawal.amount, error });
     }
   }
 
@@ -420,13 +356,13 @@ export class AdminService implements IAdminService {
 
     try {
       await this._notificationService.createNotification({
-        type: "wallet",
-        title: "Withdrawal Rejected",
-        description: `Your withdrawal request of ₹${withdrawal.amount} was rejected. Reason: ${reason || "Not specified"}.`,
-        proId: withdrawal.proId,
+        type: MESSAGES.NOTIFICATION_TYPE_WALLET,
+        title: MESSAGES.NOTIFICATION_TITLE_WITHDRAWAL_REJECTED,
+        description: `${MESSAGES.NOTIFICATION_DESC_WITHDRAWAL_REJECTED_PREFIX} ${MESSAGES.CURRENCY_INR}${withdrawal.amount} ${MESSAGES.NOTIFICATION_DESC_WITHDRAWAL_REJECTED_REASON_PREFIX} ${reason || MESSAGES.NOTIFICATION_DESC_NOT_SPECIFIED}.`,
+        proId: withdrawal.proId.toString(),
       });
     } catch (error) {
-      logger.error(MESSAGES.FAILED_CREATE_WITHDRAWAL_REJECTION_NOTIFICATION, { withdrawalId, proId: withdrawal.proId, amount: withdrawal.amount, reason, error });
+      logger.error(MESSAGES.FAILED_CREATE_WITHDRAWAL_REJECTION_NOTIFICATION, { withdrawalId, proId: withdrawal.proId.toString(), amount: withdrawal.amount, reason, error });
     }
   }
 
@@ -470,7 +406,7 @@ export class AdminService implements IAdminService {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Welcome to Fixeify - Approved for Duty",
+      subject: MESSAGES.EMAIL_SUBJECT_APPROVED_FOR_DUTY,
       html: getApprovalEmailTemplate(email, name, password),
     };
 
@@ -556,7 +492,7 @@ export class AdminService implements IAdminService {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: "Fixeify - Request Rejected",
+      subject: MESSAGES.EMAIL_SUBJECT_REQUEST_REJECTED,
       html: getRejectionEmailTemplate(reason, pendingProId),
     };
 
@@ -568,3 +504,4 @@ export class AdminService implements IAdminService {
     }
   }
 }
+

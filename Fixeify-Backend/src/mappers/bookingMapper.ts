@@ -1,0 +1,78 @@
+import type { BookingCompleteResponse, BookingResponse } from "../dtos/response/bookingDtos";
+import type { BookingCompleteRecord, PopulatedBookingRecord } from "../contracts/repository/bookingRecords";
+
+export const toBookingResponse = (booking: PopulatedBookingRecord): BookingResponse => ({
+  id: booking._id.toString(),
+  bookingId: booking.bookingId,
+  user: {
+    id: booking.userId._id.toString(),
+    name: booking.userId.name,
+    email: booking.userId.email,
+    photo: booking.userId.photo,
+  },
+  pro: {
+    id: booking.proId._id.toString(),
+    firstName: booking.proId.firstName,
+    lastName: booking.proId.lastName,
+    profilePhoto: booking.proId.profilePhoto,
+  },
+  category: {
+    id: booking.categoryId._id.toString(),
+    name: booking.categoryId.name,
+    image: booking.categoryId.image,
+  },
+  issueDescription: booking.issueDescription,
+  location: booking.location,
+  phoneNumber: booking.phoneNumber,
+  preferredDate: booking.preferredDate,
+  preferredTime: booking.preferredTime,
+  status: booking.status,
+  rejectedReason: booking.rejectedReason,
+  cancelReason: booking.cancelReason,
+  createdAt: booking.createdAt,
+  updatedAt: booking.updatedAt,
+  isRated: booking.isRated,
+  hasComplaintRaisedByPro: booking.hasComplaintRaisedByPro,
+  hasComplaintRaisedByUser: booking.hasComplaintRaisedByUser,
+  adminRevenue: booking.adminRevenue,
+  proRevenue: booking.proRevenue,
+});
+
+export const toBookingCompleteResponse = (booking: BookingCompleteRecord): BookingCompleteResponse => ({
+  id: booking._id.toString(),
+  bookingId: booking.bookingId,
+  user: {
+    id: booking.userId._id.toString(),
+    name: booking.userId.name,
+    email: booking.userId.email,
+    photo: booking.userId.photo,
+  },
+  pro: {
+    id: booking.proId._id.toString(),
+    firstName: booking.proId.firstName,
+    lastName: booking.proId.lastName,
+    profilePhoto: booking.proId.profilePhoto,
+    email: booking.proId.email,
+    phoneNumber: booking.proId.phoneNumber,
+  },
+  category: {
+    id: booking.categoryId._id.toString(),
+    name: booking.categoryId.name,
+    image: booking.categoryId.image,
+  },
+  issueDescription: booking.issueDescription,
+  location: booking.location,
+  phoneNumber: booking.phoneNumber,
+  preferredDate: booking.preferredDate,
+  preferredTime: booking.preferredTime,
+  status: booking.status,
+  rejectedReason: booking.rejectedReason,
+  cancelReason: booking.cancelReason,
+  createdAt: booking.createdAt,
+  updatedAt: booking.updatedAt,
+  isRated: booking.isRated,
+  hasComplaintRaisedByPro: booking.hasComplaintRaisedByPro,
+  hasComplaintRaisedByUser: booking.hasComplaintRaisedByUser,
+  adminRevenue: booking.adminRevenue,
+  proRevenue: booking.proRevenue,
+});

@@ -1,5 +1,4 @@
-import { IUser } from "../models/userModel";
-import { UserResponse } from "../dtos/response/userDtos";
+import type { IUser } from "../models/userModel";
 
 export interface ILocation {
   address: string;
@@ -24,9 +23,9 @@ export interface IUserRepository {
   findUserById(userId: string): Promise<IUser | null>;
   createUser(userData: Partial<IUser>): Promise<IUser>;
   findUserByEmail(email: string): Promise<IUser | null>;
-  getAllUsers(): Promise<UserResponse[]>;
-  updateBanStatus(userId: string, isBanned: boolean): Promise<UserResponse | null>;
-  getUsersWithPagination(skip: number, limit: number, sortBy?: "latest" | "oldest"): Promise<UserResponse[]>;
+  getAllUsers(): Promise<IUser[]>;
+  updateBanStatus(userId: string, isBanned: boolean): Promise<IUser | null>;
+  getUsersWithPagination(skip: number, limit: number, sortBy?: "latest" | "oldest"): Promise<IUser[]>;
   getTotalUsersCount(): Promise<number>;
   deleteUser(userId: string): Promise<void>;
   updateUser(userId: string, data: Partial<IUser>): Promise<IUser | null>;

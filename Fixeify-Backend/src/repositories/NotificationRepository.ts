@@ -1,9 +1,10 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { INotification, Notification } from "../models/notificationModel";
-import { INotificationRepository } from "./INotificationRepository";
-import { NotificationResponse } from "../dtos/response/notificationDtos";
-import mongoose from "mongoose";
+import { type INotification, Notification } from "../models/notificationModel";
+import type { INotificationRepository } from "./INotificationRepository";
+import mongoose, { type FilterQuery } from "mongoose";
+import { MESSAGES } from "../constants/messages";
+import type { CreateNotificationData, NotificationFilter, NotificationListRecord, NotificationType } from "../contracts/repository/notificationRecords";
 
 @injectable()
 export class MongoNotificationRepository extends BaseRepository<INotification> implements INotificationRepository {
@@ -11,21 +12,9 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
     super(Notification);
   }
 
-  async createNotification(data: {
-    type: "message" | "booking" | "quota" | "wallet" | "general";
-    title: string;
-    description: string;
-    userId?: string;
-    proId?: string;
-    adminId?: string;
-    chatId?: string;
-    bookingId?: string;
-    quotaId?: string;
-    walletId?: string;
-    messageId?: string;
-  }): Promise<INotification> {
+  async createNotification(data: CreateNotificationData): Promise<INotification> {
     if (!data.type || !data.title || !data.description) {
-      throw new Error("type, title, and description are required");
+      throw new Error(MESSAGES.ALL_FIELDS_REQUIRED);
     }
     return this.create({
       ...data,
@@ -40,269 +29,121 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
     });
   }
 
-  async findNotificationsByUser(userId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      throw new Error("Invalid userId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId) };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findNotificationsByUser(userId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("userId", userId, page, limit, filter);
   }
 
-  async findNotificationsByPro(proId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(proId)) {
-      throw new Error("Invalid proId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { proId: new mongoose.Types.ObjectId(proId) };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findNotificationsByPro(proId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("proId", proId, page, limit, filter);
   }
 
-  async findNotificationsByAdmin(adminId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(adminId)) {
-      throw new Error("Invalid adminId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { adminId: new mongoose.Types.ObjectId(adminId) };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findNotificationsByAdmin(adminId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("adminId", adminId, page, limit, filter);
   }
 
   async markNotificationAsRead(notificationId: string): Promise<void> {
     if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-      throw new Error("Invalid notificationId");
+      throw new Error(MESSAGES.NOTIFICATIONID_REQUIRED);
     }
     await this.updateById(notificationId, { isRead: true });
   }
 
   async markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void> {
-    if (!mongoose.Types.ObjectId.isValid(participantId)) {
-      throw new Error("Invalid participantId");
-    }
-    const filter = participantModel === "User"
-      ? { userId: new mongoose.Types.ObjectId(participantId), isRead: false }
-      : participantModel === "ApprovedPro"
-      ? { proId: new mongoose.Types.ObjectId(participantId), isRead: false }
-      : { adminId: new mongoose.Types.ObjectId(participantId), isRead: false };
-    await this._model.updateMany(filter, { isRead: true }).exec();
+    await this.markNotificationsAsRead(participantId, participantModel);
   }
 
-  async findMessageNotificationsByUser(userId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      throw new Error("Invalid userId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId), type: "message" };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findMessageNotificationsByUser(userId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("userId", userId, page, limit, filter, "message");
   }
 
-  async findMessageNotificationsByPro(proId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(proId)) {
-      throw new Error("Invalid proId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { proId: new mongoose.Types.ObjectId(proId), type: "message" };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findMessageNotificationsByPro(proId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("proId", proId, page, limit, filter, "message");
   }
 
-  async findMessageNotificationsByAdmin(adminId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(adminId)) {
-      throw new Error("Invalid adminId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { adminId: new mongoose.Types.ObjectId(adminId), type: "message" };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findMessageNotificationsByAdmin(adminId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("adminId", adminId, page, limit, filter, "message");
   }
 
-  async findNonMessageNotificationsByUser(userId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      throw new Error("Invalid userId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId), type: { $ne: "message" } };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findNonMessageNotificationsByUser(userId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("userId", userId, page, limit, filter, undefined, true);
   }
 
-  async findNonMessageNotificationsByPro(proId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(proId)) {
-      throw new Error("Invalid proId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { proId: new mongoose.Types.ObjectId(proId), type: { $ne: "message" } };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findNonMessageNotificationsByPro(proId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("proId", proId, page, limit, filter, undefined, true);
   }
 
-  async findNonMessageNotificationsByAdmin(adminId: string, page: number, limit: number, filter: 'all' | 'unread' = 'all'): Promise<{ notifications: NotificationResponse[]; total: number }> {
-    if (!mongoose.Types.ObjectId.isValid(adminId)) {
-      throw new Error("Invalid adminId");
-    }
-    const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { adminId: new mongoose.Types.ObjectId(adminId), type: { $ne: "message" } };
-    if (filter === 'unread') {
-      query.isRead = false;
-    }
-    const notifications = await this._model
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .exec();
-
-    const total = await this._model.countDocuments(query);
-
-    return {
-      notifications: notifications.map((n) => this.mapToNotificationResponse(n)),
-      total,
-    };
+  async findNonMessageNotificationsByAdmin(adminId: string, page: number, limit: number, filter: NotificationFilter = "all"): Promise<NotificationListRecord> {
+    return this.findNotificationsByParticipant("adminId", adminId, page, limit, filter, undefined, true);
   }
 
   async markAllMessageNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void> {
-    if (!mongoose.Types.ObjectId.isValid(participantId)) {
-      throw new Error("Invalid participantId");
-    }
-    const filter = participantModel === "User"
-      ? { userId: new mongoose.Types.ObjectId(participantId), type: "message", isRead: false }
-      : participantModel === "ApprovedPro"
-      ? { proId: new mongoose.Types.ObjectId(participantId), type: "message", isRead: false }
-      : { adminId: new mongoose.Types.ObjectId(participantId), type: "message", isRead: false };
-    await this._model.updateMany(filter, { isRead: true }).exec();
+    await this.markNotificationsAsRead(participantId, participantModel, "message");
   }
 
-  private mapToNotificationResponse(notification: INotification): NotificationResponse {
-    return {
-      id: notification._id.toString(),
-      type: notification.type,
-      title: notification.title,
-      description: notification.description,
-      userId: notification.userId?.toString(),
-      proId: notification.proId?.toString(),
-      adminId: notification.adminId?.toString(),
-      chatId: notification.chatId?.toString(),
-      bookingId: notification.bookingId?.toString(),
-      quotaId: notification.quotaId?.toString(),
-      walletId: notification.walletId?.toString(),
-      messageId: notification.messageId?.toString(),
-      isRead: notification.isRead,
-      timestamp: notification.createdAt.toISOString(),
+  private async findNotificationsByParticipant(
+    participantField: "userId" | "proId" | "adminId",
+    participantId: string,
+    page: number,
+    limit: number,
+    filter: NotificationFilter,
+    type?: NotificationType,
+    excludeMessages: boolean = false
+  ): Promise<NotificationListRecord> {
+    if (!mongoose.Types.ObjectId.isValid(participantId)) {
+      throw new Error(MESSAGES.ALL_FIELDS_REQUIRED);
+    }
+
+    const skip = (page - 1) * limit;
+    const query: FilterQuery<INotification> = {
+      [participantField]: new mongoose.Types.ObjectId(participantId),
     };
+
+    if (filter === "unread") {
+      query.isRead = false;
+    }
+    if (type) {
+      query.type = type;
+    }
+    if (excludeMessages) {
+      query.type = { $ne: "message" };
+    }
+
+    const [notifications, total] = await Promise.all([
+      this._model
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this._model.countDocuments(query),
+    ]);
+
+    return { notifications, total };
+  }
+
+  private async markNotificationsAsRead(
+    participantId: string,
+    participantModel: "User" | "ApprovedPro" | "Admin",
+    type?: NotificationType
+  ): Promise<void> {
+    if (!mongoose.Types.ObjectId.isValid(participantId)) {
+      throw new Error(MESSAGES.ALL_FIELDS_REQUIRED);
+    }
+
+    const participantObjectId = new mongoose.Types.ObjectId(participantId);
+    const filter: FilterQuery<INotification> = {
+      isRead: false,
+      ...(type ? { type } : {}),
+    };
+
+    if (participantModel === "User") {
+      filter.userId = participantObjectId;
+    } else if (participantModel === "ApprovedPro") {
+      filter.proId = participantObjectId;
+    } else {
+      filter.adminId = participantObjectId;
+    }
+
+    await this._model.updateMany(filter, { isRead: true }).exec();
   }
 }

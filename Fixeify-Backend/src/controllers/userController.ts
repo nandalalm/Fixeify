@@ -1,13 +1,12 @@
-import { Response, NextFunction } from "express";
+import type { Response, NextFunction } from "express";
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
-import { IUserService } from "../services/IUserService";
+import type { IUserService } from "../services/IUserService";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
-import { AuthRequest } from "../middleware/authMiddleware";
+import type { AuthRequest } from "../middleware/authMiddleware";
 import Stripe from "stripe";
 import { HttpStatus } from "../enums/httpStatus";
-import PaymentEventModel from "../models/paymentEventModel";
 import logger from "../config/logger";
 
 declare const process: {
@@ -123,7 +122,7 @@ export class UserController {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 5;
       const search = (req.query.search as string) || undefined;
-      const status = (req.query.status as string) || undefined; // e.g., "pending,accepted" | "pending" | "accepted"
+      const status = (req.query.status as string) || undefined;
       const sortBy = ((req.query.sortBy as string) as "latest" | "oldest") || "latest";
       const bookingId = (req.query.bookingId as string) || undefined;
       const { bookings, total } = await this._userService.fetchBookingDetails(
@@ -170,7 +169,7 @@ export class UserController {
       const { bookingId, amount } = req.body;
       if (!bookingId || !amount) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKINGID_AMOUNT_REQUIRED);
 
-      logger.info("Create payment intent request received", {
+      logger.info(MESSAGES.CREATE_PAYMENT_INTENT_REQUEST_RECEIVED, {
         bookingId,
         amount,
         requesterUserId: req.userId,
@@ -223,7 +222,7 @@ export class UserController {
       const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
       if (!endpointSecret) throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.STRIPE_WEBHOOK_SECRET_NOT_CONFIGURED);
 
-      logger.info("Stripe webhook received", {
+      logger.info(MESSAGES.STRIPE_WEBHOOK_RECEIVED, {
         hasSignature: Boolean(sig),
         contentType: req.headers["content-type"],
       });
@@ -238,13 +237,13 @@ export class UserController {
       } catch (err: unknown) {
         const error = err as Error;
         console.error(`${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
-        logger.error("Stripe webhook signature verification failed", {
+        logger.error(MESSAGES.STRIPE_WEBHOOK_SIGNATURE_VERIFICATION_FAILED, {
           error: error.message,
         });
         throw new HttpError(HttpStatus.BAD_REQUEST, `${MESSAGES.WEBHOOK_SIGNATURE_VERIFICATION_FAILED}: ${error.message}`);
       }
 
-      logger.info("Stripe webhook verified", {
+      logger.info(MESSAGES.STRIPE_WEBHOOK_VERIFIED, {
         eventId: event.id,
         eventType: event.type,
       });
@@ -252,31 +251,25 @@ export class UserController {
       if (event.type === "payment_intent.succeeded") {
         const paymentIntent = event.data.object as Stripe.PaymentIntent;
         const pid = paymentIntent.id;
-        // Extract booking ID from payment intent metadata
-        logger.info("Processing succeeded payment intent webhook", {
+        logger.info(MESSAGES.PROCESSING_SUCCEEDED_PAYMENT_INTENT_WEBHOOK, {
           eventId: event.id,
           paymentIntentId: pid,
           bookingId: paymentIntent.metadata?.bookingId,
           stripeStatus: paymentIntent.status,
         });
-        try {
-          await PaymentEventModel.create({ paymentIntentId: pid });
-        } catch (e: unknown) {
-          const error = e as { code?: number };
-          if (error && error.code === 11000) {
-            logger.warn("Duplicate payment_intent.succeeded webhook ignored", {
-              eventId: event.id,
-              paymentIntentId: pid,
-            });
-            res.status(HttpStatus.OK).json({ received: true, duplicate: true });
-            return;
-          }
-          throw e;
+        const isNewPaymentEvent = await this._userService.recordPaymentEvent(pid);
+        if (!isNewPaymentEvent) {
+          logger.warn(MESSAGES.DUPLICATE_PAYMENT_INTENT_SUCCEEDED_WEBHOOK_IGNORED, {
+            eventId: event.id,
+            paymentIntentId: pid,
+          });
+          res.status(HttpStatus.OK).json({ received: true, duplicate: true });
+          return;
         }
       }
 
       await this._userService.handleWebhookEvent(event);
-      logger.info("Stripe webhook processed successfully", {
+      logger.info(MESSAGES.STRIPE_WEBHOOK_PROCESSED_SUCCESSFULLY, {
         eventId: event.id,
         eventType: event.type,
       });

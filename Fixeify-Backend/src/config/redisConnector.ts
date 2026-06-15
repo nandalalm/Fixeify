@@ -17,14 +17,14 @@ export class RedisConnector {
 
   async connect(): Promise<void> {
     if (this._client?.isOpen) {
-      logger.info("Redis already connected");
+      logger.info(MESSAGES.REDIS_ALREADY_CONNECTED);
       return;
     }
 
     try {
       const url = process.env.REDIS_URL;
       if (!url) {
-        logger.warn("REDIS_URL not set. Skipping Redis connection (features depending on Redis will be disabled). Set REDIS_URL in Fixeify-Backend/.env to enable Redis.");
+        logger.warn(MESSAGES.REDIS_URL_NOT_SET_SKIP_CONNECTION);
         return; 
       }
 
@@ -37,14 +37,14 @@ export class RedisConnector {
       });
 
       this._client.on("error", (err) => {
-        logger.error(MESSAGES.REDIS_ERROR + ":", err);
+        logger.error(MESSAGES.REDIS_ERROR, err);
       });
 
       this._client.on("connect", () => {
       });
 
       this._client.on("ready", () => {
-        logger.info("Redis connected successfully");
+        logger.info(MESSAGES.REDIS_CONNECTED_SUCCESSFULLY);
       });
 
       this._client.on("end", () => {
@@ -52,7 +52,7 @@ export class RedisConnector {
 
       await this._client.connect();
     } catch (error) {
-      logger.error(MESSAGES.REDIS_CONNECT_FAILED + ":", error);
+      logger.error(MESSAGES.REDIS_CONNECT_FAILED, error);
       throw error;
     }
   }
@@ -60,13 +60,13 @@ export class RedisConnector {
   async disconnect(): Promise<void> {
     if (this._client?.isOpen) {
       await this._client.disconnect();
-      logger.info("Redis disconnected");
+      logger.info(MESSAGES.REDIS_DISCONNECTED);
     }
   }
 
   getClient(): RedisClientType {
     if (!this._client?.isOpen) {
-      throw new Error("Redis client is not connected. Call connect() first.");
+      throw new Error(MESSAGES.REDIS_CLIENT_NOT_CONNECTED);
     }
     return this._client;
   }

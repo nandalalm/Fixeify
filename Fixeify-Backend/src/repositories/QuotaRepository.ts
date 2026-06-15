@@ -1,10 +1,10 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { IQuotaRepository, PopulatedQuotaDocument } from "./IQuotaRepository";
-import Quota, { QuotaDocument } from "../models/quotaModel";
-import { QuotaResponse } from "../dtos/response/quotaDtos";
-import { Types } from "mongoose";
+import type { IQuotaRepository } from "./IQuotaRepository";
+import Quota, { type QuotaDocument } from "../models/quotaModel";
+import { type ClientSession, Types } from "mongoose";
 import Booking from "../models/bookingModel";
+import type { PopulatedQuotaRecord } from "../contracts/repository/quotaRecords";
 
 @injectable()
 export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implements IQuotaRepository {
@@ -12,7 +12,7 @@ export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implemen
     super(Quota);
   }
 
-  async createQuota(quotaData: Partial<QuotaDocument>): Promise<QuotaResponse> {
+  async createQuota(quotaData: Partial<QuotaDocument>): Promise<PopulatedQuotaRecord> {
     const quota = await this._model
       .create(quotaData)
       .then((doc) =>
@@ -21,17 +21,17 @@ export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implemen
           { path: "proId", select: "firstName lastName" },
           { path: "categoryId", select: "name image" },
         ])
-      ) as PopulatedQuotaDocument;
+      ) as PopulatedQuotaRecord;
 
-    return this.mapToQuotaResponse(quota);
+    return quota;
   }
 
-  async findQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null> {
+  async findQuotaByBookingId(bookingId: string, session?: ClientSession): Promise<PopulatedQuotaRecord | null> {
     let bookingObjectId: Types.ObjectId | null = null;
     if (Types.ObjectId.isValid(bookingId)) {
       bookingObjectId = new Types.ObjectId(bookingId);
     } else {
-      const bookingDoc = await Booking.findOne({ bookingId }).select("_id").lean();
+      const bookingDoc = await Booking.findOne({ bookingId }).select("_id").session(session || null).lean();
       if (bookingDoc?._id) bookingObjectId = bookingDoc._id as Types.ObjectId;
     }
 
@@ -44,68 +44,39 @@ export class MongoQuotaRepository extends BaseRepository<QuotaDocument> implemen
         { path: "proId", select: "firstName lastName" },
         { path: "categoryId", select: "name image" },
       ])
-      .exec() as PopulatedQuotaDocument | null;
+      .session(session || null)
+      .exec() as PopulatedQuotaRecord | null;
 
-    return quota ? this.mapToQuotaResponse(quota) : null;
+    return quota;
   }
 
-  async updateQuota(quotaId: string, data: Partial<QuotaDocument>): Promise<QuotaResponse | null> {
+  async updateQuota(quotaId: string, data: Partial<QuotaDocument>, session?: ClientSession): Promise<PopulatedQuotaRecord | null> {
     const quota = await this._model
-      .findByIdAndUpdate(quotaId, data, { new: true })
+      .findByIdAndUpdate(quotaId, data, { new: true, session })
       .populate([
         { path: "userId", select: "name email" },
         { path: "proId", select: "firstName lastName" },
         { path: "categoryId", select: "name image" },
       ])
-      .exec() as PopulatedQuotaDocument | null;
+      .exec() as PopulatedQuotaRecord | null;
 
-    return quota ? this.mapToQuotaResponse(quota) : null;
+    return quota;
   }
 
-  async markPaymentCompletedIfPending(quotaId: string): Promise<QuotaResponse | null> {
+  async markPaymentCompletedIfPending(quotaId: string, session?: ClientSession): Promise<PopulatedQuotaRecord | null> {
     const quota = await this._model
       .findOneAndUpdate(
         { _id: new Types.ObjectId(quotaId), paymentStatus: "pending" },
         { $set: { paymentStatus: "completed" } },
-        { new: true }
+        { new: true, session }
       )
       .populate([
         { path: "userId", select: "name email" },
         { path: "proId", select: "firstName lastName" },
         { path: "categoryId", select: "name image" },
       ])
-      .exec() as PopulatedQuotaDocument | null;
+      .exec() as PopulatedQuotaRecord | null;
 
-    return quota ? this.mapToQuotaResponse(quota) : null;
-  }
-
-  private mapToQuotaResponse(quota: PopulatedQuotaDocument): QuotaResponse {
-    return new QuotaResponse({
-      id: quota._id.toString(),
-      user: {
-        id: quota.userId._id.toString(),
-        name: quota.userId.name,
-        email: quota.userId.email,
-      },
-      pro: {
-        id: quota.proId._id.toString(),
-        firstName: quota.proId.firstName,
-        lastName: quota.proId.lastName,
-      },
-      bookingId: quota.bookingId.toString(),
-      category: {
-        id: quota.categoryId._id.toString(),
-        name: quota.categoryId.name,
-        image: quota.categoryId.image,
-      },
-      laborCost: quota.laborCost,
-      materialCost: quota.materialCost,
-      additionalCharges: quota.additionalCharges,
-      totalCost: quota.totalCost,
-      paymentStatus: quota.paymentStatus,
-      paymentIntentId: (quota as unknown as Record<string, unknown>).paymentIntentId as string,
-      createdAt: quota.createdAt,
-      updatedAt: quota.updatedAt,
-    });
+    return quota;
   }
 }

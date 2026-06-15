@@ -1,12 +1,9 @@
 import { injectable, inject } from "inversify";
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { TYPES } from "../types";
-import { IAdminService } from "../services/IAdminService";
+import type { IAdminService } from "../services/IAdminService";
 import { MESSAGES } from "../constants/messages";
 import { HttpError } from "../middleware/errorMiddleware";
-import { UserResponse } from "../dtos/response/userDtos";
-import { ProResponse } from "../dtos/response/proDtos";
-import { CategoryResponse } from "../dtos/response/categoryDtos";
 import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
@@ -45,7 +42,7 @@ export class AdminController {
       if (!name || !image) {
         throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.NAME_AND_EMAIL_REQUIRED);
       }
-      const category: CategoryResponse = await this._adminService.createCategory(name, image);
+      const category = await this._adminService.createCategory(name, image);
       res.status(HttpStatus.CREATED).json(category);
     } catch (error) {
       next(error);
@@ -92,7 +89,7 @@ export class AdminController {
   }
 
   async banUser(
-    req: Request<{ userId: string }, UserResponse | { message: string }, { isBanned: boolean }>,
+    req: Request<{ userId: string }, unknown, { isBanned: boolean }>,
     res: Response,
     next: NextFunction
   ): Promise<void> {
@@ -108,7 +105,7 @@ export class AdminController {
   }
 
   async banPro(
-    req: Request<{ proId: string }, ProResponse | { message: string }, { isBanned: boolean }>,
+    req: Request<{ proId: string }, unknown, { isBanned: boolean }>,
     res: Response,
     next: NextFunction
   ): Promise<void> {

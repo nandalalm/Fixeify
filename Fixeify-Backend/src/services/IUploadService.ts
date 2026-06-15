@@ -1,6 +1,7 @@
+import type { Request } from "express";
 
-import type { Express } from "express";
+export type UploadFile = NonNullable<Request["file"]>;
 
 export interface IUploadService {
-  uploadFile(file: Express.Multer.File, folder: string): Promise<string>;
+  uploadFile(file: UploadFile, folder: string): Promise<string>;
 }

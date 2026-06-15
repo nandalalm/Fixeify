@@ -1,35 +1,16 @@
-import { IChat } from "../models/chatModel";
-import { IMessage } from "../models/messageModel";
-import { MessageResponse } from "../dtos/response/chatDtos";
-import mongoose from "mongoose";
-
-export interface PopulatedUser {
-  _id: mongoose.Types.ObjectId;
-  name: string;
-}
-
-export interface PopulatedPro {
-  _id: mongoose.Types.ObjectId;
-  firstName: string;
-  lastName: string;
-}
-
-export type PopulatedChat = Omit<IChat, "participants" | "lastMessage"> & {
-  participants: {
-    userId: PopulatedUser;
-    proId: PopulatedPro;
-  };
-  lastMessage?: IMessage;
-};
+import type { IChat } from "../models/chatModel";
+import type { IMessage } from "../models/messageModel";
+import type { CreateMessageData, MessageListRecord, PopulatedChatRecord } from "../contracts/repository/chatRecords";
 
 export interface IChatRepository {
-  findById(chatId: string): Promise<PopulatedChat | null>;
+  findById(chatId: string): Promise<PopulatedChatRecord | null>;
   createChat(userId: string, proId: string): Promise<IChat>;
-  findChatByParticipants(userId: string, proId: string): Promise<PopulatedChat | null>;
-  findChatsByUser(userId: string): Promise<PopulatedChat[]>;
-  findChatsByPro(proId: string): Promise<PopulatedChat[]>;
-  createMessage(data: Partial<IMessage>): Promise<IMessage>;
-  findMessagesByChatId(chatId: string, page: number, limit: number): Promise<{ messages: MessageResponse[]; total: number }>;
+  findChatByParticipants(userId: string, proId: string): Promise<PopulatedChatRecord | null>;
+  findChatsByUser(userId: string): Promise<PopulatedChatRecord[]>;
+  findChatsByPro(proId: string): Promise<PopulatedChatRecord[]>;
+  createMessage(data: CreateMessageData): Promise<IMessage>;
+  findMessagesByChatId(chatId: string, page: number, limit: number): Promise<MessageListRecord>;
+  hasUserMessage(chatId: string): Promise<boolean>;
   updateChatLastMessage(chatId: string, message: IMessage): Promise<IChat | null>;
   updateUnreadCount(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro", increment: boolean): Promise<IChat | null>;
   markMessagesAsRead(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void>;

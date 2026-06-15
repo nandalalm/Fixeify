@@ -1,35 +1,41 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { IRatingReview, RatingReview } from "../models/ratingReviewModel";
-import { IRatingReviewRepository } from "./IRatingReviewRepository";
-
+import { type IRatingReview, RatingReview } from "../models/ratingReviewModel";
+import type { IRatingReviewRepository } from "./IRatingReviewRepository";
 import mongoose from "mongoose";
+import { MESSAGES } from "../constants/messages";
+import type {
+  CreateRatingReviewData,
+  PopulatedRatingReviewRecord,
+  RatingReviewListRecord,
+  RatingReviewTotalAggregateRecord,
+} from "../contracts/repository/ratingReviewRecords";
 
 @injectable()
 export class MongoRatingReviewRepository
-  extends BaseRepository<IRatingReview>
+  extends BaseRepository<IRatingReview, PopulatedRatingReviewRecord>
   implements IRatingReviewRepository
 {
   constructor() {
     super(RatingReview);
   }
 
-  async create(data: Partial<IRatingReview>): Promise<IRatingReview> {
+  async createRatingReview(data: CreateRatingReviewData): Promise<PopulatedRatingReviewRecord> {
     const doc = await RatingReview.create(data);
-    return (await doc.populate([
-      { path: "userId", select: "name email phoneNo photo" },
-      { path: "proId", select: "firstName lastName email phoneNumber profilePhoto" },
-      { path: "categoryId", select: "name image" },
-      { path: "bookingId", select: "issueDescription" },
-    ])) as unknown as IRatingReview;
+    const populated = await this.findById(doc._id.toString());
+    if (!populated) {
+      throw new Error(MESSAGES.NOT_FOUND);
+    }
+    return populated;
   }
 
-  async findById(id: string): Promise<IRatingReview | null> {
+  async findById(id: string): Promise<PopulatedRatingReviewRecord | null> {
     return RatingReview.findById(id)
       .populate({ path: "userId", select: "name email phoneNo photo" })
       .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
       .populate({ path: "categoryId", select: "name image" })
       .populate({ path: "bookingId", select: "issueDescription" })
+      .lean<PopulatedRatingReviewRecord>()
       .exec();
   }
 
@@ -39,7 +45,7 @@ export class MongoRatingReviewRepository
     limit: number = 5,
     sortBy?: "latest" | "oldest" | "lowest" | "highest",
     search?: string
-  ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }> {
+  ): Promise<RatingReviewListRecord> {
     const skip = (page - 1) * limit;
 
     let sort: Record<string, 1 | -1> = { createdAt: -1 };
@@ -108,20 +114,20 @@ export class MongoRatingReviewRepository
     pipeline.push({ $sort: sort }, { $skip: skip }, { $limit: limit });
 
     const [itemsAgg, totalAgg] = await Promise.all([
-      RatingReview.aggregate(pipeline),
-      RatingReview.aggregate(countPipeline),
+      RatingReview.aggregate<PopulatedRatingReviewRecord>(pipeline),
+      RatingReview.aggregate<RatingReviewTotalAggregateRecord>(countPipeline),
     ]);
 
     const total = totalAgg[0]?.total || 0;
 
-    return { items: itemsAgg as unknown as IRatingReview[], total, page, limit };
+    return { items: itemsAgg, total, page, limit };
   }
 
   async findByUserId(
     userId: string,
     page: number = 1,
     limit: number = 5
-  ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }> {
+  ): Promise<RatingReviewListRecord> {
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
       RatingReview.find({ userId: new mongoose.Types.ObjectId(userId) })
@@ -129,7 +135,7 @@ export class MongoRatingReviewRepository
         .populate({ path: "proId", select: "firstName lastName email phoneNumber profilePhoto" })
         .populate({ path: "categoryId", select: "name image" })
         .populate({ path: "bookingId", select: "issueDescription" })
-        
+        .lean<PopulatedRatingReviewRecord[]>()
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit),
@@ -143,7 +149,7 @@ export class MongoRatingReviewRepository
     limit: number = 5,
     sortBy?: "latest" | "oldest" | "lowest" | "highest",
     search?: string
-  ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }> {
+  ): Promise<RatingReviewListRecord> {
     const skip = (page - 1) * limit;
 
     let sort: Record<string, 1 | -1> = { createdAt: -1 }; 
@@ -210,12 +216,12 @@ export class MongoRatingReviewRepository
     pipeline.push({ $sort: sort }, { $skip: skip }, { $limit: limit });
 
     const [itemsAgg, totalAgg] = await Promise.all([
-      RatingReview.aggregate(pipeline),
-      RatingReview.aggregate(countPipeline),
+      RatingReview.aggregate<PopulatedRatingReviewRecord>(pipeline),
+      RatingReview.aggregate<RatingReviewTotalAggregateRecord>(countPipeline),
     ]);
 
     const total = totalAgg[0]?.total || 0;
-    return { items: itemsAgg as unknown as IRatingReview[], total, page, limit };
+    return { items: itemsAgg, total, page, limit };
   }
 
   async hasUserReviewedBookingOrQuota(

@@ -1,6 +1,6 @@
 import { injectable, inject } from "inversify";
-import { Request, Response } from "express";
-import { INotificationService } from "../services/INotificationService";
+import type { Request, Response } from "express";
+import type { INotificationService } from "../services/INotificationService";
 import { TYPES } from "../types";
 import { UserRole } from "../enums/roleEnum";
 import { MESSAGES } from "../constants/messages";
@@ -90,12 +90,12 @@ export class NotificationController {
       );
       res.status(HttpStatus.OK).json(result);
     } catch (error) {
-      logger.error("Failed to fetch message notifications", {
+      logger.error(MESSAGES.FAILED_TO_FETCH_MESSAGE_NOTIFICATIONS, {
         error: (error as Error).message,
         participantId,
         role,
       });
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch message notifications", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_FETCH_MESSAGE_NOTIFICATIONS, error: (error as Error).message });
     }
   }
 
@@ -118,12 +118,12 @@ export class NotificationController {
       );
       res.status(HttpStatus.OK).json(result);
     } catch (error) {
-      logger.error("Failed to fetch non-message notifications", {
+      logger.error(MESSAGES.FAILED_TO_FETCH_NON_MESSAGE_NOTIFICATIONS, {
         error: (error as Error).message,
         participantId,
         role,
       });
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch non-message notifications", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_FETCH_NON_MESSAGE_NOTIFICATIONS, error: (error as Error).message });
     }
   }
 
@@ -137,9 +137,9 @@ export class NotificationController {
       }
       const participantModel = role === UserRole.PRO ? "ApprovedPro" : role === UserRole.ADMIN ? "Admin" : "User";
       await this._notificationService.markAllMessageNotificationsAsRead(participantId, participantModel);
-      res.status(HttpStatus.OK).json({ message: "All message notifications marked as read" });
+      res.status(HttpStatus.OK).json({ message: MESSAGES.ALL_MESSAGE_NOTIFICATIONS_MARKED_AS_READ });
     } catch (error) {
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: "Failed to mark all message notifications as read", error: (error as Error).message });
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_MARK_ALL_MESSAGE_NOTIFICATIONS_AS_READ, error: (error as Error).message });
     }
   }
 }

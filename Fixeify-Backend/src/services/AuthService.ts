@@ -1,29 +1,35 @@
 import bcrypt from "bcryptjs";
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";
-import { IUserRepository } from "../repositories/IUserRepository";
-import { IAdminRepository } from "../repositories/IAdminRepository";
-import { IProRepository } from "../repositories/IProRepository";
+import type { IUserRepository } from "../repositories/IUserRepository";
+import type { IAdminRepository } from "../repositories/IAdminRepository";
+import type { IProRepository } from "../repositories/IProRepository";
 import { generateAccessToken, generateRefreshToken } from "../utils/jwtUtils";
-import { IUser } from "../models/userModel";
-import { IAdmin } from "../models/adminModel";
-import { ApprovedProDocument } from "../models/approvedProModel";
-import { UserResponse } from "../dtos/response/userDtos";
+import type { IUser } from "../models/userModel";
+import type { IAdmin } from "../models/adminModel";
+import type { ApprovedProDocument } from "../models/approvedProModel";
+import type { UserResponse } from "../dtos/response/userDtos";
 import RedisConnector from "../config/redisConnector";
 import nodemailer from "nodemailer";
 import { UserRole } from "../enums/roleEnum";
 import { getOtpEmailTemplate, getResetPasswordEmailTemplate } from "../utils/emailTemplates";
-import { IAuthService } from "./IAuthService";
+import type { IAuthService } from "./IAuthService";
 import { HttpError } from "../middleware/errorMiddleware";
 import logger from "../config/logger";
-import { mapUserDtoToModel } from "../utils/mappers";
 import { MESSAGES } from "../constants/messages";
 import jwt from "jsonwebtoken";
-import { Request, Response } from "express";
+import type { Request, Response } from "express";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
-import { INotificationService } from "./INotificationService";
+import type { INotificationService } from "./INotificationService";
 import { HttpStatus } from "../enums/httpStatus";
+import {
+  toAccountUserResponse,
+  toAdminUserResponse,
+  toCreateUserData,
+  toGoogleUserResponse,
+  toUserResponse,
+} from "../mappers/userMapper";
 
 @injectable()
 export class AuthService implements IAuthService {
@@ -73,11 +79,11 @@ export class AuthService implements IAuthService {
       await this._transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: email,
-        subject: "Your OTP Code",
+        subject: MESSAGES.EMAIL_SUBJECT_OTP_CODE,
         html: getOtpEmailTemplate(otp),
       });
     } catch (error) {
-      logger.error(MESSAGES.FAILED_SEND_OTP_EMAIL + ":", error);
+      logger.error(MESSAGES.FAILED_SEND_OTP_EMAIL, { error });
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_OTP_EMAIL);
     }
   }
@@ -99,43 +105,25 @@ export class AuthService implements IAuthService {
 
   async register(name: string, email: string, password: string, role: UserRole): Promise<UserResponse> {
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userData = mapUserDtoToModel({ name, email, password: hashedPassword });
+    const userData = toCreateUserData({ name, email, password: hashedPassword });
 
     if (role === UserRole.USER) {
       const newUser = await this._userRepository.createUser(userData);
       try {
         await this._notificationService.createNotification({
-          type: "general",
-          title: "Welcome to Fixeify!",
-          description: "Welcome to Fixeify! We're excited to have you on board. Start exploring our services and connect with skilled professionals.",
+          type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+          title: MESSAGES.NOTIFICATION_TITLE_WELCOME_FIXEIFY,
+          description: MESSAGES.NOTIFICATION_DESC_WELCOME_USER,
           userId: newUser.id
         });
       } catch (error) {
-        logger.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+        logger.error(MESSAGES.FAILED_SEND_NOTIFICATION, { error });
       }
 
-      return new UserResponse({
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        role: UserRole.USER,
-        phoneNo: newUser.phoneNo || null,
-        address: newUser.address || null,
-        photo: newUser.photo || null,
-        isBanned: newUser.isBanned || false,
-      });
+      return toUserResponse(newUser);
     } else if (role === UserRole.ADMIN) {
       const newAdmin = await this._adminRepository.createAdmin(userData);
-      return new UserResponse({
-        id: newAdmin.id,
-        name: newAdmin.name,
-        email: newAdmin.email,
-        role: UserRole.ADMIN,
-        phoneNo: null,
-        address: null,
-        photo: null,
-        isBanned: false,
-      });
+      return toAdminUserResponse(newAdmin);
     } else {
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ACCESS_DENIED);
     }
@@ -207,19 +195,7 @@ export class AuthService implements IAuthService {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    const userResponse = new UserResponse({
-      id: user.id,
-      name:
-        "name" in user
-          ? user.name
-          : `${(user as ApprovedProDocument).firstName || ""} ${(user as ApprovedProDocument).lastName || ""}`.trim(),
-      email: user.email,
-      role,
-      isBanned: "isBanned" in user ? user.isBanned : false,
-      phoneNo: "phoneNo" in user ? user.phoneNo : null,
-      address: "address" in user ? user.address : null,
-      photo: "photo" in user ? user.photo : null,
-    });
+    const userResponse = toAccountUserResponse(user);
 
     return {
       accessToken,
@@ -248,7 +224,7 @@ export class AuthService implements IAuthService {
         audience: process.env.GOOGLE_CLIENT_ID,
       });
     } catch (error) {
-      logger.error(MESSAGES.TOKEN_VERIFICATION_FAILED + ":", error);
+      logger.error(MESSAGES.TOKEN_VERIFICATION_FAILED, { error });
       throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.INVALID_GOOGLE_CREDENTIAL);
     }
 
@@ -260,7 +236,7 @@ export class AuthService implements IAuthService {
     let user = await this._userRepository.findUserByEmail(payload.email);
 
     if (!user) {
-      const userData = mapUserDtoToModel({
+      const userData = toCreateUserData({
         name: payload.name,
         email: payload.email,
         password: await bcrypt.hash(crypto.randomBytes(16).toString("hex"), 10),
@@ -269,13 +245,13 @@ export class AuthService implements IAuthService {
 
       try {
         await this._notificationService.createNotification({
-          type: "general",
-          title: "Welcome to Fixeify!",
-          description: "Welcome to Fixeify! Your Google account has been successfully linked. Start exploring our services and connect with skilled professionals.",
+          type: MESSAGES.NOTIFICATION_TYPE_GENERAL,
+          title: MESSAGES.NOTIFICATION_TITLE_WELCOME_FIXEIFY,
+          description: MESSAGES.NOTIFICATION_DESC_WELCOME_GOOGLE_USER,
           userId: user.id
         });
       } catch (error) {
-        logger.error(MESSAGES.FAILED_SEND_NOTIFICATION + ":", error);
+        logger.error(MESSAGES.FAILED_SEND_NOTIFICATION, { error });
       }
     }
 
@@ -297,16 +273,7 @@ export class AuthService implements IAuthService {
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    const userResponse = new UserResponse({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: UserRole.USER,
-      isBanned: user.isBanned || false,
-      phoneNo: user.phoneNo || null,
-      address: user.address || null,
-      photo: null,
-    });
+    const userResponse = toGoogleUserResponse(user);
 
     return {
       accessToken,
@@ -326,7 +293,7 @@ export class AuthService implements IAuthService {
     try {
       decoded = jwt.verify(refreshToken, secret) as { userId: string };
     } catch (err) {
-      logger.error(MESSAGES.TOKEN_VERIFICATION_FAILED + ":", err);
+      logger.error(MESSAGES.TOKEN_VERIFICATION_FAILED, { error: err });
       throw new HttpError(HttpStatus.UNAUTHORIZED, MESSAGES.INVALID_TOKEN);
     }
 
@@ -365,15 +332,12 @@ export class AuthService implements IAuthService {
 
   async getUserById(userId: string): Promise<UserResponse> {
     let user: IUser | IAdmin | ApprovedProDocument | null = await this._userRepository.findUserById(userId);
-    let role: UserRole = UserRole.USER;
 
     if (!user) {
       user = await this._adminRepository.findAdminById(userId);
-      role = UserRole.ADMIN;
     }
     if (!user) {
       user = await this._proRepository.findApprovedProById(userId);
-      role = UserRole.PRO;
     }
 
     if (!user) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.USER_NOT_FOUND);
@@ -382,19 +346,7 @@ export class AuthService implements IAuthService {
       throw new HttpError(HttpStatus.FORBIDDEN, MESSAGES.ACCOUNT_BANNED);
     }
 
-    return new UserResponse({
-      id: user.id,
-      name:
-        "name" in user
-          ? user.name
-          : `${(user as ApprovedProDocument).firstName || ""} ${(user as ApprovedProDocument).lastName || ""}`.trim(),
-      email: user.email,
-      role,
-      isBanned: "isBanned" in user ? user.isBanned : false,
-      phoneNo: "phoneNo" in user ? user.phoneNo : null,
-      address: "address" in user ? user.address : null,
-      photo: "photo" in user ? user.photo : null,
-    });
+    return toAccountUserResponse(user);
   }
 
   async logout(refreshToken: string, role: UserRole, res: Response): Promise<void> {
@@ -466,11 +418,11 @@ export class AuthService implements IAuthService {
       await this._transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: email,
-        subject: "Reset Your Fixeify Password",
+        subject: MESSAGES.EMAIL_SUBJECT_RESET_PASSWORD,
         html: getResetPasswordEmailTemplate(resetUrl),
       });
     } catch (error) {
-      logger.error(MESSAGES.FAILED_SEND_PASSWORD_RESET_EMAIL + ":", error);
+      logger.error(MESSAGES.FAILED_SEND_PASSWORD_RESET_EMAIL, { error });
       await this._redisConnector.getClient().del(resetTokenKey);
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.FAILED_SEND_PASSWORD_RESET_EMAIL);
     }

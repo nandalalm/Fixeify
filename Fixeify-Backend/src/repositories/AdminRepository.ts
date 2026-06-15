@@ -2,6 +2,7 @@ import Admin, { IAdmin } from "../models/adminModel";
 import { IAdminRepository, CreateAdminData } from "./IAdminRepository";
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
+import { ClientSession } from "mongoose";
 
 @injectable()
 export class MongoAdminRepository extends BaseRepository<IAdmin> implements IAdminRepository {
@@ -25,8 +26,8 @@ export class MongoAdminRepository extends BaseRepository<IAdmin> implements IAdm
     return this.updateById(adminId, { $inc: { revenue: amount } }); 
   }
 
-  async find(): Promise<IAdmin | null> {
-    return this._model.findOne().exec();
+  async find(session?: ClientSession): Promise<IAdmin | null> {
+    return this._model.findOne().session(session || null).exec();
   }
 
   async getAdminRevenue(adminId: string): Promise<number> {

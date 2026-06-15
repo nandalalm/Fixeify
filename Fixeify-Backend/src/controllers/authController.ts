@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from "express";
-import { IAuthService } from "../services/IAuthService";
+import type { Request, Response, NextFunction } from "express";
+import type { IAuthService } from "../services/IAuthService";
 import { LoginResponse } from "../dtos/response/userDtos";
 import { injectable, inject } from "inversify";
 import { TYPES } from "../types";

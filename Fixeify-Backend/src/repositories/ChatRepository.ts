@@ -1,32 +1,33 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { IChat, Chat } from "../models/chatModel";
-import { IMessage, MessageModel } from "../models/messageModel";
+import { type IChat, Chat } from "../models/chatModel";
+import { type IMessage, MessageModel } from "../models/messageModel";
 import logger from "../config/logger";
-import { IChatRepository,PopulatedUser,PopulatedPro,PopulatedChat } from "./IChatRepository";
-import {  MessageResponse } from "../dtos/response/chatDtos";
+import type { IChatRepository } from "./IChatRepository";
 import mongoose from "mongoose";
+import { MESSAGES } from "../constants/messages";
+import type { CreateMessageData, MessageListRecord, PopulatedChatProRecord, PopulatedChatRecord, PopulatedChatUserRecord } from "../contracts/repository/chatRecords";
 
 @injectable()
-export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> implements IChatRepository {
+export class MongoChatRepository extends BaseRepository<IChat, PopulatedChatRecord> implements IChatRepository {
   constructor() {
     super(Chat);
   }
 
-  async findById(chatId: string): Promise<PopulatedChat | null> {
+  async findById(chatId: string): Promise<PopulatedChatRecord | null> {
     if (!mongoose.Types.ObjectId.isValid(chatId)) {
-      throw new Error("Invalid chatId");
+      throw new Error(MESSAGES.CHATID_REQUIRED);
     }
     return this._model
       .findById(chatId)
-      .populate<{ participants: { userId: PopulatedUser; proId: PopulatedPro } }>({
+      .populate<{ participants: { userId: PopulatedChatUserRecord; proId: PopulatedChatProRecord } }>({
         path: "participants.userId",
-        select: "name",
+        select: "name photo",
         model: "User",
       })
-      .populate<{ participants: { userId: PopulatedUser; proId: PopulatedPro } }>({
+      .populate<{ participants: { userId: PopulatedChatUserRecord; proId: PopulatedChatProRecord } }>({
         path: "participants.proId",
-        select: "firstName lastName",
+        select: "firstName lastName profilePhoto",
         model: "ApprovedPro",
       })
       .populate<{ lastMessage?: IMessage }>({
@@ -34,13 +35,13 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
         select: "body senderId senderModel receiverId receiverModel type isRead status createdAt",
         model: "Message",
       })
-      .lean()
-      .exec() as Promise<PopulatedChat | null>;
+      .lean<PopulatedChatRecord>()
+      .exec();
   }
 
   async createChat(userId: string, proId: string): Promise<IChat> {
     if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(proId)) {
-      throw new Error("Invalid userId or proId");
+      throw new Error(MESSAGES.USERID_AND_PROID_REQUIRED);
     }
     return this.create({
       participants: {
@@ -54,9 +55,9 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
     });
   }
 
-  async findChatByParticipants(userId: string, proId: string): Promise<PopulatedChat | null> {
+  async findChatByParticipants(userId: string, proId: string): Promise<PopulatedChatRecord | null> {
     if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(proId)) {
-      throw new Error("Invalid userId or proId");
+      throw new Error(MESSAGES.USERID_AND_PROID_REQUIRED);
     }
     const query = {
       $or: [
@@ -72,14 +73,14 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
     };
     const chat = await this._model
       .findOne(query)
-      .populate<{ participants: { userId: PopulatedUser; proId: PopulatedPro } }>({
+      .populate<{ participants: { userId: PopulatedChatUserRecord; proId: PopulatedChatProRecord } }>({
         path: "participants.userId",
-        select: "name",
+        select: "name photo",
         model: "User",
       })
-      .populate<{ participants: { userId: PopulatedUser; proId: PopulatedPro } }>({
+      .populate<{ participants: { userId: PopulatedChatUserRecord; proId: PopulatedChatProRecord } }>({
         path: "participants.proId",
-        select: "firstName lastName",
+        select: "firstName lastName profilePhoto",
         model: "ApprovedPro",
       })
       .populate<{ lastMessage?: IMessage }>({
@@ -87,25 +88,25 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
         select: "body senderId senderModel receiverId receiverModel type isRead status createdAt",
         model: "Message",
       })
-      .lean()
+      .lean<PopulatedChatRecord>()
       .exec();
-    return chat as PopulatedChat | null;
+    return chat;
   }
 
-  async findChatsByUser(userId: string): Promise<PopulatedChat[]> {
+  async findChatsByUser(userId: string): Promise<PopulatedChatRecord[]> {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      throw new Error("Invalid userId");
+      throw new Error(MESSAGES.USERID_REQUIRED);
     }
-    const chats = await this._model
+    return this._model
       .find({ "participants.userId": new mongoose.Types.ObjectId(userId) })
-      .populate<{ participants: { userId: PopulatedUser; proId: PopulatedPro } }>({
+      .populate<{ participants: { userId: PopulatedChatUserRecord; proId: PopulatedChatProRecord } }>({
         path: "participants.userId",
-        select: "name",
+        select: "name photo",
         model: "User",
       })
-      .populate<{ participants: { userId: PopulatedUser; proId: PopulatedPro } }>({
+      .populate<{ participants: { userId: PopulatedChatUserRecord; proId: PopulatedChatProRecord } }>({
         path: "participants.proId",
-        select: "firstName lastName",
+        select: "firstName lastName profilePhoto",
         model: "ApprovedPro",
       })
       .populate<{ lastMessage?: IMessage }>({
@@ -113,25 +114,24 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
         select: "body senderId senderModel receiverId receiverModel type isRead status createdAt",
         model: "Message",
       })
-      .lean()
+      .lean<PopulatedChatRecord[]>()
       .exec();
-    return chats as PopulatedChat[];
   }
 
-  async findChatsByPro(proId: string): Promise<PopulatedChat[]> {
+  async findChatsByPro(proId: string): Promise<PopulatedChatRecord[]> {
     if (!mongoose.Types.ObjectId.isValid(proId)) {
-      throw new Error("Invalid proId");
+      throw new Error(MESSAGES.PROID_REQUIRED);
     }
-    const chats = await this._model
+    return this._model
       .find({ "participants.proId": new mongoose.Types.ObjectId(proId) })
-      .populate<{ participants: { userId: PopulatedUser; proId: PopulatedPro } }>({
+      .populate<{ participants: { userId: PopulatedChatUserRecord; proId: PopulatedChatProRecord } }>({
         path: "participants.userId",
-        select: "name",
+        select: "name photo",
         model: "User",
       })
-      .populate<{ participants: { userId: PopulatedUser; proId: PopulatedPro } }>({
+      .populate<{ participants: { userId: PopulatedChatUserRecord; proId: PopulatedChatProRecord } }>({
         path: "participants.proId",
-        select: "firstName lastName",
+        select: "firstName lastName profilePhoto",
         model: "ApprovedPro",
       })
       .populate<{ lastMessage?: IMessage }>({
@@ -139,57 +139,50 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
         select: "body senderId senderModel receiverId receiverModel type isRead status createdAt",
         model: "Message",
       })
-      .lean()
+      .lean<PopulatedChatRecord[]>()
       .exec();
-    return chats as PopulatedChat[];
   }
 
-  async createMessage(data: Partial<IMessage>): Promise<IMessage> {
+  async createMessage(data: CreateMessageData): Promise<IMessage> {
     if (!data.chatId || !data.senderId || !mongoose.Types.ObjectId.isValid(data.chatId) || !mongoose.Types.ObjectId.isValid(data.senderId)) {
-      throw new Error("Invalid chatId or senderId");
+      throw new Error(MESSAGES.CHATID_REQUIRED);
     }
     return MessageModel.create(data);
   }
 
-  async findMessagesByChatId(chatId: string, page: number, limit: number): Promise<{ messages: MessageResponse[]; total: number }> {
+  async findMessagesByChatId(chatId: string, page: number, limit: number): Promise<MessageListRecord> {
     try {
       const skip = (page - 1) * limit;
     
-      const messages = await MessageModel
-        .find({ chatId })
-        .sort([["createdAt", -1]])
-        .skip(skip)
-        .limit(limit)
-        .exec();
+      const query = { chatId: new mongoose.Types.ObjectId(chatId) };
+      const [messages, total] = await Promise.all([
+        MessageModel
+          .find(query)
+          .sort([["createdAt", -1]])
+          .skip(skip)
+          .limit(limit)
+          .exec(),
+        MessageModel.countDocuments(query),
+      ]);
 
-      const total = await MessageModel.countDocuments({ chatId });
-
-      return {
-        messages: messages.map((msg) => ({
-          id: msg._id.toString(),
-          chatId: msg.chatId.toString(),
-          senderId: msg.senderId.toString(),
-          senderModel: msg.senderModel,
-          receiverId: msg.receiverId.toString(),
-          receiverModel: msg.receiverModel,
-          content: msg.body,
-          timestamp: msg.createdAt.toISOString(),
-          isRead: msg.isRead,
-          attachments: msg.attachments || [],
-          type: msg.type || "text",
-          status: msg.isRead ? "read" : msg.status || "sent",
-        })),
-        total,
-      };
+      return { messages, total };
     } catch (error) {
-      logger.error("Error finding messages by chatId:", error);
+      logger.error(MESSAGES.FAILED_TO_FETCH_MESSAGES, error);
       throw error;
     }
   }
 
+  async hasUserMessage(chatId: string): Promise<boolean> {
+    const message = await MessageModel.exists({
+      chatId: new mongoose.Types.ObjectId(chatId),
+      senderModel: "User",
+    }).exec();
+    return message !== null;
+  }
+
   async updateChatLastMessage(chatId: string, message: IMessage): Promise<IChat | null> {
     if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(message._id)) {
-      throw new Error("Invalid chatId or messageId");
+      throw new Error(MESSAGES.CHATID_REQUIRED);
     }
     return this.updateById(chatId, {
       $set: { lastMessage: message._id, updatedAt: new Date() },
@@ -198,7 +191,7 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
 
   async updateUnreadCount(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro", increment: boolean): Promise<IChat | null> {
     if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
-      throw new Error("Invalid chatId or participantId");
+      throw new Error(MESSAGES.CHATID_REQUIRED);
     }
     return this._model
       .findByIdAndUpdate(
@@ -216,7 +209,7 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
 
   async markMessagesAsRead(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
     if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
-      throw new Error("Invalid chatId or participantId");
+      throw new Error(MESSAGES.CHATID_REQUIRED);
     }
     await MessageModel.updateMany(
       {
@@ -243,7 +236,7 @@ export class MongoChatRepository extends BaseRepository<IChat, PopulatedChat> im
 
   async markMessagesAsDelivered(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {
     if (!mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
-      throw new Error("Invalid chatId or participantId");
+      throw new Error(MESSAGES.CHATID_REQUIRED);
     }
    
     await MessageModel.updateMany(

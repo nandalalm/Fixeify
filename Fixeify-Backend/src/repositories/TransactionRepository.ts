@@ -1,8 +1,9 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import TransactionModel, { TransactionDocument } from "../models/transactionModel";
-import { ITransactionRepository, TransactionResponseDTO } from "./ITransactionRepository";
-import { Types } from "mongoose";
+import TransactionModel, { type TransactionDocument } from "../models/transactionModel";
+import type { ITransactionRepository } from "./ITransactionRepository";
+import { type ClientSession, Types } from "mongoose";
+import type { FindTransactionByKeysFilter, TransactionRecord } from "../contracts/repository/transactionRecords";
 
 @injectable()
 export class MongoTransactionRepository extends BaseRepository<TransactionDocument> implements ITransactionRepository {
@@ -10,7 +11,7 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
     super(TransactionModel);
   }
 
-  async findOneByKeys(filter: { bookingId: string; type: "credit" | "debit"; proId: string; amount: number; adminId?: string }): Promise<TransactionResponseDTO | null> {
+  async findOneByKeys(filter: FindTransactionByKeysFilter, session?: ClientSession): Promise<TransactionRecord | null> {
     const query: Record<string, Types.ObjectId | string | number> = {
       bookingId: new Types.ObjectId(filter.bookingId),
       type: filter.type,
@@ -20,14 +21,14 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
     if (filter.adminId) {
       query.adminId = new Types.ObjectId(filter.adminId);
     }
-    const doc = await TransactionModel.findOne(query).exec();
-    return doc ? this.map(doc) : null;
+    const doc = await TransactionModel.findOne(query).session(session || null).exec();
+    return doc;
   }
 
-  async createTransaction(data: Partial<TransactionDocument>): Promise<TransactionResponseDTO> {
+  async createTransaction(data: Partial<TransactionDocument>, session?: ClientSession): Promise<TransactionRecord> {
     try {
-      const created = await this._model.create(data);
-      return this.map(created);
+      const createdTransactions = await this._model.create([data], { session });
+      return createdTransactions[0];
     } catch (error: unknown) {
       if (error instanceof Error && 'code' in error && (error as { code: number }).code === 11000) {
         const existing = await this.findOneByKeys({
@@ -36,14 +37,14 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
           proId: data.proId!.toString(),
           amount: data.amount!,
           adminId: data.adminId?.toString()
-        });
+        }, session);
         if (existing) return existing;
       }
       throw error;
     }
   }
 
-  async findByProIdPaginated(proId: string, page: number, limit: number): Promise<{ transactions: TransactionResponseDTO[]; total: number }> {
+  async findByProIdPaginated(proId: string, page: number, limit: number): Promise<{ transactions: TransactionRecord[]; total: number }> {
     const p = Math.max(1, page || 1);
     const l = Math.max(1, limit || 5);
     const skip = (p - 1) * l;
@@ -59,10 +60,10 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
       this._model.countDocuments(query)
     ]);
 
-    return { transactions: docs.map(this.map), total };
+    return { transactions: docs, total };
   }
 
-  async findByAdminIdPaginated(adminId: string, page: number, limit: number): Promise<{ transactions: TransactionResponseDTO[]; total: number }> {
+  async findByAdminIdPaginated(adminId: string, page: number, limit: number): Promise<{ transactions: TransactionRecord[]; total: number }> {
     const p = Math.max(1, page || 1);
     const l = Math.max(1, limit || 5);
     const skip = (p - 1) * l;
@@ -78,23 +79,6 @@ export class MongoTransactionRepository extends BaseRepository<TransactionDocume
       this._model.countDocuments(query)
     ]);
 
-    return { transactions: docs.map(this.map), total };
+    return { transactions: docs, total };
   }
-
-  private map = (doc: TransactionDocument): TransactionResponseDTO => ({
-    id: doc._id.toString(),
-    transactionId: doc.transactionId,
-    proId: doc.proId.toString(),
-    walletId: doc.walletId ? doc.walletId.toString() : undefined,
-    amount: doc.amount,
-    type: doc.type,
-    date: doc.date,
-    description: doc.description,
-    bookingId: doc.bookingId ? doc.bookingId.toString() : undefined,
-    quotaId: doc.quotaId ? doc.quotaId.toString() : undefined,
-    adminId: doc.adminId ? doc.adminId.toString() : undefined,
-    createdAt: doc.createdAt,
-    updatedAt: doc.updatedAt,
-  });
 }
-

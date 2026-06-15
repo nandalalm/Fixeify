@@ -1,52 +1,20 @@
-import { UserRole } from "../../enums/roleEnum";
+import type { UserRole } from "../../enums/roleEnum";
 
-export class UserResponse {
-  public id: string;
-  public name: string;
-  public email: string;
-  public role: UserRole;
-  public photo?: string | null;
-  public phoneNo?: string | null;
-  public address?: {
+export interface UserResponse {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  photo?: string | null;
+  phoneNo?: string | null;
+  address?: {
     address: string;
     city: string;
     state: string;
     coordinates: { type: "Point"; coordinates: [number, number] };
   } | null;
-  public isBanned: boolean;
-  public createdAt?: Date;
-
-  constructor({
-    id,
-    name,
-    email,
-    role,
-    photo = null,
-    phoneNo = null,
-    address = null,
-    isBanned,
-    createdAt,
-  }: {
-    id: string;
-    name: string;
-    email: string;
-    role: UserRole;
-    photo?: string | null;
-    phoneNo?: string | null;
-    address?: { address: string; city: string; state: string; coordinates: { type: "Point"; coordinates: [number, number] } } | null;
-    isBanned: boolean;
-    createdAt?: Date;
-  }) {
-    this.id = id;
-    this.name = name;
-    this.email = email;
-    this.role = role;
-    this.photo = photo;
-    this.phoneNo = phoneNo;
-    this.address = address;
-    this.isBanned = isBanned;
-    this.createdAt = createdAt;
-  }
+  isBanned: boolean;
+  createdAt?: Date;
 }
 
 export class LoginResponse {

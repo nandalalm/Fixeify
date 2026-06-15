@@ -1,27 +1,31 @@
-import { IRatingReview } from "../models/ratingReviewModel";
+import type {
+  CreateRatingReviewData,
+  PopulatedRatingReviewRecord,
+  RatingReviewListRecord,
+} from "../contracts/repository/ratingReviewRecords";
 
 export interface IRatingReviewRepository {
-  create(data: Partial<IRatingReview>): Promise<IRatingReview>;
-  findById(id: string): Promise<IRatingReview | null>;
+  createRatingReview(data: CreateRatingReviewData): Promise<PopulatedRatingReviewRecord>;
+  findById(id: string): Promise<PopulatedRatingReviewRecord | null>;
   findByProId(
     proId: string,
     page: number,
     limit: number,
     sortBy?: "latest" | "oldest" | "lowest" | "highest",
     search?: string
-  ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }>;
+  ): Promise<RatingReviewListRecord>;
   findByUserId(
     userId: string,
     page: number,
     limit: number
-  ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }>;  
+  ): Promise<RatingReviewListRecord>;  
   
   findAll(
     page: number,
     limit: number,
     sortBy?: "latest" | "oldest" | "lowest" | "highest",
     search?: string
-  ): Promise<{ items: IRatingReview[]; total: number; page: number; limit: number }>;
+  ): Promise<RatingReviewListRecord>;
 
   
   hasUserReviewedBookingOrQuota(

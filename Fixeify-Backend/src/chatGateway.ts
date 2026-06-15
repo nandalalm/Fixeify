@@ -1,13 +1,13 @@
-import { Server, Socket } from "socket.io";
+import { Server, type Socket } from "socket.io";
 import { injectable, inject } from "inversify";
-import { IChatService } from "./services/IChatService";
-import { INotificationService } from "./services/INotificationService";
+import type { IChatService } from "./services/IChatService";
+import type { INotificationService } from "./services/INotificationService";
 import { TYPES } from "./types";
-import { MessageResponse } from "./dtos/response/chatDtos";
+import type { MessageResponse } from "./dtos/response/chatDtos";
 import mongoose from "mongoose";
-import jwt from "jsonwebtoken";
-import { JwtPayload } from "jsonwebtoken";
-import { Server as HttpServer } from "http";
+import jwt, { type JwtPayload } from "jsonwebtoken";
+import type { Server as HttpServer } from "http";
+import { MESSAGES } from "./constants/messages";
 
 declare const process: {
   env: {
@@ -64,12 +64,12 @@ export class ChatGateway {
       try {
         const token = socket.handshake.auth.token;
         if (!token) {
-          throw new Error("No token provided");
+          throw new Error(MESSAGES.NO_TOKEN_PROVIDED);
         }
 
         const secret = process.env.ACCESS_TOKEN_SECRET;
         if (!secret) {
-          throw new Error("Server configuration error: ACCESS_TOKEN_SECRET not set");
+          throw new Error(MESSAGES.ACCESS_TOKEN_SECRET_NOT_CONFIGURED);
         }
         const decoded = jwt.verify(token, secret) as JwtPayload;
         socket.userId = decoded.userId;
@@ -88,7 +88,7 @@ export class ChatGateway {
           socket.userRole = "admin";
           socket.userModel = "Admin";
         } else {
-          throw new Error("User not found");
+          throw new Error(MESSAGES.USER_NOT_FOUND);
         }
 
         this._connectedUsers.set(decoded.userId, {
@@ -101,7 +101,7 @@ export class ChatGateway {
 
         next();
       } catch {
-        next(new Error("Authentication failed"));
+        next(new Error(MESSAGES.AUTHENTICATION_FAILED));
       }
     });
 
@@ -126,21 +126,21 @@ export class ChatGateway {
       socket.on("joinChat", async ({ chatId, participantId, participantModel }: { chatId: string; participantId: string; participantModel: "User" | "ApprovedPro" }) => {
         try {
           if (socket.userId !== participantId) {
-            throw new Error("Unauthorized: User can only join their own chats");
+            throw new Error(MESSAGES.UNAUTHORIZED_OWN_CHAT_JOIN);
           }
 
           if (!chatId || !participantId || !mongoose.Types.ObjectId.isValid(chatId) || !mongoose.Types.ObjectId.isValid(participantId)) {
-            throw new Error("Invalid chatId or participantId");
+            throw new Error(MESSAGES.INVALID_CHAT_OR_PARTICIPANT);
           }
 
           const chat = await this.chatService.findById(chatId);
           if (!chat) {
-            throw new Error("Chat not found");
+            throw new Error(MESSAGES.CHAT_NOT_FOUND);
           }
 
           const isParticipant = chat.participants.userId === participantId || chat.participants.proId === participantId;
           if (!isParticipant) {
-            throw new Error("User is not a participant in this chat");
+            throw new Error(MESSAGES.USER_NOT_PARTICIPANT_IN_CHAT);
           }
 
           socket.join(chatId);
@@ -165,7 +165,7 @@ export class ChatGateway {
           socket.emit("onlineStatus", { userId: otherParticipantId, isOnline: isOtherOnline });
 
         } catch (error) {
-          socket.emit("error", { message: "Failed to join chat", error: (error as Error).message });
+          socket.emit("error", { message: MESSAGES.FAILED_TO_JOIN_CHAT, error: (error as Error).message });
         }
       });
 
@@ -197,20 +197,20 @@ export class ChatGateway {
       socket.on("sendMessage", async (data: SocketMessage) => {
         try {
           if (socket.userId !== data.senderId) {
-            throw new Error("Unauthorized: User can only send messages as themselves");
+            throw new Error(MESSAGES.UNAUTHORIZED_SEND_MESSAGES_AS_SELF);
           }
 
           if (!data.chatId || !data.senderId || !mongoose.Types.ObjectId.isValid(data.chatId) || !mongoose.Types.ObjectId.isValid(data.senderId)) {
-            throw new Error("Invalid chatId or senderId");
+            throw new Error(MESSAGES.INVALID_CHAT_OR_SENDER);
           }
 
           if (!data.role || !["user", "pro"].includes(data.role)) {
-            throw new Error("Valid role is required");
+            throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
           }
 
           const senderModel = data.role === "pro" ? "ApprovedPro" : "User";
           if ((senderModel === "User" && data.role !== "user") || (senderModel === "ApprovedPro" && data.role !== "pro")) {
-            throw new Error("Role does not match expected participant model");
+            throw new Error(MESSAGES.ROLE_MISMATCH_PARTICIPANT_MODEL);
           }
 
           const message: MessageResponse = await this.chatService.sendMessage({ ...data, senderModel });
@@ -234,7 +234,7 @@ export class ChatGateway {
           }
 
         } catch (error) {
-          socket.emit("error", { message: "Failed to send message", error: (error as Error).message });
+          socket.emit("error", { message: MESSAGES.FAILED_TO_SEND_MESSAGE, error: (error as Error).message });
         }
       });
 
@@ -242,7 +242,7 @@ export class ChatGateway {
       socket.on("markMessageRead", async ({ chatId, messageId }: { chatId: string; messageId?: string }) => {
         try {
           if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
-            throw new Error("Invalid chatId");
+            throw new Error(MESSAGES.INVALID_CHATID);
           }
 
           const participantModel = socket.userRole === "pro" ? "ApprovedPro" : "User";
@@ -273,7 +273,7 @@ export class ChatGateway {
           }
 
         } catch (error) {
-          socket.emit("error", { message: "Failed to mark message as read", error: (error as Error).message });
+          socket.emit("error", { message: MESSAGES.FAILED_TO_MARK_MESSAGE_AS_READ, error: (error as Error).message });
         }
       });
 

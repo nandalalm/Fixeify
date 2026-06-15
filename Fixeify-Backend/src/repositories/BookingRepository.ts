@@ -1,9 +1,19 @@
 import { injectable } from "inversify";
 import { BaseRepository } from "./baseRepository";
-import { IBookingRepository, PopulatedUser, PopulatedPro, PopulatedCategory, PopulatedBookingDocument, PopulatedLeanBooking } from "./IBookingRepository";
-import Booking, { BookingDocument, ITimeSlot } from "../models/bookingModel";
-import { BookingResponse, BookingCompleteResponse } from "../dtos/response/bookingDtos";
-import mongoose from "mongoose";
+import type { IBookingRepository } from "./IBookingRepository";
+import Booking, { type BookingDocument } from "../models/bookingModel";
+import mongoose, { type ClientSession, type FilterQuery } from "mongoose";
+import { MESSAGES } from "../constants/messages";
+import type { BookingTimeSlot } from "../contracts/api/bookingTypes";
+import type {
+  BookingCompleteRecord,
+  BookingConflictQueryRecord,
+  BookingListProjectionRecord,
+  PopulatedBookingCategoryRecord,
+  PopulatedBookingProRecord,
+  PopulatedBookingRecord,
+  PopulatedBookingUserRecord,
+} from "../contracts/repository/bookingRecords";
 
 
 @injectable()
@@ -12,18 +22,23 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     super(Booking);
   }
 
-  async createBooking(bookingData: Partial<BookingDocument>): Promise<BookingResponse> {
+  async createBooking(bookingData: Partial<BookingDocument>, session?: ClientSession): Promise<PopulatedBookingRecord> {
+    const createdBookings = await this._model.create([bookingData], { session });
     const booking = await this._model
-      .create(bookingData)
-      .then((doc) =>
-        doc.populate([
-          { path: "userId", select: "name email photo" },
-          { path: "proId", select: "firstName lastName profilePhoto" },
-          { path: "categoryId", select: "name image" },
-        ])
-      ) as PopulatedBookingDocument;
+      .findById(createdBookings[0]._id)
+      .session(session || null)
+      .populate([
+        { path: "userId", select: "name email photo" },
+        { path: "proId", select: "firstName lastName profilePhoto" },
+        { path: "categoryId", select: "name image" },
+      ])
+      .exec() as PopulatedBookingRecord | null;
 
-    return this.mapToBookingResponse(booking as PopulatedBookingDocument);
+    if (!booking) {
+      throw new Error(MESSAGES.BOOKING_NOT_FOUND_AFTER_CREATION);
+    }
+
+    return booking;
   }
 
   async fetchBookingDetails(
@@ -34,10 +49,10 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     status?: string,
     sortBy: "latest" | "oldest" = "latest",
     bookingId?: string
-  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+  ): Promise<{ bookings: BookingListProjectionRecord[]; total: number }> {
     const skip = (page - 1) * limit;
 
-    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId) };
+    const query: FilterQuery<BookingDocument> = { userId: new mongoose.Types.ObjectId(userId) };
 
     if (status && status.trim().length > 0) {
       const statusArray = status.split(",").map((s) => s.trim());
@@ -46,7 +61,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       query.status = { $in: ["pending", "accepted"] };
     }
 
-    const orClauses: Record<string, unknown>[] = [];
+    const orClauses: FilterQuery<BookingDocument>[] = [];
     if (search && search.trim().length > 0) {
       orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
@@ -66,7 +81,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
 
     const bookings = await this._model
       .find(query)
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+      .populate<{ userId: PopulatedBookingUserRecord; proId: PopulatedBookingProRecord; categoryId: PopulatedBookingCategoryRecord }>([
         { path: "userId", select: "name email photo" },
         { path: "proId", select: "firstName lastName profilePhoto" },
         { path: "categoryId", select: "name image" },
@@ -74,14 +89,11 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .lean()
-      .exec() as PopulatedLeanBooking[];
+      .lean<BookingListProjectionRecord[]>()
+      .exec();
 
     const total = await this._model.countDocuments(query).exec();
-    return {
-      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)),
-      total,
-    };
+    return { bookings, total };
   }
 
   async fetchBookingHistoryDetails(
@@ -92,9 +104,9 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     status?: string,
     sortBy: "latest" | "oldest" = "latest",
     bookingId?: string
-  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+  ): Promise<{ bookings: BookingListProjectionRecord[]; total: number }> {
     const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { userId: new mongoose.Types.ObjectId(userId) };
+    const query: FilterQuery<BookingDocument> = { userId: new mongoose.Types.ObjectId(userId) };
 
     const historyStatuses = ["completed", "rejected", "cancelled"];
     if (status && status.trim().length > 0) {
@@ -104,7 +116,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       query.status = { $in: historyStatuses };
     }
 
-    const orClauses: Record<string, unknown>[] = [];
+    const orClauses: FilterQuery<BookingDocument>[] = [];
     if (search && search.trim().length > 0) {
       orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
@@ -124,7 +136,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
 
     const bookings = await this._model
       .find(query)
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+      .populate<{ userId: PopulatedBookingUserRecord; proId: PopulatedBookingProRecord; categoryId: PopulatedBookingCategoryRecord }>([
         { path: "userId", select: "name email photo" },
         { path: "proId", select: "firstName lastName profilePhoto" },
         { path: "categoryId", select: "name image" },
@@ -132,14 +144,11 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .lean()
-      .exec() as PopulatedLeanBooking[];
+      .lean<BookingListProjectionRecord[]>()
+      .exec();
 
     const total = await this._model.countDocuments(query).exec();
-    return {
-      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)),
-      total,
-    };
+    return { bookings, total };
   }
 
   async fetchProBookings(
@@ -150,9 +159,9 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     sortBy: "latest" | "oldest" = "latest",
     search?: string,
     bookingId?: string
-  ): Promise<{ bookings: BookingResponse[]; total: number }> {
+  ): Promise<{ bookings: BookingListProjectionRecord[]; total: number }> {
     const skip = (page - 1) * limit;
-    const query: Record<string, unknown> = { proId: new mongoose.Types.ObjectId(proId) };
+    const query: FilterQuery<BookingDocument> = { proId: new mongoose.Types.ObjectId(proId) };
     if (status) {
       const statusArray = status.split(",").map(s => s.trim());
       if (statusArray.length > 1) {
@@ -162,7 +171,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       }
     }
 
-    const orClauses: Record<string, unknown>[] = [];
+    const orClauses: FilterQuery<BookingDocument>[] = [];
     if (search) {
       orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
@@ -183,7 +192,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     (sort as Record<string, 1 | -1>)._id = sortBy === "oldest" ? 1 : -1;
     const bookings = await this._model
       .find(query)
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+      .populate<{ userId: PopulatedBookingUserRecord; proId: PopulatedBookingProRecord; categoryId: PopulatedBookingCategoryRecord }>([
         { path: "userId", select: "name email photo" },
         { path: "proId", select: "firstName lastName profilePhoto" },
         { path: "categoryId", select: "name image" },
@@ -191,27 +200,24 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .lean()
-      .exec() as PopulatedLeanBooking[];
+      .lean<BookingListProjectionRecord[]>()
+      .exec();
 
     const total = await this._model.countDocuments(query).exec();
-    return {
-      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)),
-      total
-    };
+    return { bookings, total };
   }
 
-  async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, status?: string, sortBy: "latest" | "oldest" = "latest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
+  async fetchAllBookings(page: number = 1, limit: number = 5, search?: string, status?: string, sortBy: "latest" | "oldest" = "latest", bookingId?: string): Promise<{ bookings: BookingListProjectionRecord[]; total: number }> {
     const skip = (page - 1) * limit;
 
 
-    const query: Record<string, unknown> = {};
+    const query: FilterQuery<BookingDocument> = {};
 
     if (status) {
       query.status = status;
     }
 
-    const orClauses: Record<string, unknown>[] = [];
+    const orClauses: FilterQuery<BookingDocument>[] = [];
     if (search) {
       orClauses.push(
         { issueDescription: { $regex: search, $options: "i" } },
@@ -238,7 +244,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
 
     const bookings = await this._model
       .find(query)
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+      .populate<{ userId: PopulatedBookingUserRecord; proId: PopulatedBookingProRecord; categoryId: PopulatedBookingCategoryRecord }>([
         { path: "userId", select: "name email photo" },
         { path: "proId", select: "firstName lastName profilePhoto" },
         { path: "categoryId", select: "name image" },
@@ -246,93 +252,49 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       .sort(sort)
       .skip(skip)
       .limit(limit)
-      .lean()
-      .exec() as PopulatedLeanBooking[];
+      .lean<BookingListProjectionRecord[]>()
+      .exec();
 
     const total = await this._model.countDocuments(query).exec();
-    return {
-      bookings: bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument)),
-      total
-    };
+    return { bookings, total };
   }
 
-  async updateBooking(bookingId: string, updateData: Partial<BookingDocument>): Promise<BookingDocument | null> {
-    return this._model.findByIdAndUpdate(bookingId, updateData, { new: true }).exec();
+  async updateBooking(bookingId: string, updateData: Partial<BookingDocument>, session?: ClientSession): Promise<BookingDocument | null> {
+    return this._model.findByIdAndUpdate(bookingId, updateData, { new: true, session }).exec();
   }
 
-  async findBookingById(bookingId: string): Promise<BookingDocument | null> {
-    return this._model.findById(bookingId).exec();
+  async findBookingById(bookingId: string, session?: ClientSession): Promise<BookingDocument | null> {
+    return this._model.findById(bookingId).session(session || null).exec();
   }
 
-  async findBookingByIdPopulated(bookingId: string): Promise<BookingResponse | null> {
+  async findBookingByIdPopulated(bookingId: string): Promise<PopulatedBookingRecord | null> {
     const booking = await this._model
       .findById(bookingId)
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+      .populate<{ userId: PopulatedBookingUserRecord; proId: PopulatedBookingProRecord; categoryId: PopulatedBookingCategoryRecord }>([
         { path: "userId", select: "name email" },
         { path: "proId", select: "firstName lastName" },
         { path: "categoryId", select: "name image" },
       ])
-      .lean()
-      .exec() as PopulatedLeanBooking | null;
+      .lean<PopulatedBookingRecord | null>()
+      .exec();
 
-    return booking ? this.mapToBookingResponse(booking as PopulatedBookingDocument) : null;
+    return booking;
   }
 
-  async findBookingByIdComplete(bookingId: string): Promise<BookingCompleteResponse | null> {
+  async findBookingByIdComplete(bookingId: string): Promise<BookingCompleteRecord | null> {
     const isObjectId = mongoose.Types.ObjectId.isValid(bookingId);
     const query = isObjectId ? { _id: new mongoose.Types.ObjectId(bookingId) } : { bookingId };
     const booking = await this._model
       .findOne(query)
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
+      .populate<{ userId: PopulatedBookingUserRecord; proId: PopulatedBookingProRecord; categoryId: PopulatedBookingCategoryRecord }>([
         { path: "userId", select: "name email photo" },
         { path: "proId", select: "firstName lastName profilePhoto email phoneNumber" },
         { path: "categoryId", select: "name image" },
       ])
-      .lean()
-      .exec() as PopulatedLeanBooking | null;
+      .lean<BookingCompleteRecord | null>()
+      .exec();
 
-    return booking ? this.mapToBookingCompleteResponse(booking as PopulatedBookingDocument) : null;
-  }
-
-  private mapToBookingCompleteResponse(booking: PopulatedBookingDocument): BookingCompleteResponse {
-    return new BookingCompleteResponse({
-      id: booking._id.toString(),
-      bookingId: booking.bookingId,
-      user: {
-        id: booking.userId._id.toString(),
-        name: booking.userId.name,
-        email: booking.userId.email,
-        photo: (booking.userId as unknown as Record<string, unknown>).photo as string,
-      },
-      pro: {
-        id: booking.proId._id.toString(),
-        firstName: booking.proId.firstName,
-        lastName: booking.proId.lastName,
-        profilePhoto: (booking.proId as unknown as Record<string, unknown>).profilePhoto as string,
-        email: (booking.proId as unknown as Record<string, unknown>).email as string,
-        phoneNumber: (booking.proId as unknown as Record<string, unknown>).phoneNumber as string,
-      },
-      category: {
-        id: booking.categoryId._id.toString(),
-        name: booking.categoryId.name,
-        image: booking.categoryId.image,
-      },
-      issueDescription: booking.issueDescription,
-      location: booking.location,
-      phoneNumber: booking.phoneNumber,
-      preferredDate: booking.preferredDate,
-      preferredTime: booking.preferredTime,
-      status: booking.status,
-      rejectedReason: booking.rejectedReason,
-      cancelReason: booking.cancelReason,
-      createdAt: booking.createdAt,
-      updatedAt: booking.updatedAt,
-      isRated: booking.isRated,
-      hasComplaintRaisedByPro: booking.hasComplaintRaisedByPro,
-      hasComplaintRaisedByUser: booking.hasComplaintRaisedByUser,
-      adminRevenue: booking.adminRevenue,
-      proRevenue: booking.proRevenue,
-    });
+    return booking;
   }
 
   async cancelBooking(bookingId: string, updateData: { status: string; cancelReason: string }): Promise<void> {
@@ -342,16 +304,17 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
   async findBookingsByProAndDate(
     proId: string,
     preferredDate: Date,
-    timeSlots: ITimeSlot[],
+    timeSlots: BookingTimeSlot[],
     status: string,
-    excludeBookingId?: string
-  ): Promise<BookingResponse[]> {
+    excludeBookingId?: string,
+    session?: ClientSession
+  ): Promise<BookingConflictQueryRecord[]> {
     const startOfDay = new Date(preferredDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(preferredDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const query: Record<string, unknown> = {
+    const query: FilterQuery<BookingDocument> = {
       proId: new mongoose.Types.ObjectId(proId),
       preferredDate: { $gte: startOfDay, $lte: endOfDay },
       status,
@@ -371,30 +334,27 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
 
     const bookings = await this._model
       .find(query)
-      .populate<{ userId: PopulatedUser; proId: PopulatedPro; categoryId: PopulatedCategory }>([
-        { path: "userId", select: "name email" },
-        { path: "proId", select: "firstName lastName" },
-        { path: "categoryId", select: "name image" },
-      ])
-      .lean()
-      .exec() as PopulatedLeanBooking[];
+      .session(session || null)
+      .lean<BookingConflictQueryRecord[]>()
+      .exec();
 
-    return bookings.map((booking) => this.mapToBookingResponse(booking as PopulatedBookingDocument));
+    return bookings;
   }
 
   async findBookingsByUserProDateTime(
     userId: string,
     proId: string,
     preferredDate: Date,
-    timeSlots: ITimeSlot[],
-    status: string
-  ): Promise<BookingDocument[]> {
+    timeSlots: BookingTimeSlot[],
+    status: string,
+    session?: ClientSession
+  ): Promise<BookingConflictQueryRecord[]> {
     const startOfDay = new Date(preferredDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(preferredDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const query: Record<string, unknown> = {
+    const query: FilterQuery<BookingDocument> = {
       userId: new mongoose.Types.ObjectId(userId),
       proId: new mongoose.Types.ObjectId(proId),
       preferredDate: { $gte: startOfDay, $lte: endOfDay },
@@ -409,7 +369,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       },
     };
 
-    return await this._model.find(query).lean().exec();
+    return await this._model.find(query).session(session || null).lean<BookingConflictQueryRecord[]>().exec();
   }
 
   async getTrendingService(): Promise<{ categoryId: string; name: string; bookingCount: number } | null> {
@@ -486,45 +446,6 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       ])
       .exec();
     return (result as Array<{ categoryId: string; name: string; image?: string; bookingCount: number }>);
-  }
-
-  private mapToBookingResponse(booking: PopulatedBookingDocument): BookingResponse {
-    return new BookingResponse({
-      id: booking._id.toString(),
-      bookingId: booking.bookingId,
-      user: {
-        id: booking.userId._id.toString(),
-        name: booking.userId.name,
-        email: booking.userId.email,
-        photo: booking.userId.photo,
-      },
-      pro: {
-        id: booking.proId._id.toString(),
-        firstName: booking.proId.firstName,
-        lastName: booking.proId.lastName,
-        profilePhoto: booking.proId.profilePhoto,
-      },
-      category: {
-        id: booking.categoryId._id.toString(),
-        name: booking.categoryId.name,
-        image: booking.categoryId.image,
-      },
-      issueDescription: booking.issueDescription,
-      location: booking.location,
-      phoneNumber: booking.phoneNumber,
-      preferredDate: booking.preferredDate,
-      preferredTime: booking.preferredTime,
-      status: booking.status,
-      rejectedReason: booking.rejectedReason,
-      cancelReason: booking.cancelReason,
-      createdAt: booking.createdAt,
-      updatedAt: booking.updatedAt,
-      isRated: booking.isRated,
-      hasComplaintRaisedByPro: booking.hasComplaintRaisedByPro,
-      hasComplaintRaisedByUser: booking.hasComplaintRaisedByUser,
-      adminRevenue: booking.adminRevenue,
-      proRevenue: booking.proRevenue,
-    });
   }
 
   async getAdminRevenueMetrics(): Promise<{
