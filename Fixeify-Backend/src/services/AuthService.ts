@@ -33,7 +33,6 @@ import {
 
 @injectable()
 export class AuthService implements IAuthService {
-  private _redisConnector: RedisConnector;
   private _transporter = nodemailer.createTransport({
     service: "gmail",
     auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
@@ -48,10 +47,8 @@ export class AuthService implements IAuthService {
     @inject(TYPES.IAdminRepository) private _adminRepository: IAdminRepository,
     @inject(TYPES.IProRepository) private _proRepository: IProRepository,
     @inject(TYPES.INotificationService) private _notificationService: INotificationService,
-    @inject(TYPES.RedisConnector) redisConnector: RedisConnector
-  ) {
-    this._redisConnector = redisConnector;
-  }
+    @inject(TYPES.RedisConnector) private _redisConnector: RedisConnector
+  ) { }
 
   async sendOtp(email: string, role?: UserRole): Promise<void> {
     if (role === UserRole.USER) {

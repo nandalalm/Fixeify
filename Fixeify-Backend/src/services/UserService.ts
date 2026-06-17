@@ -41,16 +41,6 @@ declare const process: {
 
 @injectable()
 export class UserService implements IUserService {
-  async getBookingById(bookingId: string): Promise<BookingCompleteResponse | null> {
-    const booking = await this._bookingRepository.findBookingByIdComplete(bookingId);
-    return booking ? toBookingCompleteResponse(booking) : null;
-  }
-
-  async getQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null> {
-    const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
-    return quota ? toQuotaResponse(quota) : null;
-  }
-
   private _stripe: Stripe;
 
   constructor(
@@ -67,6 +57,17 @@ export class UserService implements IUserService {
       apiVersion: "2025-06-30.basil",
     });
   }
+
+  async getBookingById(bookingId: string): Promise<BookingCompleteResponse | null> {
+    const booking = await this._bookingRepository.findBookingByIdComplete(bookingId);
+    return booking ? toBookingCompleteResponse(booking) : null;
+  }
+
+  async getQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null> {
+    const quota = await this._quotaRepository.findQuotaByBookingId(bookingId);
+    return quota ? toQuotaResponse(quota) : null;
+  }
+
   async getUserProfile(userId: string): Promise<UserResponse | null> {
     const user = await this._userRepository.findUserById(userId);
     if (!user) return null;

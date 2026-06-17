@@ -7,11 +7,7 @@ import { HttpStatus } from "../enums/httpStatus";
 
 @injectable()
 export class UploadController {
-  private uploadService: IUploadService;
-
-  constructor(@inject(TYPES.IUploadService) uploadService: IUploadService) {
-    this.uploadService = uploadService;
-  }
+  constructor(@inject(TYPES.IUploadService) private _uploadService: IUploadService) { }
 
   async uploadFile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -28,7 +24,7 @@ export class UploadController {
         return;
       }
 
-      const imageUrl = await this.uploadService.uploadFile(file, folder);
+      const imageUrl = await this._uploadService.uploadFile(file, folder);
 
       res.status(HttpStatus.OK).json({ imageUrl });
     } catch (error) {

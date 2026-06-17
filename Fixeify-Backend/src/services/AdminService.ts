@@ -45,24 +45,18 @@ declare const process: {
 
 @injectable()
 export class AdminService implements IAdminService {
-  private _redisConnector: RedisConnector;
-  private _quotaRepository: IQuotaRepository;
-
   constructor(
     @inject(TYPES.IUserRepository) private _userRepository: IUserRepository,
     @inject(TYPES.IProRepository) private _proRepository: IProRepository,
     @inject(TYPES.ICategoryRepository) private _categoryRepository: ICategoryRepository,
     @inject(TYPES.IBookingRepository) private _bookingRepository: IBookingRepository,
-    @inject(TYPES.IQuotaRepository) quotaRepository: IQuotaRepository,
+    @inject(TYPES.IQuotaRepository) private _quotaRepository: IQuotaRepository,
     @inject(TYPES.IWalletRepository) private _walletRepository: IWalletRepository,
     @inject(TYPES.IWithdrawalRequestRepository) private _withdrawalRequestRepository: IWithdrawalRequestRepository,
     @inject(TYPES.ITransactionRepository) private _transactionRepository: ITransactionRepository,
     @inject(TYPES.INotificationService) private _notificationService: INotificationService,
-    @inject(TYPES.RedisConnector) redisConnector: RedisConnector
-  ) {
-    this._redisConnector = redisConnector;
-    this._quotaRepository = quotaRepository;
-  }
+    @inject(TYPES.RedisConnector) private _redisConnector: RedisConnector
+  ) { }
 
   async getAdminTransactions(adminId: string, page: number, limit: number): Promise<{ transactions: TransactionResponse[]; total: number }> {
     const { transactions, total } = await this._transactionRepository.findByAdminIdPaginated(adminId, page, limit);

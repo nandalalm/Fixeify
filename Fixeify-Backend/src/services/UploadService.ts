@@ -4,10 +4,10 @@ import { IUploadService, UploadFile } from "./IUploadService";
 
 @injectable()
 export class UploadService implements IUploadService {
-  private s3Client: S3Client;
+  private _s3Client: S3Client;
 
   constructor() {
-    this.s3Client = new S3Client({
+    this._s3Client = new S3Client({
       region: process.env.AWS_REGION,
       credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
@@ -26,7 +26,7 @@ export class UploadService implements IUploadService {
       ContentType: file.mimetype,
     });
 
-    await this.s3Client.send(command);
+    await this._s3Client.send(command);
 
     return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
   }
