@@ -2,7 +2,7 @@ import { Router } from "express";
 import { Container } from "inversify";
 import { TYPES } from "../types";
 import { UploadController } from "../controllers/uploadController";
-import { authenticateToken } from "../middleware/authMiddleware";
+import { authenticateToken, requireAnyRole } from "../middleware/authMiddleware";
 import multer from "multer";
 
 const storage = multer.memoryStorage();
@@ -22,7 +22,7 @@ export default function createUploadRoutes(container: Container): Router {
   const router = Router();
   const uploadController = container.get<UploadController>(TYPES.UploadController);
 
-  router.post("/", authenticateToken, upload.single("file"), (req, res, next) => uploadController.uploadFile(req, res, next));
+  router.post("/", authenticateToken, requireAnyRole, upload.single("file"), (req, res, next) => uploadController.uploadFile(req, res, next));
 
   router.post("/public", upload.single("file"), (req, res, next) => {
     const { folder } = req.body;
