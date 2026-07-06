@@ -15,7 +15,7 @@ import Footer from "../../components/User/Footer";
 import { JSX, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { AppDispatch, RootState } from "@/store/store";
-import { fetchReviewsByPro } from "@/store/ratingReviewSlice";
+import { fetchReviewsByPro, clearReviews } from "@/store/ratingReviewSlice";
 import { Star } from "lucide-react";
 import { getProAvailability } from "../../api/proApi"; 
 
@@ -26,11 +26,17 @@ const ProDetails = () => {
   const categoryId = location.state?.categoryId as string | undefined;
   const selectedLocation = location.state?.location as ILocation | undefined;
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const [pro, setPro] = useState<IApprovedPro | undefined>(proFromState);
   const dispatch = useDispatch<AppDispatch>();
   const { items: reviews, loading, total, page } = useSelector((state: RootState) => state.ratingReview);
 
   useEffect(() => {
+    // Clear stale reviews from a previous pro immediately to prevent flash, then fetch fresh ones
+    dispatch(clearReviews());
     if (proFromState?._id) {
       dispatch(fetchReviewsByPro({ proId: proFromState._id, page: 1, limit: 3, append: false }));
     }

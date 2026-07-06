@@ -6,7 +6,7 @@ import { LocateFixed } from "lucide-react";
 import { getProProfile, updateProProfile } from "../../api/proApi";
 import { ProProfile } from "../../interfaces/proInterface";
 import { updateUser } from "../../store/authSlice";
-import { uploadFileToS3 } from "../../api/uploadApi";
+import { uploadFile } from "../../api/uploadApi";
 import { z } from "zod";
 import { editProProfileSchema } from "../../Validation/editProProfileSchema";
 import { LocationData, EditProProfileFormData } from "../../interfaces/proInterface";
@@ -255,8 +255,8 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
     }
   };
 
-  const uploadToS3 = async (file: File): Promise<string> => {
-    return await uploadFileToS3(file, "profile-photos");
+  const handleUpload = async (file: File): Promise<string> => {
+    return await uploadFile(file, "profile-photos");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -283,7 +283,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
 
       try {
         setIsUploadingProfilePhoto(true);
-        const url = await uploadToS3(file);
+        const url = await handleUpload(file);
         setFormData((prev) => ({ ...prev, profilePhoto: url }));
         validateField("profilePhoto", url);
       } catch (error) {
@@ -327,7 +327,7 @@ const EditProProfile = ({ onCancel }: EditProProfileProps) => {
 
       try {
         setIsUploadingProfilePhoto(true);
-        const url = await uploadToS3(file);
+        const url = await handleUpload(file);
         setFormData((prev) => ({ ...prev, profilePhoto: url }));
         validateField("profilePhoto", url);
       } catch (error) {

@@ -1,7 +1,7 @@
 import { type FC, useState, useEffect, useCallback } from "react";
 import { updateCategory } from "../../api/adminApi";
 import { ICategory } from "../../interfaces/adminInterface";
-import { uploadFileToS3 } from "../../api/uploadApi";
+import { uploadFile } from "../../api/uploadApi";
 import { ConfirmationModal } from "../Reuseable/ConfirmationModal";
 import { ArrowLeft } from "lucide-react";
 import Cropper from "react-easy-crop";
@@ -85,8 +85,8 @@ export const EditCategory: FC<EditCategoryProps> = ({ onClose, onSuccess, catego
     return undefined;
   };
 
-  const uploadToS3 = async (file: File): Promise<string> => {
-    return await uploadFileToS3(file, "category-images");
+  const handleUpload = async (file: File): Promise<string> => {
+    return await uploadFile(file, "category-images");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,7 +148,7 @@ export const EditCategory: FC<EditCategoryProps> = ({ onClose, onSuccess, catego
 
       // Upload in background
       setIsUploadingImage(true);
-      const url = await uploadToS3(croppedImage);
+      const url = await handleUpload(croppedImage);
       setImage(url);
     } catch (error) {
       console.error('Failed to upload category image:', error);

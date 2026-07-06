@@ -17,6 +17,11 @@ import BookingFormSuccess from "./BookingFormSuccess";
 const BookingForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const { proId } = useParams<{ proId: string }>();
   const { user } = useSelector((state: RootState) => state.auth);
   const userId = user?.id || "";
@@ -396,20 +401,20 @@ const BookingForm = () => {
           className="w-full max-w-md"
         >
           {isLoadingProfile ? (
-            <div className="text-center">
-              <svg
-                className="animate-spin h-8 w-8 text-[#032B44] mx-auto"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z"
-                />
-              </svg>
+            <div className="space-y-6 animate-pulse">
+              <div>
+                <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded-md" />
+              </div>
+              <div>
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md" />
+              </div>
+              <div>
+                <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded-md" />
+              </div>
+              <div className="h-10 bg-gray-300 dark:bg-gray-600 rounded-md" />
             </div>
           ) : bookingDetails ? (
             <BookingFormSuccess bookingDetails={bookingDetails} navigate={navigate} proId={proId} pro={pro} categoryId={categoryId} location={selectedLocation} />

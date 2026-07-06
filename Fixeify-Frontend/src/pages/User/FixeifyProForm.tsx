@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { uploadFileToS3 } from "../../api/uploadApi";
+import { uploadFile } from "../../api/uploadApi";
 import api from "../../api/axios";
 import Navbar from "../../components/User/Navbar";
 import Footer from "../../components/User/Footer";
@@ -368,8 +368,8 @@ const FixeifyProForm = () => {
     }
   };
 
-  const uploadToS3 = async (file: File, folder: string): Promise<string> => {
-    return await uploadFileToS3(file, folder, true);
+  const handleUpload = async (file: File, folder: string): Promise<string> => {
+    return await uploadFile(file, folder, true);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, field: "profilePhoto" | "idProof") => {
@@ -403,11 +403,11 @@ const FixeifyProForm = () => {
       try {
         if (field === "profilePhoto") {
           setIsUploadingProfilePhoto(true);
-          const url = await uploadToS3(validFiles[0], "profile-photos");
+          const url = await handleUpload(validFiles[0], "profile-photos");
           setFormData((prev) => ({ ...prev, profilePhotoUrl: url }));
         } else {
           setIsUploadingIdProof(true);
-          const urls = await Promise.all(validFiles.map((file) => uploadToS3(file, "id-proofs")));
+          const urls = await Promise.all(validFiles.map((file) => handleUpload(file, "id-proofs")));
           // Replace object URLs with real S3 URLs
           setFormData((prev) => {
             const newIdProofUrls = [...prev.idProofUrls];
@@ -458,11 +458,11 @@ const FixeifyProForm = () => {
 
         if (field === "profilePhoto") {
           setIsUploadingProfilePhoto(true);
-          const url = await uploadToS3(validFiles[0], "profile-photos");
+          const url = await handleUpload(validFiles[0], "profile-photos");
           setFormData((prev) => ({ ...prev, profilePhotoUrl: url }));
         } else {
           setIsUploadingIdProof(true);
-          const urls = await Promise.all(validFiles.map((file) => uploadToS3(file, "id-proofs")));
+          const urls = await Promise.all(validFiles.map((file) => handleUpload(file, "id-proofs")));
           // Replace object URLs with real S3 URLs
           setFormData((prev) => {
             const newIdProofUrls = [...prev.idProofUrls];

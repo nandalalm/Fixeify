@@ -69,6 +69,13 @@ const ratingReviewSlice = createSlice({
     resetError(state) {
       state.error = null;
     },
+    clearReviews(state) {
+      state.items = [];
+      state.total = 0;
+      state.page = 1;
+      state.loading = false;
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -114,5 +121,5 @@ const ratingReviewSlice = createSlice({
   },
 });
 
-export const { resetError } = ratingReviewSlice.actions;
+export const { resetError, clearReviews } = ratingReviewSlice.actions;
 export default ratingReviewSlice.reducer;

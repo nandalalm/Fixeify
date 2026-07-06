@@ -4,7 +4,6 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { RootState, AppDispatch } from "../../store/store";
 import { UserRole, User } from "../../store/authSlice";
 import Navbar from "../../components/User/Navbar";
-import Footer from "../../components/User/Footer";
 import MessageBox from "../../components/Messaging/MessageBox";
 import { createChat, fetchConversationMessages, markMessagesRead, fetchExistingChat } from "../../store/chatSlice";
 import { fetchApprovedProById } from "../../api/adminApi";
@@ -136,7 +135,6 @@ const ChatPage = () => {
         <div className="flex justify-center items-center flex-1">
           <div className="spinner border-t-4 border-blue-500 rounded-full w-12 h-12 animate-spin"></div>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -148,7 +146,6 @@ const ChatPage = () => {
         <div className="flex justify-center items-center flex-1 text-red-500 dark:text-red-400">
           {error || "Failed to load chat"}
         </div>
-        <Footer />
       </div>
     );
   }
@@ -167,7 +164,6 @@ const ChatPage = () => {
           />
         </div>
       </main>
-      <Footer />
     </div>
   );
 };

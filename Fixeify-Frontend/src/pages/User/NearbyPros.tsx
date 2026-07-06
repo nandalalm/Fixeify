@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, Link, useNavigate } from "react-router-dom";
 import { getNearbyPros } from "../../api/userApi";
 import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
@@ -73,6 +73,11 @@ const ProCard = ({ pro }: { pro: IApprovedPro }) => {
 const NearbyPros = () => {
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const queryParams = new URLSearchParams(location.search);
   const categoryId = queryParams.get("categoryId") || "";
   const stateLocation = location.state?.location as ILocation | undefined;
@@ -91,7 +96,7 @@ const NearbyPros = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [selectAll, setSelectAll] = useState(false);
-  const [hasEverLoadedPros, setHasEverLoadedPros] = useState(false);
+  const hasEverLoadedProsRef = useRef(false);
   const [isFilterApplied, setIsFilterApplied] = useState(false);
   
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -134,8 +139,8 @@ const NearbyPros = () => {
       }
       
       // Track if we've ever successfully loaded pros (to distinguish no pros vs no filtered results)
-      if (!hasEverLoadedPros && response.total > 0) {
-        setHasEverLoadedPros(true);
+      if (!hasEverLoadedProsRef.current && response.total > 0) {
+        hasEverLoadedProsRef.current = true;
       }
       
       setError(null);
@@ -150,7 +155,7 @@ const NearbyPros = () => {
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [selectedLocation, navigate, categoryId, sortBy, availabilityFilter, hasEverLoadedPros]);
+  }, [selectedLocation, navigate, categoryId, sortBy, availabilityFilter]);
 
   const loadMorePros = () => {
     const nextPage = currentPage + 1;
@@ -426,7 +431,7 @@ const NearbyPros = () => {
             </>
           ) : (
             // Show different messages based on whether filters are applied or no pros exist in area
-            (getActiveFiltersCount() > 0) && hasEverLoadedPros ? (
+            (getActiveFiltersCount() > 0) && hasEverLoadedProsRef.current ? (
               // Filtered results but no matches
               <div className="flex mb-[50px] flex-col items-center justify-center py-12">
                 <div className="text-6xl mb-4">🔍</div>

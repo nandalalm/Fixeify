@@ -231,14 +231,7 @@ const authSlice = createSlice({
         localStorage.removeItem("isAuthenticatedManuallySet");
         disconnectSocket();
       })
-      .addCase(checkBanStatus.pending, (state) => {
-        state.status = "loading";
-      })
-      .addCase(checkBanStatus.fulfilled, (state) => {
-        state.status = "succeeded";
-      })
       .addCase(checkBanStatus.rejected, (state, action) => {
-        state.status = "failed";
         state.error = action.payload as string;
       })
       .addCase(logoutUser.pending, (state) => {

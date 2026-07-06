@@ -2,7 +2,7 @@ import express, { Router } from "express";
 import { Container } from "inversify";
 import { TYPES } from "../types";
 import { ProController } from "../controllers/proController";
-import { authenticateToken, requirePro } from "../middleware/authMiddleware";
+import { authenticateToken, requirePro, requireAnyRole } from "../middleware/authMiddleware";
 
 export default function createProRoutes(container: Container): Router {
   const router = express.Router();
@@ -16,7 +16,7 @@ export default function createProRoutes(container: Container): Router {
   
   router.put("/updateProfile/:id", authenticateToken, requirePro, proController.updateProfile.bind(proController));
   router.put("/changePassword/:id", authenticateToken, requirePro, proController.changePassword.bind(proController));
-  router.get("/fetchAvailability/:id", authenticateToken, requirePro, proController.getAvailability.bind(proController));
+  router.get("/fetchAvailability/:id", authenticateToken, requireAnyRole, proController.getAvailability.bind(proController));
   router.put("/updateAvailability/:id", authenticateToken, requirePro, proController.updateAvailability.bind(proController));
   router.get("/bookings/:id", authenticateToken, requirePro, proController.fetchProBookings.bind(proController));
   router.get("/booking/:id", authenticateToken, requirePro, proController.getBookingById.bind(proController));

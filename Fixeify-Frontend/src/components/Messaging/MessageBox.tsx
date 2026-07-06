@@ -6,7 +6,7 @@ import { Message, User } from "../../interfaces/messagesInterface";
 import { getSocket, isSocketConnected } from "../../services/socket";
 import { fetchConversationMessages, updateOnlineStatus, updateMessageStatus, addIncomingMessage, setConversationLastMessageStatus } from "../../store/chatSlice";
 import { sendNewMessage } from "../../api/chatApi";
-import { uploadFileToS3 } from "../../api/uploadApi";
+import { uploadFile } from "../../api/uploadApi";
 
 
 
@@ -140,8 +140,8 @@ const MessageBox: FC<MessageBoxProps> = ({
   };
 
   // S3 Upload function
-  const uploadToS3 = async (file: File, folder: string): Promise<string> => {
-    return await uploadFileToS3(file, folder);
+  const handleUpload = async (file: File, folder: string): Promise<string> => {
+    return await uploadFile(file, folder);
   };
 
   // Handle image selection with better validation
@@ -524,7 +524,7 @@ const MessageBox: FC<MessageBoxProps> = ({
 
         // Upload image to S3 if selected
         if (selectedImage) {
-          const imageUrl = await uploadToS3(selectedImage, "chat-images");
+          const imageUrl = await handleUpload(selectedImage, "chat-images");
           attachments = [{
             url: imageUrl,
             mime: selectedImage.type,

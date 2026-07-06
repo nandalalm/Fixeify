@@ -51,7 +51,9 @@ export class ChatGateway {
   public init(server: HttpServer): void {
     this._io = new Server(server, {
       cors: {
-        origin: process.env.FRONTEND_URL,
+        origin: process.env.FRONTEND_URLS
+          ? process.env.FRONTEND_URLS.split(",").map((s) => s.trim()).filter(Boolean)
+          : process.env.FRONTEND_URL,
         methods: ["GET", "POST"],
         credentials: true,
       },

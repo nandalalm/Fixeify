@@ -7,7 +7,7 @@ import { RootState, AppDispatch } from "../../store/store";
 import { updateUserProfile, getUserProfile } from "../../api/userApi";
 import { UserProfile } from "../../interfaces/userInterface";
 import { updateUser } from "../../store/authSlice";
-import { uploadFileToS3 } from "../../api/uploadApi";
+import { uploadFile } from "../../api/uploadApi";
 import { LocateFixed } from "lucide-react";
 import { z } from "zod";
 import { editProfileSchema } from "../../Validation/editProfileSchema";
@@ -270,8 +270,8 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
     }
   };
 
-  const uploadToS3 = async (file: File): Promise<string> => {
-    return await uploadFileToS3(file, "profile-photos");
+  const handleUpload = async (file: File): Promise<string> => {
+    return await uploadFile(file, "profile-photos");
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -296,7 +296,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
 
       try {
         setIsUploadingProfilePhoto(true);
-        const url = await uploadToS3(file);
+        const url = await handleUpload(file);
         setFormData((prev) => ({ ...prev, photo: url }));
         validateField("photo", url);
       } catch {
@@ -335,7 +335,7 @@ const EditProfile = ({ onCancel }: EditProfileProps) => {
 
       try {
         setIsUploadingProfilePhoto(true);
-        const url = await uploadToS3(file);
+        const url = await handleUpload(file);
         setFormData((prev) => ({ ...prev, photo: url }));
         validateField("photo", url);
       } catch {

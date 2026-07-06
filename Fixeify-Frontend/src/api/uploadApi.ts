@@ -1,6 +1,6 @@
 import api from "./axios";
 
-export const uploadFileToS3 = async (file: File, folder: string, isPublic: boolean = false): Promise<string> => {
+export const uploadFile = async (file: File, folder: string, isPublic: boolean = false): Promise<string> => {
   const formData = new FormData();
   formData.append("file", file);
   formData.append("folder", folder);

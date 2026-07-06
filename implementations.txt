@@ -1,0 +1,65 @@
+========================================================
+  AWS S3 → CLOUDINARY MIGRATION PLAN
+========================================================
+
+MUST-FOLLOW RULES (adhere strictly throughout):
+  - No `any` type — use proper TypeScript types everywhere
+  - No code comments
+  - No console.log statements
+  - Follow SOLID principles already in place (Repository–Service–Controller, DI via InversifyJS)
+  - IUploadService interface contract must not change — only the implementation changes
+  - Rename uploadFileToS3 → uploadFile across frontend (S3 name is misleading after migration)
+
+--------------------------------------------------------
+STEPS
+--------------------------------------------------------
+
+[x] STEP 1 — Install cloudinary package in backend
+    File : Fixeify-Backend/package.json
+    Action: run `npm install cloudinary` in Fixeify-Backend
+    Note  : also run `npm uninstall @aws-sdk/client-s3 @aws-sdk/s3-request-presigner`
+
+[x] STEP 2 — Replace UploadService.ts (backend)
+    File  : Fixeify-Backend/src/services/UploadService.ts
+    Action: Remove S3Client / PutObjectCommand logic.
+            Configure cloudinary.v2 with env vars in constructor.
+            Use cloudinary.uploader.upload_stream() to stream multer
+            buffer directly to Cloudinary. Return result.secure_url.
+
+[x] STEP 3 — Update backend .env
+    File  : Fixeify-Backend/.env
+    Action: Remove AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+            AWS_REGION, AWS_BUCKET_NAME.
+            Add CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY,
+            CLOUDINARY_API_SECRET.
+
+[x] STEP 4 — Rename uploadFileToS3 → uploadFile in frontend API
+    File  : Fixeify-Frontend/src/api/uploadApi.ts
+    Action: Rename exported function from uploadFileToS3 to uploadFile.
+            No logic change — endpoint stays the same.
+
+[x] STEP 5 — Update all frontend call sites (import + usage rename)
+    Files :
+      - Fixeify-Frontend/src/components/Admin/AddCategory.tsx
+      - Fixeify-Frontend/src/components/Admin/EditCategory.tsx
+      - Fixeify-Frontend/src/components/Messaging/MessageBox.tsx
+      - Fixeify-Frontend/src/components/Pro/EditProProfile.tsx
+      - Fixeify-Frontend/src/components/User/EditProfile.tsx
+      - Fixeify-Frontend/src/pages/User/FixeifyProForm.tsx
+    Action: Update import { uploadFileToS3 } → import { uploadFile }
+            Update all local wrapper function names (uploadToS3 → uploadFile).
+            Update all call sites accordingly.
+
+[x] STEP 6 — Remove @aws-sdk/client-s3 from frontend
+    File  : Fixeify-Frontend/package.json
+    Action: run `npm uninstall @aws-sdk/client-s3` in Fixeify-Frontend
+
+[x] STEP 7 — Clean up frontend .env (already clean — verify)
+    File  : Fixeify-Frontend/.env
+    Action: Confirm no VITE_AWS_* vars remain (already absent — just verify).
+
+[x] STEP 8 — Build verification
+    Action: Run `npm run build` in Fixeify-Backend to confirm tsc compiles
+            with no errors after removing aws-sdk types.
+
+========================================================
