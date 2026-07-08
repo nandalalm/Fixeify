@@ -6,6 +6,7 @@
     "dev": "nodemon src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "seed:categories": "node dist/scripts/seedCategories.js",
     "lint": "eslint src/"
   },
   "keywords": [],
@@ -27,12 +28,14 @@
     "ioredis": "^5.7.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.13.2",
+    "morgan": "^1.10.0",
     "multer": "^2.0.2",
     "nodemailer": "^6.10.0",
     "redis": "^4.7.0",
     "reflect-metadata": "^0.2.2",
     "socket.io": "^4.8.1",
-    "stripe": "^18.3.0"
+    "stripe": "^18.3.0",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
@@ -47,8 +50,6 @@
     "@typescript-eslint/eslint-plugin": "^8.29.0",
     "@typescript-eslint/parser": "^8.29.0",
     "eslint": "^9.24.0",
-    "morgan": "^1.10.0",
-    "nodemon": "^3.1.9",
-    "winston": "^3.17.0"
+    "nodemon": "^3.1.9"
   }
 }
