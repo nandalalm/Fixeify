@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import mongoose from "mongoose";
+import logger from "../config/logger";
 import { CategoryModel } from "../models/categoryModel";
 
 dotenv.config();
@@ -36,12 +37,12 @@ const seedCategories = async (): Promise<void> => {
   }
 
   const total = await CategoryModel.countDocuments();
-  console.log(`Seeded ${categories.length} categories. Total categories: ${total}`);
+  logger.info(`Seeded ${categories.length} categories. Total categories: ${total}`);
 };
 
 seedCategories()
   .catch((error) => {
-    console.error("Failed to seed categories:", error);
+    logger.error("Failed to seed categories:", error);
     process.exitCode = 1;
   })
   .finally(async () => {
