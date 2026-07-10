@@ -190,6 +190,7 @@ export class ChatService implements IChatService {
     }
 
     await this._chatRepository.markMessagesAsRead(chatId, participantId, participantModel);
+    await this._notificationService.markChatMessageNotificationsAsRead(participantId, participantModel, chatId);
   }
 
   async markMessagesAsDelivered(chatId: string, participantId: string, participantModel: "User" | "ApprovedPro"): Promise<void> {

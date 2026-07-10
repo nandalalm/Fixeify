@@ -9,4 +9,5 @@ export interface INotificationService {
   markNotificationAsRead(notificationId: string): Promise<void>;
   markAllNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void>;
   markAllMessageNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin"): Promise<void>;
+  markChatMessageNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin", chatId: string): Promise<void>;
 }

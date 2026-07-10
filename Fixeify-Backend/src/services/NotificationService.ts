@@ -121,4 +121,12 @@ export class NotificationService implements INotificationService {
     if (!mongoose.Types.ObjectId.isValid(participantId)) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
     await this._notificationRepository.markAllMessageNotificationsAsRead(participantId, participantModel);
   }
+
+  async markChatMessageNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin", chatId: string): Promise<void> {
+    if (!participantId || !chatId) throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.ALL_FIELDS_REQUIRED);
+    if (!mongoose.Types.ObjectId.isValid(participantId) || !mongoose.Types.ObjectId.isValid(chatId)) {
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.SERVER_ERROR);
+    }
+    await this._notificationRepository.markChatMessageNotificationsAsRead(participantId, participantModel, chatId);
+  }
 }

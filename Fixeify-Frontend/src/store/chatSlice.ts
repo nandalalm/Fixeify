@@ -701,8 +701,9 @@ const chatSlice = createSlice({
       })
       .addCase(markChatMessageNotificationsRead.fulfilled, (state, action) => {
         const { chatId } = action.meta.arg;
-        state.messageNotifications = state.messageNotifications.map(notification => 
-          notification.chatId === chatId ? { ...notification, isRead: true } : notification
+        state.messageNotifications = state.messageNotifications.filter(notification => notification.chatId !== chatId);
+        state.notifications = state.notifications.map(notification =>
+          notification.chatId === chatId && notification.type === "message" ? { ...notification, isRead: true } : notification
         );
         state.status = "succeeded";
       })

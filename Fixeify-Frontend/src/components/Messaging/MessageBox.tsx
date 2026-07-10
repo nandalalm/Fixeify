@@ -4,7 +4,7 @@ import { AppDispatch, RootState } from "../../store/store";
 import { Check, CheckCheck, Send, ArrowLeft, ChevronDown, X, Image as ImageIcon, User as UserIcon } from "lucide-react";
 import { Message, User } from "../../interfaces/messagesInterface";
 import { getSocket, isSocketConnected } from "../../services/socket";
-import { fetchConversationMessages, updateOnlineStatus, updateMessageStatus, addIncomingMessage, setConversationLastMessageStatus } from "../../store/chatSlice";
+import { fetchConversationMessages, updateOnlineStatus, updateMessageStatus, addIncomingMessage, setConversationLastMessageStatus, markChatMessageNotificationsRead } from "../../store/chatSlice";
 import { sendNewMessage } from "../../api/chatApi";
 import { uploadFile } from "../../api/uploadApi";
 
@@ -262,13 +262,14 @@ const MessageBox: FC<MessageBoxProps> = ({
     if (socket && isSocketConnected()) {
       const role = currentUser.role as Role;
       if (isValidChatRole(role)) {
+        const notificationRole: "user" | "pro" = role === Role.PRO ? "pro" : "user";
         socket.emit("joinChat", {
           chatId: conversationId,
           participantId: currentUser.id,
           participantModel: role === Role.PRO ? "ApprovedPro" : "User",
         });
-        // Mark existing unread messages as read since user opened MessageBox
         socket.emit("markMessageRead", { chatId: conversationId });
+        dispatch(markChatMessageNotificationsRead({ userId: currentUser.id, role: notificationRole, chatId: conversationId }));
       }
     }
 
@@ -379,6 +380,9 @@ const MessageBox: FC<MessageBoxProps> = ({
             if (socket && isSocketConnected()) {
               socket.emit("markMessageRead", { chatId: conversationId, messageId: message.id });
             }
+            if (currentUser.role === "user" || currentUser.role === "pro") {
+              dispatch(markChatMessageNotificationsRead({ userId: currentUser.id, role: currentUser.role, chatId: conversationId }));
+            }
           }
         }
       };
@@ -467,7 +471,7 @@ const MessageBox: FC<MessageBoxProps> = ({
         socket.off("error", handleError);
       };
     }
-  }, [socket, conversationId, currentUser.id, dispatch]);
+  }, [socket, conversationId, currentUser.id, currentUser.role, dispatch]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

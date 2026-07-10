@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import Navbar from "../../components/User/Navbar";
-import Footer from "../../components/User/Footer";
 import ProfileInfo from "../../components/User/ProfileInfo";
 import EditProfile from "../../components/User/EditProfile";
 import ChangePassword from "../../components/User/ChangePassword";
@@ -223,7 +222,6 @@ const Profile = () => {
           {activeTab === "Conflicts" && <UserConflicts />}
         </div>
       </div>
-      <Footer />
       <ConfirmationModal
         isOpen={showLogoutModal}
         onConfirm={handleLogoutConfirm}

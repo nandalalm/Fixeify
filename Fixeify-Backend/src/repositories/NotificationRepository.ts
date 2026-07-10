@@ -80,6 +80,29 @@ export class MongoNotificationRepository extends BaseRepository<INotification> i
     await this.markNotificationsAsRead(participantId, participantModel, "message");
   }
 
+  async markChatMessageNotificationsAsRead(participantId: string, participantModel: "User" | "ApprovedPro" | "Admin", chatId: string): Promise<void> {
+    if (!mongoose.Types.ObjectId.isValid(participantId) || !mongoose.Types.ObjectId.isValid(chatId)) {
+      throw new Error(MESSAGES.ALL_FIELDS_REQUIRED);
+    }
+
+    const participantObjectId = new mongoose.Types.ObjectId(participantId);
+    const filter: FilterQuery<INotification> = {
+      type: "message",
+      chatId: new mongoose.Types.ObjectId(chatId),
+      isRead: false,
+    };
+
+    if (participantModel === "User") {
+      filter.userId = participantObjectId;
+    } else if (participantModel === "ApprovedPro") {
+      filter.proId = participantObjectId;
+    } else {
+      filter.adminId = participantObjectId;
+    }
+
+    await this._model.updateMany(filter, { isRead: true }).exec();
+  }
+
   private async findNotificationsByParticipant(
     participantField: "userId" | "proId" | "adminId",
     participantId: string,

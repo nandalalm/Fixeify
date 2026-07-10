@@ -142,4 +142,20 @@ export class NotificationController {
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_MARK_ALL_MESSAGE_NOTIFICATIONS_AS_READ, error: (error as Error).message });
     }
   }
+
+  async markChatMessageNotificationsAsRead(req: Request, res: Response): Promise<void> {
+    const { role, participantId, chatId } = req.params;
+
+    try {
+      if (!participantId || !chatId) throw new Error(MESSAGES.ALL_FIELDS_REQUIRED);
+      if (!role || !this.isUserRole(role)) {
+        throw new Error(MESSAGES.VALID_ROLE_REQUIRED);
+      }
+      const participantModel = role === UserRole.PRO ? "ApprovedPro" : role === UserRole.ADMIN ? "Admin" : "User";
+      await this._notificationService.markChatMessageNotificationsAsRead(participantId, participantModel, chatId);
+      res.status(HttpStatus.OK).json({ message: MESSAGES.ALL_MESSAGE_NOTIFICATIONS_MARKED_AS_READ });
+    } catch (error) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: MESSAGES.FAILED_TO_MARK_ALL_MESSAGE_NOTIFICATIONS_AS_READ, error: (error as Error).message });
+    }
+  }
 }

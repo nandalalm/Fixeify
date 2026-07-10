@@ -14,6 +14,7 @@ export default function createNotificationRoutes(container: Container): Router {
   router.put("/read/:notificationId", authenticateToken, requireAnyRole, notificationController.markNotificationAsRead.bind(notificationController));
   router.put("/read-all/:role/:participantId", authenticateToken, requireAnyRole, notificationController.markAllNotificationsAsRead.bind(notificationController));
   router.put("/read-all-messages/:role/:participantId", authenticateToken, requireAnyRole, notificationController.markAllMessageNotificationsAsRead.bind(notificationController));
+  router.put("/read-chat-messages/:role/:participantId/:chatId", authenticateToken, requireAnyRole, notificationController.markChatMessageNotificationsAsRead.bind(notificationController));
 
   return router;
 }
