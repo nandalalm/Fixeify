@@ -2,8 +2,6 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { getTicketsByComplainant, getTicketById } from "@/api/ticketApi";
-import { getUserProfile } from "@/api/userApi";
-import { getProProfile } from "@/api/proApi";
 import { TicketResponse } from "@/interfaces/ticketInterface";
 import TicketTable from "@/components/Reuseable/TicketTable";
 import TicketDetails from "@/components/Reuseable/TicketDetails";
@@ -28,32 +26,10 @@ const ProConflicts: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
   const [anyTicketsExist, setAnyTicketsExist] = useState<boolean>(true);
 
-  // caches to avoid duplicate lookups
-  const userNameCache = React.useRef<Record<string, string>>({});
-  const proNameCache = React.useRef<Record<string, string>>({});
   const resolveName = async (type: "user" | "pro", id: string): Promise<string> => {
+    void type;
     if (!id) return "";
-    if (type === "user") {
-      if (userNameCache.current[id]) return userNameCache.current[id];
-      try {
-        const u = await getUserProfile(id);
-        const name = u?.name || id;
-        userNameCache.current[id] = name;
-        return name;
-      } catch {
-        return id;
-      }
-    } else {
-      if (proNameCache.current[id]) return proNameCache.current[id];
-      try {
-        const p = await getProProfile(id);
-        const name = [p?.firstName, p?.lastName].filter(Boolean).join(" ") || id;
-        proNameCache.current[id] = name;
-        return name;
-      } catch {
-        return id;
-      }
-    }
+    return id;
   };
 
   const load = useCallback(async () => {
@@ -220,7 +196,7 @@ const ProConflicts: React.FC = () => {
                     showTypeBadges={false}
                   />
                 ) : (
-                  <TicketDetails ticket={selected} onBack={() => { setSelected(null); setDetailLoading(false); load(); }} />
+                  <TicketDetails ticket={selected} viewerRole="pro" onBack={() => { setSelected(null); setDetailLoading(false); load(); }} />
                 )}
               </>
             ) : (

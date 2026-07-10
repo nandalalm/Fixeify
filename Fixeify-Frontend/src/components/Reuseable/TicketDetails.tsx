@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { TicketResponse } from "@/interfaces/ticketInterface";
 import { fetchBookingById as fetchUserBookingById, getUserProfile, fetchQuotaByBookingId as fetchUserQuotaByBookingId } from "@/api/userApi";
-import { fetchQuotaByBookingId as fetchProQuotaByBookingId, getProProfile } from "@/api/proApi";
+import { fetchBookingById as fetchProBookingById, fetchQuotaByBookingId as fetchProQuotaByBookingId, getProProfile } from "@/api/proApi";
 import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
 import { UserProfile } from "@/interfaces/userInterface";
@@ -9,6 +9,7 @@ import { ProProfile } from "@/interfaces/proInterface";
 
 interface TicketDetailsProps {
   ticket: TicketResponse;
+  viewerRole?: "user" | "pro";
   onBack?: () => void;
 }
 
@@ -26,7 +27,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode }>=({ title, 
   </div>
 );
 
-const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
+const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, viewerRole = "user", onBack }) => {
   const [booking, setBooking] = useState<BookingCompleteResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [against, setAgainst] = useState<UserProfile | ProProfile | null>(null);
@@ -95,28 +96,36 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
     let mounted = true;
     const load = async () => {
       try {
-        const b = await fetchUserBookingById(ticket.bookingId);
+        const b = viewerRole === "pro"
+          ? await fetchProBookingById(ticket.bookingId)
+          : await fetchUserBookingById(ticket.bookingId);
         if (mounted) setBooking(b);
       } catch (error) {
         console.error('Failed to fetch booking:', error);
       }
 
       try {
-        const q = await fetchUserQuotaByBookingId(ticket.bookingId);
+        const q = viewerRole === "pro"
+          ? await fetchProQuotaByBookingId(ticket.bookingId)
+          : await fetchUserQuotaByBookingId(ticket.bookingId);
         if (mounted) setQuota(q);
       } catch {
-        try {
+        if (viewerRole !== "pro") {
+          try {
           const q2 = await fetchProQuotaByBookingId(ticket.bookingId);
           if (mounted) setQuota(q2);
-        } catch (error) {
-          console.error('Failed to fetch pro quota:', error);
+          } catch (error) {
+            console.error('Failed to fetch pro quota:', error);
+          }
         }
       }
 
       try {
         if (ticket.againstType === "user") {
-          const u = await getUserProfile(ticket.againstId);
-          if (mounted) setAgainst(u);
+          if (viewerRole !== "pro") {
+            const u = await getUserProfile(ticket.againstId);
+            if (mounted) setAgainst(u);
+          }
         } else {
           const p = await getProProfile(ticket.againstId);
           if (mounted) setAgainst(p);
@@ -127,7 +136,7 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
     };
     load();
     return () => { mounted = false; };
-  }, [ticket.bookingId, ticket.againstId, ticket.againstType]);
+  }, [ticket.bookingId, ticket.againstId, ticket.againstType, viewerRole]);
 
   return (
     <div className="space-y-4">
@@ -197,7 +206,7 @@ const TicketDetails: React.FC<TicketDetailsProps> = ({ ticket, onBack }) => {
           </>
         ) : (
           <>
-            <LabelValue label="Email" value={(against as UserProfile | null)?.email} />
+            <LabelValue label="Email" value={(against as UserProfile | null)?.email || booking?.user?.email} />
             <LabelValue label="Phone" value={booking?.phoneNumber || "-"} />
             {ticket.isUserBanned && (
               <LabelValue label="Action Taken" value="User Banned" />
