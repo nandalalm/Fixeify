@@ -81,6 +81,28 @@ This design decouples time-based logic from request lifecycle and improves fault
 | Maps          | Google Maps API                                  |
 | Payments      | Stripe                                           |
 | Architecture  | Repository–Service–Controller, DTOs, SOLID       |
+| Containers    | Docker, Docker Compose                           |
+| Web Server    | Nginx                                            |
+| Deployment    | Google Cloud Platform VM                         |
+| CI/CD         | GitHub Actions                                   |
+
+---
+
+## 🚢 DevOps & Deployment
+
+Fixeify is now fully Dockerized and deployed on a Google Cloud Platform VM.
+
+- The frontend is built with Vite and served through Nginx in a Docker container.
+- The backend runs as a separate Dockerized Node.js service.
+- Docker Compose is used to build and run the frontend and backend together.
+- CI/CD is implemented with GitHub Actions.
+- On every push to `main`, the deployment workflow SSHs into the GCP VM, pulls the latest code, stops the existing containers, rebuilds the Docker images, and starts the stack again in detached mode.
+
+Production deployment command:
+
+```bash
+docker compose --env-file ./Fixeify-Frontend/.env up --build -d
+```
 
 ---
 
