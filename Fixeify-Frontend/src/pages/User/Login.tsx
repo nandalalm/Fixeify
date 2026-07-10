@@ -15,6 +15,7 @@ const LoginPage = () => {
   const [userRole, setUserRole] = useState<"user" | "pro">("user");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string>("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   // Responsive Google button width (GIS only accepts 120–400px)
@@ -23,6 +24,18 @@ const LoginPage = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
+  const demoCredentials = {
+    user: {
+      email: import.meta.env.VITE_DEMO_USER_EMAIL ?? "",
+      password: import.meta.env.VITE_DEMO_USER_PASSWORD ?? "",
+    },
+    pro: {
+      email: import.meta.env.VITE_DEMO_PRO_EMAIL ?? "",
+      password: import.meta.env.VITE_DEMO_PRO_PASSWORD ?? "",
+    },
+  } as const;
+  const selectedDemoCredentials = demoCredentials[userRole];
+  const canUseDemoLogin = Boolean(selectedDemoCredentials.email && selectedDemoCredentials.password);
 
   useEffect(() => {
     dispatch({ type: "auth/clearError" });
@@ -61,18 +74,57 @@ const LoginPage = () => {
     setServerError("");
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-    setServerError("");
+  const handleLoginError = (error: unknown) => {
+    console.error("Login error:", error);
+    if (error instanceof z.ZodError) {
+      const fieldErrors: Record<string, string> = {};
+      error.errors.forEach((err) => (fieldErrors[err.path[0]] = err.message));
+      setErrors(fieldErrors);
+    } else if (error instanceof Error) {
+      const err = error as { response?: { status?: number; data?: { message?: string } }; status?: number; message?: string };
+      if (err.response?.status || err.status) {
+        const status = err.response?.status || err.status;
+        const message = err.response?.data?.message || err.message || "Login failed";
 
+        switch (status) {
+          case 400:
+            if (message === "Invalid role selected") {
+              setServerError("Invalid role selected. Please choose the correct role.");
+            } else {
+              setServerError(message);
+            }
+            dispatch({ type: "auth/logoutUserSync" });
+            break;
+          case 422:
+            setServerError("Incorrect password. Please try again.");
+            dispatch({ type: "auth/logoutUserSync" });
+            break;
+          case 403:
+            setServerError("Your account has been banned. Please contact our support team.");
+            dispatch({ type: "auth/logoutUserSync" });
+            break;
+          case 404:
+            setServerError("Email not registered. Please sign up.");
+            dispatch({ type: "auth/logoutUserSync" });
+            break;
+          default:
+            setServerError(message || "Login failed. Please try again.");
+            dispatch({ type: "auth/logoutUserSync" });
+        }
+      } else {
+        setServerError("Unable to connect to the server. Please try again later.");
+        dispatch({ type: "auth/logoutUserSync" });
+      }
+    } else {
+      setServerError("An unexpected error occurred. Please try again.");
+      dispatch({ type: "auth/logoutUserSync" });
+    }
+  };
+
+  const signInWithCredentials = async (email: string, password: string, role: "user" | "pro") => {
+    setIsLoggingIn(true);
     try {
-      const validatedData = loginSchema.parse({ ...formData, role: userRole });
-      const { accessToken, user } = await loginUser(
-        validatedData.email,
-        validatedData.password,
-        validatedData.role
-      );
+      const { accessToken, user } = await loginUser(email, password, role);
       const mappedUser = {
         ...user,
         role: user.role === "user" ? UserRole.USER : user.role === "pro" ? UserRole.PRO : UserRole.ADMIN,
@@ -86,51 +138,40 @@ const LoginPage = () => {
         navigate("/admin-dashboard", { replace: true });
       }
     } catch (error) {
-      console.error("Login error:", error);
-      if (error instanceof z.ZodError) {
-        const fieldErrors: Record<string, string> = {};
-        error.errors.forEach((err) => (fieldErrors[err.path[0]] = err.message));
-        setErrors(fieldErrors);
-      } else if (error instanceof Error) {
-        const err = error as { response?: { status?: number; data?: { message?: string } }; status?: number; message?: string };
-        if (err.response?.status || err.status) {
-          const status = err.response?.status || err.status;
-          const message = err.response?.data?.message || err.message || "Login failed";
-
-          switch (status) {
-            case 400:
-              if (message === "Invalid role selected") {
-                setServerError("Invalid role selected. Please choose the correct role.");
-              } else {
-                setServerError(message);
-              }
-              dispatch({ type: "auth/logoutUserSync" });
-              break;
-            case 422:
-              setServerError("Incorrect password. Please try again.");
-              dispatch({ type: "auth/logoutUserSync" });
-              break;
-            case 403:
-              setServerError("Your account has been banned. Please contact our support team.");
-              dispatch({ type: "auth/logoutUserSync" });
-              break;
-            case 404:
-              setServerError("Email not registered. Please sign up.");
-              dispatch({ type: "auth/logoutUserSync" });
-              break;
-            default:
-              setServerError(message || "Login failed. Please try again.");
-              dispatch({ type: "auth/logoutUserSync" });
-          }
-        } else {
-          setServerError("Unable to connect to the server. Please try again later.");
-          dispatch({ type: "auth/logoutUserSync" });
-        }
-      } else {
-        setServerError("An unexpected error occurred. Please try again.");
-        dispatch({ type: "auth/logoutUserSync" });
-      }
+      handleLoginError(error);
+    } finally {
+      setIsLoggingIn(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrors({});
+    setServerError("");
+
+    try {
+      const validatedData = loginSchema.parse({ ...formData, role: userRole });
+      await signInWithCredentials(validatedData.email, validatedData.password, validatedData.role);
+    } catch (error) {
+      handleLoginError(error);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    const demoFormData = {
+      email: selectedDemoCredentials.email,
+      password: selectedDemoCredentials.password,
+    };
+    setFormData(demoFormData);
+    setErrors({});
+    setServerError("");
+
+    if (!demoFormData.email || !demoFormData.password) {
+      setServerError(`Demo ${userRole === "user" ? "user" : "pro"} login is not configured.`);
+      return;
+    }
+
+    await signInWithCredentials(demoFormData.email, demoFormData.password, userRole);
   };
 
   const handleGoogleLoginSuccess = async (credentialResponse: { credential?: string }) => {
@@ -270,11 +311,22 @@ const LoginPage = () => {
                 <button
                   type="submit"
                   className="w-full bg-[#032B44] text-white py-2 px-4 rounded-md hover:bg-[#054869] transition duration-300 dark:bg-gray-700 dark:!text-white dark:hover:bg-gray-600"
-                  disabled={!formData.email || !formData.password}
+                  disabled={!formData.email || !formData.password || isLoggingIn}
                 >
-                  Login
+                  {isLoggingIn ? "Logging in..." : "Login"}
                 </button>
                 </form>
+
+                {canUseDemoLogin && (
+                  <button
+                    type="button"
+                    onClick={handleDemoLogin}
+                    disabled={isLoggingIn}
+                    className="mt-3 w-full border border-[#032B44] text-[#032B44] py-2 px-4 rounded-md hover:bg-[#032B44] hover:text-white transition duration-300 dark:border-gray-500 dark:text-gray-200 dark:hover:bg-gray-700"
+                  >
+                    {isLoggingIn ? "Logging in..." : `Demo ${userRole === "user" ? "User" : "Pro"} Login`}
+                  </button>
+                )}
 
                 {/* Fixed height container for dynamic content */}
                 <div className="mt-4" style={{ minHeight: '140px' }}>
