@@ -1,12 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { TicketResponse } from "@/interfaces/ticketInterface";
-import { fetchBookingById as fetchUserBookingById } from "@/api/userApi";
-import { fetchQuotaByBookingId as fetchUserQuotaByBookingId, getUserProfile } from "@/api/userApi";
-import { fetchQuotaByBookingId as fetchProQuotaByBookingId, getProProfile } from "@/api/proApi";
+import { fetchBookingById as fetchAdminBookingById, fetchQuotaByBookingId as fetchAdminQuotaByBookingId } from "@/api/adminApi";
 import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
-import { UserProfile } from "@/interfaces/userInterface";
-import { ProProfile } from "@/interfaces/proInterface";
 import { toggleBanUser, toggleBanPro } from "@/api/adminApi";
 import { updateTicketBanStatus } from "@/api/ticketApi";
 import { ConfirmationModal } from "@/components/Reuseable/ConfirmationModal";
@@ -36,8 +32,6 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
   const [error, setError] = useState<string | null>(null);
   const [booking, setBooking] = useState<BookingCompleteResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
-  const [complainant, setComplainant] = useState<UserProfile | ProProfile | null>(null);
-  const [against, setAgainst] = useState<UserProfile | ProProfile | null>(null);
   const [banLoading, setBanLoading] = useState(false);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [showBanModal, setShowBanModal] = useState(false);
@@ -46,6 +40,18 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
 
   const complainantDisplay = useMemo(() => ticket.complainantName?.trim() || ticket.complainantId, [ticket]);
   const againstDisplay = useMemo(() => ticket.againstName?.trim() || ticket.againstId, [ticket]);
+  const bookingUser = booking?.user;
+  const bookingPro = booking?.pro;
+  const getEmail = (type: "user" | "pro", id: string): string | undefined => {
+    if (type === "user" && bookingUser?.id === id) return bookingUser.email;
+    if (type === "pro" && bookingPro?.id === id) return bookingPro.email;
+    return undefined;
+  };
+  const getPhone = (type: "user" | "pro", id: string): string | undefined => {
+    if (type === "user" && bookingUser?.id === id) return booking?.phoneNumber;
+    if (type === "pro" && bookingPro?.id === id) return bookingPro.phoneNumber;
+    return undefined;
+  };
 
   // Helper: format HH:mm to 12-hour time with AM/PM
   const formatTo12h = (time?: string) => {
@@ -88,36 +94,20 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
     let mounted = true;
     const load = async () => {
       try {
-        // Booking details
-        const b = await fetchUserBookingById(ticket.bookingId);
+        const b = await fetchAdminBookingById(ticket.bookingId);
         if (mounted) setBooking(b);
 
-        // Quota details (try user route first, fallback to pro route)
         try {
-          const q = await fetchUserQuotaByBookingId(ticket.bookingId);
+          const q = await fetchAdminQuotaByBookingId(ticket.bookingId);
           if (mounted) setQuota(q);
         } catch {
-          try {
-            const q2 = await fetchProQuotaByBookingId(ticket.bookingId);
-            if (mounted) setQuota(q2);
-          } catch {
-            // ignore
-          }
-        }
-
-        // Party profiles
-        if (ticket.complainantType === "user") {
-          getUserProfile(ticket.complainantId).then((p) => mounted && setComplainant(p)).catch(() => {});
-        } else {
-          getProProfile(ticket.complainantId).then((p) => mounted && setComplainant(p)).catch(() => {});
-        }
-        if (ticket.againstType === "user") {
-          getUserProfile(ticket.againstId).then((p) => mounted && setAgainst(p)).catch(() => {});
-        } else {
-          getProProfile(ticket.againstId).then((p) => mounted && setAgainst(p)).catch(() => {});
+          if (mounted) setQuota(null);
         }
       } catch {
-        // ignore fetch errors; fallback fields will still render
+        if (mounted) {
+          setBooking(null);
+          setQuota(null);
+        }
       }
     };
     load();
@@ -260,14 +250,14 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
           <LabelValue label="Name" value={complainantDisplay} />
           {ticket.complainantType === "user" && (
             <>
-              <LabelValue label="Email" value={(complainant as UserProfile | null)?.email} />
-              <LabelValue label="Phone" value={(complainant as UserProfile | null)?.phoneNo || "-"} />
+              <LabelValue label="Email" value={getEmail("user", ticket.complainantId)} />
+              <LabelValue label="Phone" value={getPhone("user", ticket.complainantId) || "-"} />
             </>
           )}
           {ticket.complainantType === "pro" && (
             <>
-              <LabelValue label="Email" value={(complainant as ProProfile | null)?.email} />
-              <LabelValue label="Phone" value={(complainant as ProProfile | null)?.phoneNumber} />
+              <LabelValue label="Email" value={getEmail("pro", ticket.complainantId)} />
+              <LabelValue label="Phone" value={getPhone("pro", ticket.complainantId)} />
               <LabelValue label="Service Type" value={booking?.category?.name || "-"} />
             </>
           )}
@@ -277,14 +267,14 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
           <LabelValue label="Name" value={againstDisplay} />
           {ticket.againstType === "user" && (
             <>
-              <LabelValue label="Email" value={(against as UserProfile | null)?.email} />
-              <LabelValue label="Phone" value={(against as UserProfile | null)?.phoneNo ||booking?.phoneNumber || "-"} />
+              <LabelValue label="Email" value={getEmail("user", ticket.againstId)} />
+              <LabelValue label="Phone" value={getPhone("user", ticket.againstId) || "-"} />
             </>
           )}
           {ticket.againstType === "pro" && (
             <>
-              <LabelValue label="Email" value={(against as ProProfile | null)?.email} />
-              <LabelValue label="Phone" value={(against as ProProfile | null)?.phoneNumber} />
+              <LabelValue label="Email" value={getEmail("pro", ticket.againstId)} />
+              <LabelValue label="Phone" value={getPhone("pro", ticket.againstId)} />
               <LabelValue label="Service Type" value={booking?.category?.name || "-"} />
             </>
           )}

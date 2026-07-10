@@ -688,6 +688,7 @@ const AdminRevenueManagement: FC = () => {
                     <div className="mt-2">
                       <TransactionDetails
                         transaction={selectedAdminTransaction}
+                        viewerRole="admin"
                         onClose={async () => {
                           await refreshAdminTransactions();
                           setSelectedAdminTransaction(null);

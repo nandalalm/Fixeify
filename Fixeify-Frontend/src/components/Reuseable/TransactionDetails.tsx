@@ -4,7 +4,8 @@ import { ITransaction } from "@/interfaces/walletInterface";
 import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
 import { fetchBookingById as fetchUserBookingById, fetchQuotaByBookingId as fetchUserQuotaByBookingId } from "@/api/userApi";
-import { fetchQuotaByBookingId as fetchProQuotaByBookingId } from "@/api/proApi";
+import { fetchBookingById as fetchProBookingById, fetchQuotaByBookingId as fetchProQuotaByBookingId } from "@/api/proApi";
+import { fetchBookingById as fetchAdminBookingById, fetchQuotaByBookingId as fetchAdminQuotaByBookingId } from "@/api/adminApi";
 
 const LabelValue: React.FC<{ label: React.ReactNode; value?: React.ReactNode }> = ({ label, value }) => (
   <div className="flex flex-col sm:flex-row sm:items-center gap-1 py-1">
@@ -78,10 +79,11 @@ const formatDateTimeDDMMYYYY12h = (d: Date | string | number) => {
 interface TransactionDetailsProps {
   transaction: ITransaction;
   onClose: () => void;
+  viewerRole?: "user" | "pro" | "admin";
   showRevenueSplit?: boolean;
 }
 
-const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, onClose, showRevenueSplit = false }) => {
+const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, onClose, viewerRole = "user", showRevenueSplit = false }) => {
   const [booking, setBooking] = useState<BookingCompleteResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -91,26 +93,29 @@ const TransactionDetails: React.FC<TransactionDetailsProps> = ({ transaction, on
       if (!transaction.bookingId) return;
       setLoading(true);
       try {
-        const b = await fetchUserBookingById(transaction.bookingId);
+        const b = viewerRole === "pro"
+          ? await fetchProBookingById(transaction.bookingId)
+          : viewerRole === "admin"
+            ? await fetchAdminBookingById(transaction.bookingId)
+            : await fetchUserBookingById(transaction.bookingId);
         setBooking(b);
-      } catch (error) {
-        console.error('Failed to fetch booking:', error);
+      } catch {
+        setBooking(null);
       }
       try {
-        const q = await fetchUserQuotaByBookingId(transaction.bookingId);
+        const q = viewerRole === "pro"
+          ? await fetchProQuotaByBookingId(transaction.bookingId)
+          : viewerRole === "admin"
+            ? await fetchAdminQuotaByBookingId(transaction.bookingId)
+            : await fetchUserQuotaByBookingId(transaction.bookingId);
         setQuota(q);
       } catch {
-        try {
-          const q2 = await fetchProQuotaByBookingId(transaction.bookingId);
-          setQuota(q2);
-        } catch (error) {
-          console.error('Failed to fetch pro quota:', error);
-        }
+        setQuota(null);
       }
       setLoading(false);
     };
     load();
-  }, [transaction.bookingId]);
+  }, [transaction.bookingId, viewerRole]);
 
   return (
     <div className="w-full max-w-none">

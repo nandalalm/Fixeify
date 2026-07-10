@@ -1,13 +1,15 @@
 import { FC, useEffect, useMemo, useState } from "react";
 import { Star, Eye, X, Phone, User as UserIcon } from "lucide-react";
 import { RatingReviewResponse } from "@/api/ratingReviewApi";
-import { BookingResponse } from "@/interfaces/bookingInterface";
+import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
-import { fetchBookingById, fetchQuotaByBookingId } from "@/api/proApi";
+import { fetchBookingById as fetchProBookingById, fetchQuotaByBookingId as fetchProQuotaByBookingId } from "@/api/proApi";
+import { fetchBookingById as fetchAdminBookingById, fetchQuotaByBookingId as fetchAdminQuotaByBookingId } from "@/api/adminApi";
 
 export interface ReviewDetailsProps {
   review: RatingReviewResponse;
   onBack: () => void;
+  viewerRole?: "pro" | "admin";
 }
 
 const LabelValue: React.FC<{ label: React.ReactNode; value?: React.ReactNode }>=({ label, value }) => (
@@ -138,8 +140,8 @@ const formatDateDDMMYYYY = (d: Date | string | number) => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
-const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
-  const [booking, setBooking] = useState<BookingResponse | null>(null);
+const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack, viewerRole = "pro" }) => {
+  const [booking, setBooking] = useState<BookingCompleteResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,22 +177,23 @@ const ReviewDetails: FC<ReviewDetailsProps> = ({ review, onBack }) => {
       if (!bookingId) return;
       try {
         setLoading(true);
+        const fetchQuota = viewerRole === "admin" ? fetchAdminQuotaByBookingId : fetchProQuotaByBookingId;
+        const fetchBooking = viewerRole === "admin" ? fetchAdminBookingById : fetchProBookingById;
         const [quotaRes, bookingRes] = await Promise.all([
-          fetchQuotaByBookingId(bookingId),
-          fetchBookingById(bookingId),
+          fetchQuota(bookingId),
+          fetchBooking(bookingId),
         ]);
         setQuota(quotaRes);
         setBooking(bookingRes);
         setError(null);
-      } catch (error) {
-        console.error('Failed to load booking/quota details:', error);
+      } catch {
         setError("Failed to load booking/quota details");
       } finally {
         setLoading(false);
       }
     };
     fetchData();
-  }, [bookingId]);
+  }, [bookingId, viewerRole]);
 
   return (
     <div className="space-y-4">

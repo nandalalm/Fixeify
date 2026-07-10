@@ -2,8 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { getAllTickets, updateTicketStatus } from "@/api/ticketApi";
-import { getUserProfile } from "@/api/userApi";
-import { getProProfile } from "@/api/proApi";
 import { TicketResponse, TicketPriority } from "@/interfaces/ticketInterface";
 import TicketTable from "@/components/Reuseable/TicketTable";
 import { ConfirmationModal } from "@/components/Reuseable/ConfirmationModal";
@@ -46,33 +44,10 @@ const AdminConflictManagement: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [anyTicketsExist, setAnyTicketsExist] = useState<boolean>(true);
 
-  // Simple caches to avoid duplicate profile fetches per session
-  const userNameCache = React.useRef<Record<string, string>>({});
-  const proNameCache = React.useRef<Record<string, string>>({});
-
   const resolveName = async (type: "user" | "pro", id: string): Promise<string> => {
+    void type;
     if (!id) return "";
-    if (type === "user") {
-      if (userNameCache.current[id]) return userNameCache.current[id];
-      try {
-        const u = await getUserProfile(id);
-        const name = u?.name || id;
-        userNameCache.current[id] = name;
-        return name;
-      } catch {
-        return id;
-      }
-    } else {
-      if (proNameCache.current[id]) return proNameCache.current[id];
-      try {
-        const p = await getProProfile(id);
-        const name = [p?.firstName, p?.lastName].filter(Boolean).join(" ") || id;
-        proNameCache.current[id] = name;
-        return name;
-      } catch {
-        return id;
-      }
-    }
+    return id;
   };
 
   const showSuccess = (msg: string) => {

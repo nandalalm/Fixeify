@@ -464,6 +464,7 @@ const ProWalletManagement = () => {
                               ) : (
                                 <TransactionDetails
                                   transaction={selectedTransaction}
+                                  viewerRole="pro"
                                   onClose={async () => {
                                     setIsViewingTransaction(true);
                                     await refreshWallet({ silent: true });

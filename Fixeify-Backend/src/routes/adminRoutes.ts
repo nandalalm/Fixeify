@@ -21,6 +21,7 @@ export default function createAdminRoutes(container: Container): Router {
   router.get("/fetchCategories", authenticateToken, requireAdmin, adminController.getCategories.bind(adminController));
   router.put("/updateCategories/:categoryId", authenticateToken, requireAdmin, adminController.updateCategory.bind(adminController));
   router.get("/fetchBookings", authenticateToken, requireAdmin, adminController.getBookings.bind(adminController));
+  router.get("/booking/:bookingId", authenticateToken, requireAdmin, adminController.getBookingById.bind(adminController));
   router.get("/fetchQuota/:bookingId", authenticateToken, requireAdmin, adminController.getQuotaByBookingId.bind(adminController));
   router.get("/fetchWithdrawalRequests", authenticateToken, requireAdmin, adminController.getWithdrawalRequests.bind(adminController));
   router.post("/acceptWithdrawalRequest/:withdrawalId", authenticateToken, requireAdmin, adminController.acceptWithdrawalRequest.bind(adminController));

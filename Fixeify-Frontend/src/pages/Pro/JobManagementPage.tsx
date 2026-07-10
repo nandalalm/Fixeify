@@ -409,9 +409,23 @@ const JobManagementPage = () => {
           priority: data.priority,
         })
       ).unwrap();
+      const submittedBookingId = complaintBooking.id;
+      setBookings((prev) =>
+        prev.map((booking) =>
+          booking.id === submittedBookingId
+            ? { ...booking, hasComplaintRaisedByPro: true }
+            : booking
+        )
+      );
+      setSelectedBooking((prev) =>
+        prev && prev.id === submittedBookingId
+          ? { ...prev, hasComplaintRaisedByPro: true }
+          : prev
+      );
       setComplaintOpen(false);
       setComplaintBooking(null);
-      // Refetch bookings so the complaint button hides based on updated flags
+      // Refetch the open details panel and list so the complaint button hides immediately and stays in sync.
+      setRefreshKey(prev => prev + 1);
       await fetchBookings(activeTab);
       showSuccessMessage("Complaint submitted successfully");
     } catch (err: unknown) {

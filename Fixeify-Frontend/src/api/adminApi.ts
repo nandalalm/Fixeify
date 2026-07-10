@@ -1,5 +1,5 @@
 import api from "./axios";
-import { BookingResponse } from "../interfaces/bookingInterface";
+import { BookingCompleteResponse, BookingResponse } from "../interfaces/bookingInterface";
 import { QuotaResponse } from "../interfaces/quotaInterface";
 import { ICategory, User, PendingPro, IApprovedPro, BanStatusResponse } from "../interfaces/adminInterface";
 import { IWithdrawalRequest } from "../interfaces/withdrawalRequestInterface";
@@ -127,6 +127,13 @@ export const fetchAdminBookings = async (
 
 export const fetchQuotaByBookingId = async (bookingId: string): Promise<QuotaResponse> => {
   const response = await api.get(`${AdminBase}/fetchQuota/${bookingId}`, {
+    withCredentials: true,
+  });
+  return response.data;
+};
+
+export const fetchBookingById = async (bookingId: string): Promise<BookingCompleteResponse> => {
+  const response = await api.get(`${AdminBase}/booking/${bookingId}`, {
     withCredentials: true,
   });
   return response.data;

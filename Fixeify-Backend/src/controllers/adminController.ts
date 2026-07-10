@@ -25,6 +25,17 @@ export class AdminController {
     }
   }
 
+  async getBookingById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { bookingId } = req.params;
+      const booking = await this._adminService.getBookingById(bookingId);
+      if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
+      res.status(HttpStatus.OK).json(booking);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getQuotaByBookingId(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { bookingId } = req.params;

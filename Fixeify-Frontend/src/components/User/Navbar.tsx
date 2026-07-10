@@ -154,6 +154,15 @@ const Navbar = () => {
     setShowLogoutModal(false);
   };
 
+  const openMessagePanel = () => {
+    setIsNotificationPanelOpen(false);
+    setIsMessagePanelOpen(true);
+  };
+
+  const openNotificationPanel = () => {
+    setIsMessagePanelOpen(false);
+    setIsNotificationPanelOpen(true);
+  };
 
   return (
     <motion.header
@@ -190,7 +199,7 @@ const Navbar = () => {
             {accessToken && (
               <>
                 <button
-                  onClick={() => setIsMessagePanelOpen(true)}
+                  onClick={openMessagePanel}
                   className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
                 >
                   <MessageCircle className="h-5 w-5" />
@@ -202,7 +211,7 @@ const Navbar = () => {
                 </button>
                 
                 <button
-                  onClick={() => setIsNotificationPanelOpen(true)}
+                  onClick={openNotificationPanel}
                   className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
                 >
                   <Bell className="h-5 w-5" />
@@ -304,7 +313,7 @@ const Navbar = () => {
           {accessToken && (
             <>
               <button
-                onClick={() => setIsMessagePanelOpen(true)}
+                onClick={openMessagePanel}
                 className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
               >
                 <MessageCircle className="h-5 w-5" />
@@ -316,7 +325,7 @@ const Navbar = () => {
               </button>
               
               <button
-                onClick={() => setIsNotificationPanelOpen(true)}
+                onClick={openNotificationPanel}
                 className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-white dark:hover:bg-gray-700"
               >
                 <Bell className="h-5 w-5" />

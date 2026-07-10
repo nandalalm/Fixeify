@@ -7,7 +7,7 @@ import { RatingReviewResponse, getAllReviews, PaginatedReviews } from "@/api/rat
 import { Star, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import ReviewDetails from "@/components/Reuseable/ReviewDetails";
 
-import { fetchBookingById } from "@/api/proApi";
+import { fetchBookingById } from "@/api/adminApi";
 import { AdminTopNavbar } from "@/components/Admin/AdminTopNavbar";
 
 const AdminReviewManagement: FC = () => {
@@ -265,7 +265,7 @@ const AdminReviewManagement: FC = () => {
                 <div className="text-center">
                   <h2 className="text-xl font-semibold text-gray-900">Rating Details</h2>
                 </div>
-                <ReviewDetails review={selectedReview} onBack={handleBackFromDetails} />
+                <ReviewDetails review={selectedReview} onBack={handleBackFromDetails} viewerRole="admin" />
               </div>
             ) : (
               <>

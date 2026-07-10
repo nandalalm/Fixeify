@@ -78,6 +78,16 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
     setShowLogoutModal(false);
   };
 
+  const openMessagePanel = () => {
+    setIsNotificationPanelOpen(false);
+    setIsMessagePanelOpen(true);
+  };
+
+  const openNotificationPanel = () => {
+    setIsMessagePanelOpen(false);
+    setIsNotificationPanelOpen(true);
+  };
+
   if (!user) return null;
 
   return (
@@ -115,7 +125,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
         <div className="flex items-center gap-4">
           {/* Message Icon */}
           <button
-            onClick={() => setIsMessagePanelOpen(true)}
+            onClick={openMessagePanel}
             className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             <MessageCircle className="h-5 w-5" />
@@ -128,7 +138,7 @@ const ProTopNavbar: FC<ProTopNavbarProps> = ({ toggleSidebar, isLargeScreen = tr
           
           {/* Notification Bell Icon */}
           <button
-            onClick={() => setIsNotificationPanelOpen(true)}
+            onClick={openNotificationPanel}
             className="relative p-2 text-gray-700 rounded-md hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             <Bell className="h-5 w-5" />

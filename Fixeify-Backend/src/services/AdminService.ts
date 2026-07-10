@@ -13,7 +13,7 @@ import type { UserResponse } from "../dtos/response/userDtos";
 import type { IAdminService } from "./IAdminService";
 import type { ProResponse, PendingProResponse } from "../dtos/response/proDtos";
 import type { CategoryResponse } from "../dtos/response/categoryDtos";
-import type { BookingResponse } from "../dtos/response/bookingDtos";
+import type { BookingCompleteResponse, BookingResponse } from "../dtos/response/bookingDtos";
 import type { QuotaResponse } from "../dtos/response/quotaDtos";
 import type { WithdrawalResponse } from "../dtos/response/withdrawalDtos";
 import type { TransactionResponse } from "../dtos/response/transactionDtos";
@@ -29,7 +29,7 @@ import mongoose from "mongoose";
 import { toAdminUserListResponse, toUserResponse } from "../mappers/userMapper";
 import { toCategoryResponse, toCategoryResponses } from "../mappers/categoryMapper";
 import { toPendingProResponse, toPopulatedProResponse, toProResponse } from "../mappers/proMapper";
-import { toBookingResponse } from "../mappers/bookingMapper";
+import { toBookingCompleteResponse, toBookingResponse } from "../mappers/bookingMapper";
 import { toQuotaResponse } from "../mappers/quotaMapper";
 import { toTransactionResponse } from "../mappers/transactionMapper";
 import { toWithdrawalResponses } from "../mappers/withdrawalMapper";
@@ -67,6 +67,11 @@ export class AdminService implements IAdminService {
   async getBookings(page: number, limit: number, search?: string, status?: string, sortBy?: "latest" | "oldest", bookingId?: string): Promise<{ bookings: BookingResponse[]; total: number }> {
     const { bookings, total } = await this._bookingRepository.fetchAllBookings(page, limit, search, status, sortBy, bookingId);
     return { bookings: bookings.map(toBookingResponse), total };
+  }
+
+  async getBookingById(bookingId: string): Promise<BookingCompleteResponse | null> {
+    const booking = await this._bookingRepository.findBookingByIdComplete(bookingId);
+    return booking ? toBookingCompleteResponse(booking) : null;
   }
 
   async getQuotaByBookingId(bookingId: string): Promise<QuotaResponse | null> {

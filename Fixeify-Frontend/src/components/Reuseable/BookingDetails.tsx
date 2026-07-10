@@ -4,6 +4,7 @@ import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
 import { fetchBookingById as fetchUserBookingById, fetchQuotaByBookingId as fetchUserQuotaByBookingId } from "@/api/userApi";
 import { fetchBookingById as fetchProBookingById, fetchQuotaByBookingId as fetchProQuotaByBookingId } from "@/api/proApi";
+import { fetchBookingById as fetchAdminBookingById, fetchQuotaByBookingId as fetchAdminQuotaByBookingId } from "@/api/adminApi";
 import LocationMap from "@/components/User/LocationMap";
 import { Download } from "lucide-react";
 import { generateInvoice } from "@/utils/invoiceGenerator";
@@ -184,7 +185,9 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
       try {
         const b: BookingCompleteResponse = viewerRole === "pro"
           ? await fetchProBookingById(bookingId)
-          : await fetchUserBookingById(bookingId);
+          : viewerRole === "admin"
+            ? await fetchAdminBookingById(bookingId)
+            : await fetchUserBookingById(bookingId);
         if (mounted) {
           setBooking(b);
           if (onBookingUpdate && b) {
@@ -195,7 +198,9 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
           try {
             const q = viewerRole === "pro"
               ? await fetchProQuotaByBookingId(bookingId)
-              : await fetchUserQuotaByBookingId(bookingId);
+              : viewerRole === "admin"
+                ? await fetchAdminQuotaByBookingId(bookingId)
+                : await fetchUserQuotaByBookingId(bookingId);
             if (mounted) setQuota(q);
           } catch (e: unknown) {
             const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
