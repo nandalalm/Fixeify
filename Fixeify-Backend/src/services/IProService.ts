@@ -2,7 +2,7 @@ import type { PendingProResponse, ProProfileResponse } from "../dtos/response/pr
 import type { IPendingPro } from "../models/pendingProModel";
 import type { UserResponse } from "../dtos/response/userDtos";
 import type { CategoryResponse } from "../dtos/response/categoryDtos";
-import type { BookingResponse } from "../dtos/response/bookingDtos";
+import type { BookingCompleteResponse, BookingResponse } from "../dtos/response/bookingDtos";
 import type { QuotaResponse } from "../dtos/response/quotaDtos";
 import type { QuotaRequest } from "../dtos/request/quotaDtos";
 import type { WalletResponse } from "../dtos/response/walletDtos";
@@ -44,7 +44,7 @@ export interface IProService {
     search?: string,
     bookingId?: string
   ): Promise<{ bookings: BookingResponse[]; total: number }>;
-  getBookingById(id: string): Promise<BookingResponse>;
+  getBookingById(id: string): Promise<BookingCompleteResponse>;
   acceptBooking(bookingId: string): Promise<{ message: string }>;
   rejectBooking(bookingId: string, rejectedReason: string): Promise<{ message: string }>;
   generateQuota(bookingId: string, data: QuotaRequest): Promise<QuotaResponse>;

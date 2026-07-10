@@ -1,6 +1,6 @@
 import api from "./axios";
 import { ProProfile, Availability } from "../interfaces/proInterface";
-import { BookingResponse } from "../interfaces/bookingInterface";
+import { BookingCompleteResponse, BookingResponse } from "../interfaces/bookingInterface";
 import { QuotaRequest, QuotaResponse } from "../interfaces/quotaInterface";
 import { WalletResponse } from "../interfaces/walletInterface";
 import { WithdrawalFormData, IWithdrawalRequest } from "../interfaces/withdrawalRequestInterface";
@@ -145,7 +145,7 @@ export const fetchProWithdrawalRequests = async (
   return response.data;
 };
 
-export const fetchBookingById = async (bookingId: string): Promise<BookingResponse> => {
+export const fetchBookingById = async (bookingId: string): Promise<BookingCompleteResponse> => {
   const response = await api.get(`${ProBase}/booking/${bookingId}`, { withCredentials: true });
   return response.data;
 };

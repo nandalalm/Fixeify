@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../store/store";
-import { fetchBookingDetails, createPaymentIntent, cancelBooking } from "../../api/userApi";
+import { fetchBookingDetails, createPaymentIntent, cancelBooking, fetchQuotaByBookingId } from "../../api/userApi";
 import { BookingResponse } from "../../interfaces/bookingInterface";
 import { QuotaResponse } from "../../interfaces/quotaInterface";
 import { IApprovedPro } from "../../interfaces/adminInterface";
@@ -9,7 +9,6 @@ import { RotateCcw } from "lucide-react";
 import BookingTable from "../../components/Reuseable/BookingTable";
 import BookingDetails from "../../components/Reuseable/BookingDetails";
 import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
-import { fetchQuotaByBookingId } from "../../api/proApi";
 import { loadStripe, type Stripe, type StripeError, type PaymentIntent } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { setPaymentSuccessData, UserRole } from "../../store/authSlice";

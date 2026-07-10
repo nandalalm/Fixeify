@@ -3,7 +3,7 @@ import { Eye, Phone, X, User as UserIcon } from "lucide-react";
 import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import { QuotaResponse } from "@/interfaces/quotaInterface";
 import { fetchBookingById as fetchUserBookingById, fetchQuotaByBookingId as fetchUserQuotaByBookingId } from "@/api/userApi";
-import { fetchQuotaByBookingId as fetchProQuotaByBookingId } from "@/api/proApi";
+import { fetchBookingById as fetchProBookingById, fetchQuotaByBookingId as fetchProQuotaByBookingId } from "@/api/proApi";
 import LocationMap from "@/components/User/LocationMap";
 import { Download } from "lucide-react";
 import { generateInvoice } from "@/utils/invoiceGenerator";
@@ -182,7 +182,9 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
     const load = async () => {
       setLoading(true);
       try {
-        const b = await fetchUserBookingById(bookingId);
+        const b: BookingCompleteResponse = viewerRole === "pro"
+          ? await fetchProBookingById(bookingId)
+          : await fetchUserBookingById(bookingId);
         if (mounted) {
           setBooking(b);
           if (onBookingUpdate && b) {
@@ -191,16 +193,13 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         }
         if (mounted && b && !["pending", "rejected", "cancelled"].includes(b.status) && showQuotaSection) {
           try {
-            const q = await fetchUserQuotaByBookingId(bookingId);
+            const q = viewerRole === "pro"
+              ? await fetchProQuotaByBookingId(bookingId)
+              : await fetchUserQuotaByBookingId(bookingId);
             if (mounted) setQuota(q);
           } catch (e: unknown) {
-            try {
-              const q2 = await fetchProQuotaByBookingId(bookingId);
-              if (mounted) setQuota(q2);
-            } catch (e2: unknown) {
-              const msg = (e2 as { response?: { data?: { message?: string } } })?.response?.data?.message || (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-              if (mounted && msg) setBannerError(msg);
-            }
+            const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+            if (mounted && msg) setBannerError(msg);
           }
         } else {
           if (mounted) setQuota(null);
@@ -223,7 +222,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
     };
     load();
     return () => { mounted = false; };
-  }, [bookingId, refreshKey, showQuotaSection, onReady, onBookingUpdate]);
+  }, [bookingId, refreshKey, showQuotaSection, onReady, onBookingUpdate, viewerRole]);
 
   useEffect(() => {
     if (!bannerError) return;

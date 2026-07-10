@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { cancelBooking } from "../../api/userApi";
-import { fetchQuotaByBookingId } from "../../api/proApi";
 import { BookingResponse } from "../../interfaces/bookingInterface";
 import { QuotaResponse } from "../../interfaces/quotaInterface";
 import { IApprovedPro, ILocation } from "../../interfaces/adminInterface";
@@ -14,7 +13,7 @@ import {
   useStripe,
   useElements,
 } from "@stripe/react-stripe-js";
-import { createPaymentIntent, fetchBookingDetails } from "../../api/userApi";
+import { createPaymentIntent, fetchBookingDetails, fetchQuotaByBookingId } from "../../api/userApi";
 import { useDispatch } from "react-redux";
 import { setPaymentSuccessData } from "../../store/authSlice";
 import { UserRole } from "../../store/authSlice";

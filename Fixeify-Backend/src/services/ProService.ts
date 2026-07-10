@@ -10,7 +10,7 @@ import type { IProService, IAvailability } from "./IProService";
 import type { ProProfileResponse, ProResponse, PendingProResponse } from "../dtos/response/proDtos";
 import type { UserResponse } from "../dtos/response/userDtos";
 import type { CategoryResponse } from "../dtos/response/categoryDtos";
-import type { BookingResponse } from "../dtos/response/bookingDtos";
+import type { BookingCompleteResponse, BookingResponse } from "../dtos/response/bookingDtos";
 import { HttpError } from "../middleware/errorMiddleware";
 import { MESSAGES } from "../constants/messages";
 import { HttpStatus } from "../enums/httpStatus";
@@ -29,7 +29,7 @@ import { scheduleSlotRelease, cancelSlotRelease } from "./queue/SlotReleaseQueue
 import { toProUserResponse } from "../mappers/userMapper";
 import { toCategoryResponses } from "../mappers/categoryMapper";
 import { toPendingProResponse, toProProfileResponse } from "../mappers/proMapper";
-import { toBookingResponse } from "../mappers/bookingMapper";
+import { toBookingCompleteResponse, toBookingResponse } from "../mappers/bookingMapper";
 import { toQuotaResponse } from "../mappers/quotaMapper";
 import { toWalletResponse } from "../mappers/walletMapper";
 import { toWithdrawalResponse, toWithdrawalResponses } from "../mappers/withdrawalMapper";
@@ -210,10 +210,10 @@ export class ProService implements IProService {
     return { bookings: bookings.map(toBookingResponse), total };
   }
 
-  async getBookingById(id: string): Promise<BookingResponse> {
-    const booking = await this._bookingRepository.findBookingByIdPopulated(id);
+  async getBookingById(id: string): Promise<BookingCompleteResponse> {
+    const booking = await this._bookingRepository.findBookingByIdComplete(id);
     if (!booking) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.BOOKING_NOT_FOUND);
-    return toBookingResponse(booking);
+    return toBookingCompleteResponse(booking);
   }
 
   async acceptBooking(bookingId: string): Promise<{ message: string }> {
