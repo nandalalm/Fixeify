@@ -500,6 +500,7 @@ export class UserService implements IUserService {
       const adminRevenue = Math.round(quota.totalCost * 0.3);
 
       await this._bookingRepository.updateBooking(booking.id, {
+        status: "completed",
         adminRevenue: adminRevenue,
         proRevenue: proAmount
       }, session);
@@ -537,10 +538,6 @@ export class UserService implements IUserService {
         logger.error(MESSAGES.FAILED_CREATE_ADMIN_REVENUE_TRANSACTION, { bookingId: booking.id, error });
         throw error;
       }
-
-      await this._bookingRepository.updateBooking(bookingId, {
-        status: "completed",
-      }, session);
 
       paymentCompletion = {
         bookingUserId: booking.userId.toString(),
@@ -635,7 +632,7 @@ export class UserService implements IUserService {
     try { await cancelSlotRelease(bookingId); } catch (error) {
       logger.error(MESSAGES.FAILED_CANCEL_SLOT_RELEASE_USER, { bookingId, error });
     }
-    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null });
+    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null, slotReleaseAt: null });
 
 
     try {

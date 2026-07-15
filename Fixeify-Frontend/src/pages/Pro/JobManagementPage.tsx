@@ -71,7 +71,7 @@ const JobManagementPage = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   // const [selectedQuota, setSelectedQuota] = useState<QuotaResponse | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "">("latest");
+  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "failed" | "">("latest");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<{ requests: number; scheduled: number; history: number }>({
     requests: 1,
@@ -103,8 +103,8 @@ const JobManagementPage = () => {
           status = "accepted";
           break;
         case "history": {
-          const historyStatuses = ["completed", "rejected", "cancelled"] as const;
-          if (historyStatuses.includes(sortOption as "completed" | "rejected" | "cancelled")) {
+          const historyStatuses = ["completed", "rejected", "cancelled", "failed"] as const;
+          if (historyStatuses.includes(sortOption as "completed" | "rejected" | "cancelled" | "failed")) {
             status = sortOption as string; // narrow to specific history status
           } else {
             status = historyStatuses.join(",");
@@ -152,8 +152,8 @@ const JobManagementPage = () => {
           status = "accepted";
           break;
         case "history": {
-          const historyStatuses = ["completed", "rejected", "cancelled"] as const;
-          if (historyStatuses.includes(sortOption as "completed" | "rejected" | "cancelled")) {
+          const historyStatuses = ["completed", "rejected", "cancelled", "failed"] as const;
+          if (historyStatuses.includes(sortOption as "completed" | "rejected" | "cancelled" | "failed")) {
             status = sortOption as string;
           } else {
             status = historyStatuses.join(",");
@@ -522,6 +522,7 @@ const JobManagementPage = () => {
                       <option value="completed">Completed</option>
                       <option value="rejected">Rejected</option>
                       <option value="cancelled">Cancelled</option>
+                      <option value="failed">Failed</option>
                     </>
                   )}
                 </select>

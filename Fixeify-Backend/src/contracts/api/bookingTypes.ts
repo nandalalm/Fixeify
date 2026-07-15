@@ -14,4 +14,4 @@ export interface BookingLocation {
   };
 }
 
-export type BookingStatus = "pending" | "accepted" | "rejected" | "completed" | "cancelled";
+export type BookingStatus = "pending" | "accepted" | "rejected" | "completed" | "cancelled" | "failed";

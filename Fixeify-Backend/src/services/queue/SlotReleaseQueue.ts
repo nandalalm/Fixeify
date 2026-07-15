@@ -15,7 +15,7 @@ declare const process: {
 const QUEUE_NAME = 'slot-release';
 
 export type SlotReleaseJobData = {
-  bookingId: string; 
+  bookingId: string;
 };
 
 let connection: IORedis | null = null;
@@ -43,26 +43,38 @@ const getDayKeyFromDateIST = (date: Date): keyof IAvailability => {
   return ist.toLocaleString('en-US', { weekday: 'long' }).toLowerCase() as keyof IAvailability;
 };
 
-async function freeSlotsForBooking(bookingId: string) {
+async function releaseSlotsForBooking(bookingId: string) {
   const booking = await Booking.findById(bookingId).lean();
   if (!booking) return;
+  if (!["accepted", "completed"].includes(booking.status)) return;
   const pro = await ApprovedProModel.findById(booking.proId);
-  if (!pro) return;
-  const dayKey = getDayKeyFromDateIST(new Date(booking.preferredDate));
-  const daySlots = pro.availability[dayKey] || [];
-  let changed = false;
-  for (const sel of booking.preferredTime) {
-    const idx = daySlots.findIndex((s) => s.startTime === sel.startTime && s.endTime === sel.endTime);
-    if (idx !== -1 && daySlots[idx].booked) {
-      daySlots[idx].booked = false;
-      changed = true;
+  if (pro) {
+    const dayKey = getDayKeyFromDateIST(new Date(booking.preferredDate));
+    const daySlots = pro.availability[dayKey] || [];
+    let changed = false;
+    for (const sel of booking.preferredTime) {
+      const idx = daySlots.findIndex((s) => s.startTime === sel.startTime && s.endTime === sel.endTime);
+      if (idx !== -1 && daySlots[idx].booked) {
+        daySlots[idx].booked = false;
+        changed = true;
+      }
+    }
+    if (changed) {
+      pro.availability[dayKey] = daySlots;
+      pro.markModified('availability');
+      await pro.save();
     }
   }
-  if (changed) {
-    pro.availability[dayKey] = daySlots;
-    pro.markModified('availability');
-    await pro.save();
-  }
+  const releasedSlots = booking.preferredTime.map((slot) => ({
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    booked: false,
+  }));
+  await Booking.findByIdAndUpdate(booking._id, {
+    preferredTime: releasedSlots,
+    slotReleaseJobId: null,
+    slotReleaseAt: null,
+  }).exec();
 }
 
 export async function initSlotReleaseWorker() {
@@ -75,7 +87,7 @@ export async function initSlotReleaseWorker() {
       if (!mongoose.connection.readyState) {
         return;
       }
-      await freeSlotsForBooking(job.data.bookingId);
+      await releaseSlotsForBooking(job.data.bookingId);
     },
     { connection: connection as IORedis }
   );
@@ -87,7 +99,7 @@ export async function scheduleSlotRelease(bookingId: string, runAt: Date): Promi
   if (!ok || !queue) return false;
   const delay = Math.max(0, runAt.getTime() - Date.now());
   const opts: JobsOptions = {
-    jobId: bookingId, 
+    jobId: bookingId,
     delay,
     removeOnComplete: true,
     removeOnFail: 50,
@@ -107,15 +119,20 @@ export async function cancelSlotRelease(bookingId: string) {
       await job.remove();
     }
   } catch {
-    // Job removal failed, continue execution
+    return;
   }
 }
 
 export async function resyncSlotReleaseJobs() {
   const ok = ensureRedisAndQueue().ok;
-  if (!ok) return; 
+  if (!ok) return;
   const candidates = await Booking.find(
-    { status: { $in: ['accepted', 'completed'] } },
+    {
+      $or: [
+        { status: 'accepted' },
+        { status: 'completed', slotReleaseAt: { $ne: null } },
+      ],
+    },
     { _id: 1, slotReleaseAt: 1, slotReleaseJobId: 1 }
   ).lean();
   const now = Date.now();
@@ -126,9 +143,9 @@ export async function resyncSlotReleaseJobs() {
       continue;
     }
     if (ts <= now) {
-      await freeSlotsForBooking(b._id.toString());
+      await releaseSlotsForBooking(b._id.toString());
       try { await cancelSlotRelease(b._id.toString()); } catch {
-        // Job cancellation failed, continue execution
+        continue;
       }
       continue;
     }

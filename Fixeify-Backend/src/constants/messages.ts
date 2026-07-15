@@ -166,6 +166,7 @@ export const MESSAGES = {
 
   BOOKING_PREFERRED_DATE_PASSED: "This booking cannot be accepted as the preferred date has passed.",
   BOOKING_PREFERRED_SLOTS_PASSED: "This booking cannot be accepted as one or more preferred time slots have passed.",
+  BOOKING_ACCEPTANCE_WINDOW_EXPIRED: "This booking can no longer be accepted because it is less than 1 hour before the scheduled time.",
   BOOKING_MUST_BE_ACCEPTED_TO_GENERATE_QUOTA: "Booking must be accepted to generate quota",
   FAILED_SEND_BOOKING_ACCEPTANCE_NOTIFICATION: "Failed to send booking acceptance notification",
   FAILED_SEND_BOOKING_REJECTION_NOTIFICATION: "Failed to send booking rejection notification",

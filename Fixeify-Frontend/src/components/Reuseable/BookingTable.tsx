@@ -39,6 +39,7 @@ const BookingTable: React.FC<BookingTableProps> = ({ bookings, onViewDetails, to
                 booking.status === "pending" ? "bg-yellow-200 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-100" :
                 booking.status === "accepted" ? "bg-green-100 text-green-800 dark:bg-green-600 dark:text-green-100" :
                 booking.status === "cancelled" ? "bg-red-100 text-red-800 dark:bg-red-600 dark:text-red-100" :
+                booking.status === "failed" ? "bg-rose-100 text-rose-800 dark:bg-rose-600 dark:text-rose-100" :
                 "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-100"
               }`}>
                 {booking.status}
@@ -109,6 +110,7 @@ const BookingTable: React.FC<BookingTableProps> = ({ bookings, onViewDetails, to
                     booking.status === "pending" ? "bg-yellow-200 text-yellow-800 dark:bg-yellow-600 dark:text-yellow-100" :
                     booking.status === "accepted" ? "bg-green-100 text-green-800 dark:bg-green-600 dark:text-green-100" :
                     booking.status === "cancelled" ? "bg-red-100 text-red-800 dark:bg-red-600 dark:text-red-100" :
+                    booking.status === "failed" ? "bg-rose-100 text-rose-800 dark:bg-rose-600 dark:text-rose-100" :
                     "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-100"
                   }`}>
                     {booking.status}

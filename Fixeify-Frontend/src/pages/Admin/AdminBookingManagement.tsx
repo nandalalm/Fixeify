@@ -22,7 +22,7 @@ const AdminBookingManagement: FC = () => {
   const [selectedBooking, setSelectedBooking] = useState<BookingResponse | null>(null);
   // const [selectedQuota, setSelectedQuota] = useState<QuotaResponse | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "pending" | "accepted" | "completed" | "rejected" | "cancelled" | "">("latest");
+  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "pending" | "accepted" | "completed" | "rejected" | "cancelled" | "failed" | "">("latest");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const limit = 5;
@@ -35,8 +35,8 @@ const AdminBookingManagement: FC = () => {
     setError(null);
     try {
       // Determine server-side params
-      const statusFilter = ["pending", "accepted", "completed", "rejected", "cancelled"].includes(sortOption)
-        ? (sortOption as "pending" | "accepted" | "completed" | "rejected" | "cancelled")
+      const statusFilter = ["pending", "accepted", "completed", "rejected", "cancelled", "failed"].includes(sortOption)
+        ? (sortOption as "pending" | "accepted" | "completed" | "rejected" | "cancelled" | "failed")
         : undefined;
       const sortByParam = sortOption === "latest" || sortOption === "oldest" ? sortOption : "latest";
       // Heuristic: if search input looks like a Booking ID (no spaces, length >= 6), also pass as bookingId
@@ -171,6 +171,7 @@ const AdminBookingManagement: FC = () => {
                     <option value="completed">Sort by Completed</option>
                     <option value="rejected">Sort by Rejected</option>
                     <option value="cancelled">Sort by Cancelled</option>
+                    <option value="failed">Sort by Failed</option>
                   </select>
                 </div>
               </div>

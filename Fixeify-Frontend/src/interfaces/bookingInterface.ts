@@ -23,7 +23,7 @@ export class BookingResponse {
   phoneNumber: string;
   preferredDate: Date;
   preferredTime: ITimeSlot[];
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
+  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled" | "failed";
   rejectedReason?: string;
   cancelReason?: string;
   isRated?: boolean;
@@ -43,7 +43,7 @@ export class BookingResponse {
     phoneNumber: string;
     preferredDate: Date;
     preferredTime: ITimeSlot[];
-    status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
+    status: "pending" | "accepted" | "rejected" | "completed" | "cancelled" | "failed";
     rejectedReason?: string;
     cancelReason?: string;
     isRated?: boolean;
@@ -101,7 +101,7 @@ export class BookingCompleteResponse {
   phoneNumber: string;
   preferredDate: Date;
   preferredTime: ITimeSlot[];
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
+  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled" | "failed";
   rejectedReason?: string;
   cancelReason?: string;
   isRated?: boolean;
@@ -123,7 +123,7 @@ export class BookingCompleteResponse {
     phoneNumber: string;
     preferredDate: Date;
     preferredTime: ITimeSlot[];
-    status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
+    status: "pending" | "accepted" | "rejected" | "completed" | "cancelled" | "failed";
     rejectedReason?: string;
     cancelReason?: string;
     isRated?: boolean;

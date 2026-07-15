@@ -14,6 +14,29 @@ import { BookingResponse } from "../../interfaces/bookingInterface";
 import BookingFormSecond from "./BookingFormSecond";
 import BookingFormSuccess from "./BookingFormSuccess";
 
+const formatDateInputValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const normalizeAddress = (address?: string) => address?.trim().toLowerCase() || "";
+const normalizePhoneNumber = (phoneNumber?: string | null) => phoneNumber?.replace(/\D/g, "").slice(0, 10) || "";
+
+const validateIssueDescription = (description: string) => {
+  const trimmedDescription = description.trim();
+  if (!trimmedDescription) return "Issue description cannot be empty";
+  if (trimmedDescription.length < 10) return "Issue description must be at least 10 characters long";
+  return "";
+};
+
+const validatePhoneNumber = (phoneNumber: string) => {
+  if (!phoneNumber) return "Phone number is required";
+  if (phoneNumber.length !== 10) return "Phone number must be exactly 10 digits";
+  return "";
+};
+
 const BookingForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -28,14 +51,16 @@ const BookingForm = () => {
   const pro = location.state?.pro as IApprovedPro | undefined;
   const categoryId = location.state?.categoryId as string | undefined;
   const selectedLocation = location.state?.location as ILocation | undefined;
+  const initialLocationAddress = selectedLocation?.address || "";
 
   const [formData, setFormData] = useState({
     issueDescription: "",
     location: selectedLocation || null as ILocation | null,
     phoneNumber: "",
-    preferredDate: "",
+    preferredDate: formatDateInputValue(new Date()),
     preferredTime: [] as ITimeSlot[],
   });
+  const [locationInputValue, setLocationInputValue] = useState(initialLocationAddress);
   const [savedLocation, setSavedLocation] = useState<ILocation | null>(null);
   const [savedPhoneNumber, setSavedPhoneNumber] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -44,8 +69,13 @@ const BookingForm = () => {
   const [bookingDetails, setBookingDetails] = useState<BookingResponse | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const locationInputRef = useRef<HTMLInputElement | null>(null);
+  const shouldShowSavedLocation =
+    !!savedLocation && normalizeAddress(locationInputValue) !== normalizeAddress(savedLocation.address);
+  const shouldShowSavedPhoneNumber =
+    !!savedPhoneNumber && normalizePhoneNumber(formData.phoneNumber) !== normalizePhoneNumber(savedPhoneNumber);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -59,8 +89,7 @@ const BookingForm = () => {
         const response = await getUserProfile(userId);
         if (response.address) setSavedLocation(response.address);
         if (response.phoneNo) setSavedPhoneNumber(response.phoneNo);
-      } catch (error) {
-        console.error("Failed to fetch user profile:", error);
+      } catch {
         setErrors({ general: "Failed to fetch user profile." });
       } finally {
         setIsLoadingProfile(false);
@@ -121,6 +150,7 @@ const BookingForm = () => {
             }
 
             setFormData((prev) => ({ ...prev, location: locationData }));
+            setLocationInputValue(address);
             setErrors((prev) => ({ ...prev, location: "" }));
           } else {
             setErrors({ location: "Please provide a valid location." });
@@ -146,7 +176,7 @@ const BookingForm = () => {
   const handleGetCurrentLocation = () => {
     if (navigator.geolocation) {
       setIsLoadingLocation(true);
-      if (locationInputRef.current) locationInputRef.current.value = "";
+      setLocationInputValue("");
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
@@ -187,7 +217,7 @@ const BookingForm = () => {
                 }
 
                 setFormData((prev) => ({ ...prev, location: locationData }));
-                if (locationInputRef.current) locationInputRef.current.value = address;
+                setLocationInputValue(address);
                 setErrors((prev) => ({ ...prev, location: "" }));
               } else {
                 setErrors({ location: "Unable to fetch current location details." });
@@ -220,23 +250,46 @@ const BookingForm = () => {
   const handleUseSavedLocation = () => {
     if (savedLocation) {
       setFormData((prev) => ({ ...prev, location: savedLocation }));
-      if (locationInputRef.current) locationInputRef.current.value = savedLocation.address;
+      setLocationInputValue(savedLocation.address);
       setErrors((prev) => ({ ...prev, location: "" }));
     }
   };
 
   const handleUseSavedPhoneNumber = () => {
     if (savedPhoneNumber) {
-      setFormData((prev) => ({ ...prev, phoneNumber: savedPhoneNumber }));
+      setFormData((prev) => ({ ...prev, phoneNumber: normalizePhoneNumber(savedPhoneNumber) }));
       setErrors((prev) => ({ ...prev, phoneNumber: "" }));
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    const updatedValue = name === "issueDescription" ? value : value.trim();
+    const updatedValue =
+      name === "issueDescription"
+        ? value.slice(0, 500)
+        : name === "phoneNumber"
+        ? normalizePhoneNumber(value)
+        : value.trim();
+    const validationError =
+      name === "issueDescription"
+        ? validateIssueDescription(updatedValue)
+        : name === "phoneNumber"
+        ? validatePhoneNumber(updatedValue)
+        : "";
     setFormData((prev) => ({ ...prev, [name]: updatedValue }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
+    setErrors((prev) => ({ ...prev, [name]: validationError }));
+    setServerError("");
+    setSuccessMessage("");
+  };
+
+  const handleLocationInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setLocationInputValue(value);
+    setFormData((prev) => {
+      if (normalizeAddress(value) === normalizeAddress(prev.location?.address)) return prev;
+      return { ...prev, location: null };
+    });
+    setErrors((prev) => ({ ...prev, location: "" }));
     setServerError("");
     setSuccessMessage("");
   };
@@ -259,16 +312,21 @@ const BookingForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
     setErrors({});
     setServerError("");
     setSuccessMessage("");
 
     if (!userId) {
       setServerError("Please log in to create a booking.");
+      setIsSubmitting(false);
       return;
     }
     if (!pro || !proId || !categoryId) {
       setServerError("Professional or category data not found.");
+      setIsSubmitting(false);
       return;
     }
 
@@ -300,6 +358,7 @@ const BookingForm = () => {
 
         if (selectedTimes.some((time) => time < earliestAllowedTime)) {
           setErrors({ preferredTime: "Booking must be scheduled at least 1 hour in advance" });
+          setIsSubmitting(false);
           return;
         }
       }
@@ -316,16 +375,12 @@ const BookingForm = () => {
       setBookingDetails(response);
       setSuccessMessage("Booking created successfully!");
     } catch (error) {
+      setIsSubmitting(false);
       if (error instanceof z.ZodError) {
         const fieldErrors: Record<string, string> = {};
         error.errors.forEach((err) => {
           const field = err.path[0] as string;
-          fieldErrors[field] = `${field.charAt(0).toUpperCase() + field.slice(1)} is required`;
-          if (field === "phoneNumber" && formData.phoneNumber.length > 0 && formData.phoneNumber.length !== 10) {
-            fieldErrors[field] = "Enter a valid 10-digit phone number";
-          } else if (field === "preferredTime" && formData.preferredTime.length === 0) {
-            fieldErrors[field] = "Please select at least one time slot";
-          }
+          fieldErrors[field] = err.message;
         });
         setErrors(fieldErrors);
       } else if (error instanceof Error) {
@@ -340,7 +395,7 @@ const BookingForm = () => {
               } else if (message.includes("Time slot is already booked")) {
                 setErrors({ preferredTime: "One or more selected time slots are already booked. Please choose different slots." });
               } else if (message.includes("You already have a booking")) {
-                setServerError(message); // Handle the new overlapping booking error
+                setServerError(message);
               } else if (message.includes("Time slot") || message.includes("Preferred time")) {
                 setErrors({ preferredTime: message });
               } else if (message.includes("Professional is currently unavailable")) {
@@ -438,6 +493,7 @@ const BookingForm = () => {
                   onChange={handleChange}
                   placeholder="Describe the issue (10–500 characters)"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                  maxLength={500}
                   required
                   rows={4}
                 />
@@ -454,7 +510,8 @@ const BookingForm = () => {
                     type="text"
                     id="location"
                     name="location"
-                    defaultValue={formData.location?.address || ""}
+                    value={locationInputValue}
+                    onChange={handleLocationInputChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 pr-10 dark:bg-gray-700 dark:text-white dark:border-gray-600"
                     placeholder="Enter your location"
                     required
@@ -485,17 +542,18 @@ const BookingForm = () => {
                   </button>
                 </div>
                 {errors.location && <p className="text-red-500 text-sm mt-1">{errors.location}</p>}
-                {savedLocation && (
-                  <button
-                    type="button"
-                    onClick={handleUseSavedLocation}
-                    className="mt-2 w-full px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500"
-                  >
-                    Use Saved Location
-                  </button>
+                {shouldShowSavedLocation && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleUseSavedLocation}
+                      className="mt-2 w-full px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500"
+                    >
+                      Use Saved Location
+                    </button>
+                    <p className="text-gray-400 text-sm pl-3">Saved Location: {savedLocation.address}</p>
+                  </>
                 )}
-                {savedLocation?.address&&
-                <p className="text-gray-400 text-sm pl-3">Saved Location: {savedLocation?.address}</p>}
               </div>
 
               <div>
@@ -510,20 +568,24 @@ const BookingForm = () => {
                   onChange={handleChange}
                   placeholder="Enter 10-digit phone number"
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={10}
                   required
                 />
                 {errors.phoneNumber && <p className="text-red-500 text-sm mt-1">{errors.phoneNumber}</p>}
-                {savedPhoneNumber && (
-                  <button
-                    type="button"
-                    onClick={handleUseSavedPhoneNumber}
-                    className="mt-2 w-full px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500"
-                  >
-                    Use Saved Phone Number
-                  </button>
+                {shouldShowSavedPhoneNumber && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleUseSavedPhoneNumber}
+                      className="mt-2 w-full px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500"
+                    >
+                      Use Saved Phone Number
+                    </button>
+                    <p className="text-gray-400 text-sm pl-3">Saved Phone No: {savedPhoneNumber}</p>
+                  </>
                 )}
-                {savedPhoneNumber&&
-                <p className="text-gray-400 text-sm pl-3">Saved Phone No: {savedPhoneNumber}</p>}
               </div>
 
               <BookingFormSecond
@@ -542,9 +604,10 @@ const BookingForm = () => {
 
               <button
                 type="submit"
-                className="w-full px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869] dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500"
+                disabled={isSubmitting}
+                className="w-full px-4 py-2 bg-[#032B44] text-white rounded-md hover:bg-[#054869] disabled:opacity-60 disabled:cursor-not-allowed dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500"
               >
-                Submit Booking
+                {isSubmitting ? "Submitting..." : "Submit Booking"}
               </button>
             </form>
           )}

@@ -127,6 +127,7 @@ const StatusBadge: React.FC<{ kind: "booking" | "payment"; value: string }>=({ k
     else if (v === "rejected") classes += "border-red-600 text-red-700";
     else if (v === "completed") classes += "border-green-600 text-green-700";
     else if (v === "cancelled") classes += "border-gray-400 text-gray-600";
+    else if (v === "failed") classes += "border-rose-600 text-rose-700";
     else classes += "border-gray-300 text-gray-600";
   } else {
     if (v === "pending") classes += "border-amber-500 text-amber-700";
@@ -387,6 +388,9 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
         )}
         {booking.status === "cancelled" && booking.cancelReason && (
           <LabelValue label="Cancellation Reason" value={booking.cancelReason} />
+        )}
+        {booking.status === "failed" && booking.rejectedReason && (
+          <LabelValue label="Failure Reason" value={booking.rejectedReason} />
         )}
       </Section>
 

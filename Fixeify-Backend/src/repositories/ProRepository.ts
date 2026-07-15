@@ -4,7 +4,7 @@ import { PendingProModel, type PendingProDocument } from "../models/pendingProMo
 import { ApprovedProModel, type ApprovedProDocument, type ITimeSlot } from "../models/approvedProModel";
 import type { CategoryDocument } from "../models/categoryModel";
 import type { IProRepository } from "./IProRepository";
-import { type ClientSession, Types, type PipelineStage } from "mongoose";
+import { type ClientSession, Types, type PipelineStage, type FilterQuery } from "mongoose";
 import type { NearbyProRecord, PopulatedApprovedProRecord, ProProfileRecord } from "../contracts/repository/proRecords";
 
 declare const console: {
@@ -278,45 +278,56 @@ export class MongoProRepository extends BaseRepository<PendingProDocument> imple
 
   async updateAvailability(proId: string, dayOfWeek: string, timeSlots: ITimeSlot[], booked: boolean = true, session?: ClientSession): Promise<ApprovedProDocument | null> {
     try {
-      const startTimes = timeSlots.map(slot => slot.startTime);
-      const endTimes = timeSlots.map(slot => slot.endTime);
-      const availabilityDay = dayOfWeek as keyof ApprovedProDocument["availability"];
+      if (timeSlots.length === 0) return null;
+
+      const uniqueSlots = Array.from(
+        new Map(timeSlots.map((slot) => [`${slot.startTime}-${slot.endTime}`, slot])).values()
+      );
+
+      const slotConditions = uniqueSlots.map((slot) => ({
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+      }));
+
+      const slotStateConditions = slotConditions.map((slot) => ({
+        [`availability.${dayOfWeek}`]: {
+          $elemMatch: {
+            ...slot,
+            ...(booked ? { booked: false } : {}),
+          },
+        },
+      })) as FilterQuery<ApprovedProDocument>[];
+
+      const slotUpdates = slotConditions.reduce<Record<string, boolean>>((updates, _slot, index) => {
+        updates[`availability.${dayOfWeek}.$[slot${index}].booked`] = booked;
+        return updates;
+      }, {});
+
+      const arrayFilters = slotConditions.map((slot, index) => ({
+        [`slot${index}.startTime`]: slot.startTime,
+        [`slot${index}.endTime`]: slot.endTime,
+        ...(booked ? { [`slot${index}.booked`]: false } : {}),
+      }));
+
+      const query: FilterQuery<ApprovedProDocument> = {
+        _id: proId,
+        ...(slotStateConditions.length > 0 ? { $and: slotStateConditions } : {}),
+      };
 
       const result = await ApprovedProModel.findOneAndUpdate(
+        query,
         {
-          _id: proId,
-          [`availability.${dayOfWeek}`]: {
-            $elemMatch: {
-              startTime: { $in: startTimes },
-              endTime: { $in: endTimes }
-            }
-          }
-        },
-        {
-          $set: {
-            [`availability.${dayOfWeek}.$[elem].booked`]: booked
-          }
+          $set: slotUpdates
         },
         {
           new: true,
-          arrayFilters: [{ "elem.startTime": { $in: startTimes }, "elem.endTime": { $in: endTimes } }],
+          arrayFilters,
           session
         }
       ).exec();
 
-      if (!result) {
-        const pro = await ApprovedProModel.findById(proId).session(session || null);
-        if (pro) {
-          pro.availability = pro.availability || {};
-          pro.availability[availabilityDay] = timeSlots.map(slot => ({ ...slot, booked }));
-          return await pro.save({ session });
-        }
-        return null;
-      }
-
       return result;
-    } catch (error) {
-      console.error("Error updating availability:", error);
+    } catch {
       return null;
     }
   }

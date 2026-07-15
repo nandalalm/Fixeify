@@ -34,6 +34,47 @@ import { toQuotaResponse } from "../mappers/quotaMapper";
 import { toWalletResponse } from "../mappers/walletMapper";
 import { toWithdrawalResponse, toWithdrawalResponses } from "../mappers/withdrawalMapper";
 
+const IST_OFFSET_MINUTES = 330;
+
+const getSlotReleaseDateInIST = (preferredDate: Date, endMinutes: number): Date => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(preferredDate);
+
+  let year = 0;
+  let month = 0;
+  let day = 0;
+
+  for (const part of parts) {
+    if (part.type === "year") year = Number(part.value);
+    if (part.type === "month") month = Number(part.value);
+    if (part.type === "day") day = Number(part.value);
+  }
+
+  const hours = Math.floor(endMinutes / 60);
+  const minutes = endMinutes % 60;
+  const utcTime = Date.UTC(year, month - 1, day, hours, minutes, 0, 0) - IST_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcTime);
+};
+
+type AvailabilityDay = keyof IAvailability;
+
+const AVAILABILITY_DAYS: AvailabilityDay[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
+
+const hasBookedAvailabilitySlots = (availability: IAvailability): boolean =>
+  AVAILABILITY_DAYS.some((day) => availability[day]?.some((slot) => slot.booked) ?? false);
+
 @injectable()
 export class ProService implements IProService {
   constructor(
@@ -175,16 +216,41 @@ export class ProService implements IProService {
     const existingPro = await this._proRepository.findApprovedProById(proId);
     if (!existingPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
-    if (data.isUnavailable) {
-      const hasBookedSlots = Object.values(data.availability).some(
-        (slots: { startTime: string; endTime: string; booked: boolean }[] | undefined) => slots?.some((slot) => slot.booked)
-      );
-      if (hasBookedSlots) {
-        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CANNOT_MARK_UNAVAILABLE_WITH_BOOKED_SLOTS);
-      }
+    if (data.isUnavailable && hasBookedAvailabilitySlots(existingPro.availability || {})) {
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CANNOT_MARK_UNAVAILABLE_WITH_BOOKED_SLOTS);
     }
 
-    const updatedPro = await this._proRepository.updateApprovedPro(proId, { availability: data.availability, isUnavailable: data.isUnavailable });
+    const normalizedAvailability: IAvailability = {};
+    for (const day of AVAILABILITY_DAYS) {
+      const existingSlots = existingPro.availability?.[day] || [];
+      const incomingSlots = data.availability?.[day] || [];
+      const bookedSlots = existingSlots.filter((slot) => slot.booked);
+
+      for (const bookedSlot of bookedSlots) {
+        const preserved = incomingSlots.some(
+          (slot) =>
+            slot.startTime === bookedSlot.startTime &&
+            slot.endTime === bookedSlot.endTime &&
+            slot.booked
+        );
+        if (!preserved) {
+          throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.CANNOT_MARK_UNAVAILABLE_WITH_BOOKED_SLOTS);
+        }
+      }
+
+      normalizedAvailability[day] = incomingSlots.map((slot) => ({
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        booked: existingSlots.some(
+          (existingSlot) =>
+            existingSlot.startTime === slot.startTime &&
+            existingSlot.endTime === slot.endTime &&
+            existingSlot.booked
+        ),
+      }));
+    }
+
+    const updatedPro = await this._proRepository.updateApprovedPro(proId, { availability: normalizedAvailability, isUnavailable: data.isUnavailable });
     if (!updatedPro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
     return { availability: updatedPro.availability || {}, isUnavailable: updatedPro.isUnavailable };
@@ -219,6 +285,7 @@ export class ProService implements IProService {
   async acceptBooking(bookingId: string): Promise<{ message: string }> {
     const session = await mongoose.startSession();
     let acceptedBooking: { userId: string; slotReleaseAt: Date } | null = null;
+    let acceptanceWindowExpired = false;
     try {
       session.startTransaction();
       const booking = await this._bookingRepository.findBookingById(bookingId, session);
@@ -226,34 +293,37 @@ export class ProService implements IProService {
       if (booking.status !== "pending") throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_NOT_PENDING);
 
       const currentDateTime = new Date();
-      const currentIST = new Date(currentDateTime.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
 
       const preferredDate = new Date(booking.preferredDate);
       const preferredDateIST = new Date(preferredDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
 
-      const currentDateOnly = new Date(currentIST.getFullYear(), currentIST.getMonth(), currentIST.getDate());
-      const preferredDateOnly = new Date(preferredDateIST.getFullYear(), preferredDateIST.getMonth(), preferredDateIST.getDate());
+      const toMinutes = (t: string) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m;
+      };
 
-      if (preferredDateOnly < currentDateOnly) {
-        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_PREFERRED_DATE_PASSED);
-      }
-
-      const isPastTimeSlot = booking.preferredTime.some(slot => {
-        const [hours, minutes] = slot.startTime.split(":").map(Number);
-        const slotDateTime = new Date(preferredDateIST);
-        slotDateTime.setHours(hours, minutes, 0, 0);
-        return slotDateTime < currentIST;
-      });
-
-      if (isPastTimeSlot) {
-        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_PREFERRED_SLOTS_PASSED);
-      }
+      const firstStartMinutes = booking.preferredTime
+        .map(s => toMinutes(s.startTime))
+        .reduce((min, cur) => (cur < min ? cur : min), Number.MAX_SAFE_INTEGER);
+      const firstStartDateTime = getSlotReleaseDateInIST(preferredDate, firstStartMinutes);
+      const latestAcceptTime = new Date(firstStartDateTime.getTime() - 60 * 60 * 1000);
 
       const pro = await this._proRepository.findApprovedProById(booking.proId.toString(), session);
       if (!pro) throw new HttpError(HttpStatus.NOT_FOUND, MESSAGES.PRO_NOT_FOUND);
 
       const dayOfWeek = preferredDateIST.toLocaleString("en-US", { weekday: "long" }).toLowerCase();
       const availableSlots = pro.availability[dayOfWeek as keyof ApprovedProDocument["availability"]] || [];
+
+      const updatedSlots = booking.preferredTime.map((slot) => ({
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        booked: true,
+      }));
+      const releasedSlots = booking.preferredTime.map((slot) => ({
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        booked: false,
+      }));
 
       for (const slot of booking.preferredTime) {
         const matchingSlot = availableSlots.find(
@@ -262,68 +332,71 @@ export class ProService implements IProService {
         if (!matchingSlot) {
           throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAIL_SELECTED_SLOTS);
         }
+        if (!matchingSlot.booked) {
+          throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAIL_SELECTED_SLOTS);
+        }
       }
 
-      const updatedSlots = booking.preferredTime.map((slot) => ({
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        booked: true,
-      }));
-
-      const availabilityUpdate = await this._proRepository.updateAvailability(pro.id, dayOfWeek, updatedSlots, true, session);
-      if (!availabilityUpdate) {
-        throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
-      }
-
-      const conflictingBookings = await this._bookingRepository.findBookingsByProAndDate(
-        pro.id,
-        preferredDate,
-        booking.preferredTime,
-        "pending",
-        bookingId,
-        session
-      );
-
-      for (const conflictingBooking of conflictingBookings) {
-        await this._bookingRepository.updateBooking(conflictingBooking._id.toString(), {
-          status: "rejected",
-          rejectedReason: MESSAGES.SCHEDULE_CONFLICT,
+      if (currentDateTime > latestAcceptTime) {
+        const availabilityRelease = await this._proRepository.updateAvailability(pro.id, dayOfWeek, releasedSlots, false, session);
+        if (!availabilityRelease) {
+          throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.FAILED_UPDATE_PRO_AVAILABILITY);
+        }
+        await this._bookingRepository.updateBooking(bookingId, {
+          status: "failed",
+          rejectedReason: MESSAGES.BOOKING_ACCEPTANCE_WINDOW_EXPIRED,
+          preferredTime: releasedSlots.map((slot) => ({ ...slot })),
+          slotReleaseJobId: null,
+          slotReleaseAt: null,
         }, session);
+        acceptanceWindowExpired = true;
+      } else {
+        const conflictingBookings = await this._bookingRepository.findBookingsByProAndDate(
+          pro.id,
+          preferredDate,
+          booking.preferredTime,
+          "pending",
+          bookingId,
+          session
+        );
+
+        for (const conflictingBooking of conflictingBookings) {
+          await this._bookingRepository.updateBooking(conflictingBooking._id.toString(), {
+            status: "rejected",
+            rejectedReason: MESSAGES.SCHEDULE_CONFLICT,
+          }, session);
+        }
+
+        await this._bookingRepository.updateBooking(bookingId, {
+          status: "accepted",
+          preferredTime: updatedSlots.map((slot) => ({ ...slot })),
+        }, session);
+
+        const lastEndMinutes = booking.preferredTime
+          .map(s => toMinutes(s.endTime))
+          .reduce((max, cur) => (cur > max ? cur : max), 0);
+        const runAt = getSlotReleaseDateInIST(preferredDate, lastEndMinutes);
+        await this._bookingRepository.updateBooking(
+          bookingId,
+          { slotReleaseJobId: null, slotReleaseAt: runAt },
+          session
+        );
+
+        acceptedBooking = {
+          userId: booking.userId.toString(),
+          slotReleaseAt: runAt,
+        };
       }
-
-      await this._bookingRepository.updateBooking(bookingId, {
-        status: "accepted",
-        preferredTime: updatedSlots.map((slot) => ({ ...slot })),
-      }, session);
-
-      const toMinutes = (t: string) => {
-        const [h, m] = t.split(":").map(Number);
-        return h * 60 + m;
-      };
-      const lastEndMinutes = booking.preferredTime
-        .map(s => toMinutes(s.endTime))
-        .reduce((max, cur) => (cur > max ? cur : max), 0);
-      const endH = Math.floor(lastEndMinutes / 60);
-      const endM = lastEndMinutes % 60;
-      const preferredDateIST2 = new Date(preferredDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      preferredDateIST2.setHours(endH, endM, 0, 0);
-      const runAt = new Date(preferredDateIST2.toISOString());
-      await this._bookingRepository.updateBooking(
-        bookingId,
-        { slotReleaseJobId: null, slotReleaseAt: runAt },
-        session
-      );
-
-      acceptedBooking = {
-        userId: booking.userId.toString(),
-        slotReleaseAt: runAt,
-      };
       await session.commitTransaction();
     } catch (error) {
       await session.abortTransaction();
       throw error;
     } finally {
       session.endSession();
+    }
+
+    if (acceptanceWindowExpired) {
+      throw new HttpError(HttpStatus.BAD_REQUEST, MESSAGES.BOOKING_ACCEPTANCE_WINDOW_EXPIRED);
     }
 
     if (!acceptedBooking) {
@@ -390,7 +463,7 @@ export class ProService implements IProService {
     try { await cancelSlotRelease(bookingId); } catch (error) {
       logger.error(MESSAGES.FAILED_CANCEL_SLOT_RELEASE, { bookingId, error });
     }
-    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null });
+    await this._bookingRepository.updateBooking(bookingId, { slotReleaseJobId: null, slotReleaseAt: null });
 
     try {
       await this._notificationService.createNotification({

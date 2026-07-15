@@ -23,8 +23,10 @@ const OngoingRequest = () => {
   const [selectedBooking, setSelectedBooking] = useState<BookingResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
   const [localPaymentStatus, setLocalPaymentStatus] = useState<string | null>(null);
+  const [paymentSetupError, setPaymentSetupError] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [isPreparingPayment, setIsPreparingPayment] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -123,6 +125,7 @@ const OngoingRequest = () => {
     setSelectedBooking(booking);
     setClientSecret(null);
     setQuota(null);
+    setPaymentSetupError(null);
     setDetailsLoading(true);
   };
 
@@ -211,16 +214,32 @@ const OngoingRequest = () => {
 
   const handleStartPayment = async () => {
     if (!selectedBooking || !quota) return;
-    const resp = await createPaymentIntent(selectedBooking.id, quota.totalCost * 100);
-    setClientSecret(resp.clientSecret);
-    setLocalPaymentStatus("pending");
+    setIsPreparingPayment(true);
+    setPaymentSetupError(null);
+    try {
+      const resp = await createPaymentIntent(selectedBooking.id, quota.totalCost * 100);
+      setClientSecret(resp.clientSecret);
+      setLocalPaymentStatus("pending");
+    } catch {
+      setPaymentSetupError("Failed to start payment. Please try again.");
+    } finally {
+      setIsPreparingPayment(false);
+    }
   };
 
   const handleRetryPayment = async () => {
     if (!selectedBooking || !quota) return;
-    const resp = await createPaymentIntent(selectedBooking.id, quota.totalCost * 100);
-    setClientSecret(resp.clientSecret);
-    setLocalPaymentStatus("pending");
+    setIsPreparingPayment(true);
+    setPaymentSetupError(null);
+    try {
+      const resp = await createPaymentIntent(selectedBooking.id, quota.totalCost * 100);
+      setClientSecret(resp.clientSecret);
+      setLocalPaymentStatus("pending");
+    } catch {
+      setPaymentSetupError("Failed to restart payment. Please try again.");
+    } finally {
+      setIsPreparingPayment(false);
+    }
   };
 
 
@@ -282,25 +301,18 @@ const OngoingRequest = () => {
     const submit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!stripe || !elements || !clientSecret) return;
-      
-      const { error: validationError } = await elements.submit();
-      if (validationError) {
-        if (validationError.code === 'card_incomplete' && validationError.type === 'validation_error') {
-          setMessage("Please enter your card details to proceed with the payment.");
-        } else {
-          setMessage(validationError.message || "Please check your card details and try again.");
-        }
-        setIsLoading(false);
-        return;
-      }
-      
+
       setIsLoading(true);
       setMessage(null); 
       
       try {
         const { error: submitError } = await elements.submit();
         if (submitError) {
-          setMessage(submitError.message || "Failed to validate payment details. Please check your information and try again.");
+          if (submitError.code === 'card_incomplete' && submitError.type === 'validation_error') {
+            setMessage("Please enter your card details to proceed with the payment.");
+          } else {
+            setMessage(submitError.message || "Please check your card details and try again.");
+          }
           setIsLoading(false);
           return;
         }
@@ -470,6 +482,9 @@ const OngoingRequest = () => {
                 <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">Total</span>
                 <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-gray-50">₹{quota.totalCost}</span>
               </div>
+              {paymentSetupError && (
+                <p className="mt-3 text-sm text-red-500 dark:text-red-400">{paymentSetupError}</p>
+              )}
 
               {(() => {
                 const status = localPaymentStatus ?? String(quota.paymentStatus);
@@ -484,8 +499,12 @@ const OngoingRequest = () => {
                 }
                 if (status === "pending" && !clientSecret) {
                   return (
-                    <button onClick={handleStartPayment} className="mt-4 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white">
-                      Go to Payment
+                    <button
+                      onClick={handleStartPayment}
+                      disabled={isPreparingPayment}
+                      className="mt-4 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+                    >
+                      {isPreparingPayment ? "Preparing..." : "Go to Payment"}
                     </button>
                   );
                 }
@@ -493,8 +512,12 @@ const OngoingRequest = () => {
                   return (
                     <div className="mt-3">
                       <p className="text-sm text-red-500 dark:text-red-400">Your payment was not successful, please try again.</p>
-                      <button onClick={handleRetryPayment} className="mt-2 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white">
-                        Retry Payment
+                      <button
+                        onClick={handleRetryPayment}
+                        disabled={isPreparingPayment}
+                        className="mt-2 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+                      >
+                        {isPreparingPayment ? "Preparing..." : "Retry Payment"}
                       </button>
                     </div>
                   );

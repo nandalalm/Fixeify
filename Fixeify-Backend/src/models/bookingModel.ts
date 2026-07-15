@@ -48,7 +48,7 @@ export interface IBooking {
   phoneNumber: string;
   preferredDate: Date;
   preferredTime: ITimeSlot[];
-  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled";
+  status: "pending" | "accepted" | "rejected" | "completed" | "cancelled" | "failed";
   rejectedReason?: string;
   cancelReason?: string;
   isRated?: boolean;
@@ -91,7 +91,7 @@ const bookingSchema = new Schema<BookingDocument>(
     preferredTime: { type: [timeSlotSchema], required: true },
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected", "completed", "cancelled"],
+      enum: ["pending", "accepted", "rejected", "completed", "cancelled", "failed"],
       default: "pending",
     },
     rejectedReason: { type: String },

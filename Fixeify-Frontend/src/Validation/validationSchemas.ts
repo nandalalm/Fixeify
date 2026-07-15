@@ -78,10 +78,10 @@ export const resetPasswordSchema = z.object({
 export const bookingSchema = z.object({
   issueDescription: z
     .string()
+    .trim()
+    .nonempty("Issue description cannot be empty")
     .min(10, "Issue description must be at least 10 characters long")
-    .max(500, "Issue description cannot exceed 500 characters")
-    .nonempty("Issue description is required")
-    .trim(),
+    .max(500, "Issue description cannot exceed 500 characters"),
   location: z
     .object({
       address: z.string().nonempty("Address is required"),
@@ -98,9 +98,9 @@ export const bookingSchema = z.object({
     .refine((val) => val !== null, { message: "Location is required" }),
   phoneNumber: z
     .string()
-    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits")
     .nonempty("Phone number is required")
-    .trim(),
+    .trim()
+    .regex(/^\d{10}$/, "Phone number must be exactly 10 digits"),
   preferredDate: z
     .string()
     .nonempty("Preferred date is required")

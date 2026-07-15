@@ -40,22 +40,22 @@ const BookingHistory: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   useSelector((state: RootState) => state.ratingReview);
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "">("latest");
+  const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "failed" | "">("latest");
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const serverParams = useMemo(() => {
-    const isStatus = ["completed", "rejected", "cancelled"].includes(sortOption);
-    const status = isStatus ? (sortOption as "completed" | "rejected" | "cancelled") : undefined;
+    const isStatus = ["completed", "rejected", "cancelled", "failed"].includes(sortOption);
+    const status = isStatus ? (sortOption as "completed" | "rejected" | "cancelled" | "failed") : undefined;
     const sortBy: "latest" | "oldest" = sortOption === "oldest" ? "oldest" : "latest";
     return { status, sortBy };
   }, [sortOption]);
 
   const filtersActive = useMemo(() => {
     const hasSearch = searchTerm.trim().length > 0;
-    const hasStatus = ["completed", "rejected", "cancelled"].includes(sortOption);
+    const hasStatus = ["completed", "rejected", "cancelled", "failed"].includes(sortOption);
     return hasSearch || hasStatus;
   }, [searchTerm, sortOption]);
 
@@ -199,7 +199,7 @@ const BookingHistory: React.FC = () => {
           />
           <select
             value={sortOption}
-            onChange={(e) => setSortOption(e.target.value as "latest" | "oldest" | "completed" | "rejected" | "cancelled" | "")}
+            onChange={(e) => setSortOption(e.target.value as "latest" | "oldest" | "completed" | "rejected" | "cancelled" | "failed" | "")}
             className="w-full sm:w-1/6 p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white text-gray-900 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 dark:focus:ring-blue-400"
           >
             <option value="latest">Sort by Latest</option>
@@ -207,6 +207,7 @@ const BookingHistory: React.FC = () => {
             <option value="completed">Sort by Completed</option>
             <option value="rejected">Sort by Rejected</option>
             <option value="cancelled">Sort by Cancelled</option>
+            <option value="failed">Sort by Failed</option>
           </select>
         </div>
       )}

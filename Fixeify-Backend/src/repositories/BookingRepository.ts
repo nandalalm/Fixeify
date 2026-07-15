@@ -108,7 +108,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     const skip = (page - 1) * limit;
     const query: FilterQuery<BookingDocument> = { userId: new mongoose.Types.ObjectId(userId) };
 
-    const historyStatuses = ["completed", "rejected", "cancelled"];
+    const historyStatuses = ["completed", "rejected", "cancelled", "failed"];
     if (status && status.trim().length > 0) {
       const statusArray = status.split(",").map((s) => s.trim());
       query.status = statusArray.length > 1 ? { $in: statusArray } : statusArray[0];

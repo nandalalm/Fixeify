@@ -193,6 +193,7 @@ const UserBookingDetails = ({ booking, onBack }: { booking: BookingResponse; onB
   const [error, setError] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [isPreparingPayment, setIsPreparingPayment] = useState(false);
   const [isReasonModalOpen, setIsReasonModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -227,14 +228,30 @@ const UserBookingDetails = ({ booking, onBack }: { booking: BookingResponse; onB
 
   const handlePayment = async () => {
     if (!quota || !currentBooking) return;
-    const response = await createPaymentIntent(currentBooking.id, quota.totalCost * 100);
-    setClientSecret(response.clientSecret);
+    setIsPreparingPayment(true);
+    setError(null);
+    try {
+      const response = await createPaymentIntent(currentBooking.id, quota.totalCost * 100);
+      setClientSecret(response.clientSecret);
+    } catch {
+      setError("Failed to start payment. Please try again.");
+    } finally {
+      setIsPreparingPayment(false);
+    }
   };
 
   const handleRetryPayment = async () => {
     if (!quota || !currentBooking) return;
-    const response = await createPaymentIntent(currentBooking.id, quota.totalCost * 100);
-    setClientSecret(response.clientSecret);
+    setIsPreparingPayment(true);
+    setError(null);
+    try {
+      const response = await createPaymentIntent(currentBooking.id, quota.totalCost * 100);
+      setClientSecret(response.clientSecret);
+    } catch {
+      setError("Failed to restart payment. Please try again.");
+    } finally {
+      setIsPreparingPayment(false);
+    }
   };
 
   const onPaymentSuccess = () => {
@@ -451,9 +468,10 @@ const UserBookingDetails = ({ booking, onBack }: { booking: BookingResponse; onB
               ) : quota.paymentStatus === "pending" && !clientSecret ? (
                 <button
                   onClick={handlePayment}
-                  className="mt-4 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+                  disabled={isPreparingPayment}
+                  className="mt-4 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
                 >
-                  Go to Payment
+                  {isPreparingPayment ? "Preparing..." : "Go to Payment"}
                 </button>
               ) : quota.paymentStatus === "failed" ? (
                 <>
@@ -462,9 +480,10 @@ const UserBookingDetails = ({ booking, onBack }: { booking: BookingResponse; onB
                   </p>
                   <button
                     onClick={handleRetryPayment}
-                    className="mt-2 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
+                    disabled={isPreparingPayment}
+                    className="mt-2 bg-[#032B44] rounded-md text-sm text-white font-medium hover:bg-[#054869] px-4 py-1.5 transition-colors disabled:opacity-60 disabled:cursor-not-allowed dark:bg-gray-300 dark:text-gray-800 dark:hover:bg-gray-500 dark:hover:!text-white"
                   >
-                    Retry Payment
+                    {isPreparingPayment ? "Preparing..." : "Retry Payment"}
                   </button>
                 </>
               ) : null}
