@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "../../store/store";
 import { fetchBookingDetails, createPaymentIntent, cancelBooking, fetchQuotaByBookingId } from "../../api/userApi";
-import { BookingResponse } from "../../interfaces/bookingInterface";
+import { BookingCompleteResponse, BookingResponse } from "../../interfaces/bookingInterface";
 import { QuotaResponse } from "../../interfaces/quotaInterface";
 import { IApprovedPro } from "../../interfaces/adminInterface";
 import { RotateCcw } from "lucide-react";
@@ -127,6 +127,7 @@ const OngoingRequest = () => {
     setQuota(null);
     setPaymentSetupError(null);
     setDetailsLoading(true);
+    setShowCancelButton(false);
   };
 
   const handleBack = () => {
@@ -183,6 +184,20 @@ const OngoingRequest = () => {
     setSortOption("latest");
     setCurrentPage(1);
   };
+
+  const handleDetailsReady = useCallback(() => {
+    setDetailsLoading(false);
+  }, []);
+
+  const handleBookingUpdate = useCallback((updatedBooking: BookingCompleteResponse) => {
+    setSelectedBooking((currentBooking) => {
+      if (!currentBooking || updatedBooking.status === currentBooking.status) {
+        return currentBooking;
+      }
+
+      return updatedBooking;
+    });
+  }, []);
 
   useEffect(() => {
     const loadDetails = async () => {
@@ -388,15 +403,11 @@ const OngoingRequest = () => {
           viewerRole="user"
           showQuotaSection={false}
           onBack={handleBack}
-          onReady={() => setDetailsLoading(false)}
-          onBookingUpdate={(updatedBooking) => {
-            if (updatedBooking.status !== selectedBooking.status) {
-              setSelectedBooking(updatedBooking);
-            }
-          }}
+          onReady={handleDetailsReady}
+          onBookingUpdate={handleBookingUpdate}
         />
         {/* Cancel pending booking - controlled by showCancelButton state */}
-        {showCancelButton && (
+        {!detailsLoading && showCancelButton && (
           <div className="w-full">
             <button
               onClick={requestCancelBooking}
