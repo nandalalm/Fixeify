@@ -32,6 +32,43 @@ import { toQuotaResponse } from "../mappers/quotaMapper";
 import type { QuotaResponse } from "../dtos/response/quotaDtos";
 import PaymentEventModel from "../models/paymentEventModel";
 
+const IST_OFFSET_MINUTES = 330;
+
+const getSlotEndDateInIST = (preferredDate: Date, endMinutes: number): Date => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(preferredDate);
+
+  let year = 0;
+  let month = 0;
+  let day = 0;
+
+  for (const part of parts) {
+    if (part.type === "year") year = Number(part.value);
+    if (part.type === "month") month = Number(part.value);
+    if (part.type === "day") day = Number(part.value);
+  }
+
+  const hours = Math.floor(endMinutes / 60);
+  const minutes = endMinutes % 60;
+  const utcTime = Date.UTC(year, month - 1, day, hours, minutes, 0, 0) - IST_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcTime);
+};
+
+const hasBookingEndTimePassed = (booking: IBooking): boolean => {
+  if (booking.slotReleaseAt && new Date() >= new Date(booking.slotReleaseAt)) return true;
+  const lastEndMinutes = booking.preferredTime
+    .map((slot) => {
+      const [hours, minutes] = slot.endTime.split(":").map(Number);
+      return hours * 60 + minutes;
+    })
+    .reduce((max, current) => (current > max ? current : max), 0);
+  return new Date() >= getSlotEndDateInIST(new Date(booking.preferredDate), lastEndMinutes);
+};
+
 declare const process: {
   env: {
     STRIPE_SECRET_KEY: string;
@@ -498,9 +535,10 @@ export class UserService implements IUserService {
       }
 
       const adminRevenue = Math.round(quota.totalCost * 0.3);
+      const bookingStatusUpdate = hasBookingEndTimePassed(booking) ? { status: "completed" as const } : {};
 
       await this._bookingRepository.updateBooking(booking.id, {
-        status: "completed",
+        ...bookingStatusUpdate,
         adminRevenue: adminRevenue,
         proRevenue: proAmount
       }, session);

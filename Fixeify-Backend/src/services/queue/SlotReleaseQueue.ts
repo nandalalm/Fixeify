@@ -3,6 +3,7 @@ import IORedis from 'ioredis';
 import mongoose from 'mongoose';
 import Booking from '../../models/bookingModel';
 import ApprovedProModel from '../../models/approvedProModel';
+import QuotaModel from '../../models/quotaModel';
 import type { IAvailability } from '../../models/pendingProModel';
 
 declare const process: {
@@ -70,7 +71,10 @@ async function releaseSlotsForBooking(bookingId: string) {
     endTime: slot.endTime,
     booked: false,
   }));
+  const quota = await QuotaModel.findOne({ bookingId: booking._id }, { paymentStatus: 1 }).lean();
+  const bookingStatusUpdate = quota?.paymentStatus === "completed" ? { status: "completed" as const } : {};
   await Booking.findByIdAndUpdate(booking._id, {
+    ...bookingStatusUpdate,
     preferredTime: releasedSlots,
     slotReleaseJobId: null,
     slotReleaseAt: null,
