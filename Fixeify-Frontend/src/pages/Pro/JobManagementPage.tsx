@@ -241,13 +241,12 @@ const JobManagementPage = () => {
       await acceptBooking(selectedBooking.id);
       showSuccessMessage("Booking accepted successfully");
       setIsAcceptModalOpen(false);
-      setSelectedBooking(null);
-      await fetchBookings(activeTab);
       setRefreshKey(prev => prev + 1);
     } catch (err: unknown) {
       const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "An error occurred while accepting the booking";
       showErrorMessage(errorMessage);
       setIsAcceptModalOpen(false);
+      setRefreshKey(prev => prev + 1);
     } finally {
       setActionLoading(false);
     }
@@ -268,6 +267,7 @@ const JobManagementPage = () => {
     } catch (err: unknown) {
       showErrorMessage((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to reject booking");
       setIsRejectModalOpen(false);
+      setRefreshKey(prev => prev + 1);
     } finally {
       setActionLoading(false);
     }
