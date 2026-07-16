@@ -15,7 +15,6 @@ import { UserRole } from "../../store/authSlice";
 import { ProNavbar } from "../../components/Pro/ProNavbar";
 import ProTopNavbar from "../../components/Pro/ProTopNavbar";
 import { ConfirmationModal } from "../../components/Reuseable/ConfirmationModal";
-// import { QuotaResponse } from "../../interfaces/quotaInterface";
 import BookingTable from "../../components/Reuseable/BookingTable";
 import BookingDetails from "../../components/Reuseable/BookingDetails";
 import RaiseComplaintModal from "../../components/Modals/RaiseComplaintModal";
@@ -30,8 +29,6 @@ const formatDate = (date: Date): string => {
     year: "numeric",
   });
 };
-
-// removed unused status helpers; BookingDetails handles status rendering
 
 const JobManagementPage = () => {
   const user = useSelector((state: RootState) => state.auth.user);
@@ -51,7 +48,6 @@ const JobManagementPage = () => {
   const [selectedBooking, setSelectedBooking] = useState<BookingResponse | null>(null);
   const [complaintBooking, setComplaintBooking] = useState<BookingResponse | null>(null);
   const [complaintOpen, setComplaintOpen] = useState(false);
-  // view is now inline using BookingDetails
   const [isAcceptModalOpen, setIsAcceptModalOpen] = useState<boolean>(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState<boolean>(false);
   const [isQuotaModalOpen, setIsQuotaModalOpen] = useState<boolean>(false);
@@ -69,7 +65,6 @@ const JobManagementPage = () => {
     additionalCharges: "",
   });
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  // const [selectedQuota, setSelectedQuota] = useState<QuotaResponse | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [sortOption, setSortOption] = useState<"latest" | "oldest" | "completed" | "rejected" | "cancelled" | "failed" | "">("latest");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -88,7 +83,6 @@ const JobManagementPage = () => {
   const fetchBookings = useCallback(async (tab: "requests" | "scheduled" | "history") => {
     if (!user || !accessToken || user.role !== UserRole.PRO) return;
 
-    // Only show full loading on non-initial loads
     if (!initialLoad) {
       setLoading(true);
     }
@@ -105,7 +99,7 @@ const JobManagementPage = () => {
         case "history": {
           const historyStatuses = ["completed", "rejected", "cancelled", "failed"] as const;
           if (historyStatuses.includes(sortOption as "completed" | "rejected" | "cancelled" | "failed")) {
-            status = sortOption as string; // narrow to specific history status
+            status = sortOption as string;
           } else {
             status = historyStatuses.join(",");
           }
@@ -125,7 +119,6 @@ const JobManagementPage = () => {
       setBookings(bookings);
       setTotalPages((prev) => ({ ...prev, [tab]: Math.ceil(total / limit) }));
     } catch (err: unknown) {
-      console.error(`Fetch pro bookings error for ${tab}:`, err);
       setError((err as { response?: { data?: { message?: string }; status?: number } })?.response?.data?.message || "Failed to load bookings");
       if ((err as { response?: { status?: number } })?.response?.status === 401) {
         dispatch(logoutUserSync());
@@ -138,7 +131,6 @@ const JobManagementPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, accessToken, dispatch, navigate]);
 
-  // Silent fetch to use during tab switching (no full-page loader)
   const fetchBookingsSilent = useCallback(async (tab: "requests" | "scheduled" | "history", pageOverride?: number) => {
     if (!user || !accessToken || user.role !== UserRole.PRO) return;
     setError(null);
@@ -161,7 +153,7 @@ const JobManagementPage = () => {
           break;
         }
       }
-      const page = typeof pageOverride === 'number' ? pageOverride : currentPage[tab];
+      const page = typeof pageOverride === "number" ? pageOverride : currentPage[tab];
       const sortByParam = sortOption === "oldest" ? "oldest" : "latest";
       const { bookings, total } = await fetchProBookings(
         user.id,
@@ -175,7 +167,6 @@ const JobManagementPage = () => {
       setBookings(bookings);
       setTotalPages((prev) => ({ ...prev, [tab]: Math.ceil(total / limit) }));
     } catch (err: unknown) {
-      console.error(`Silent fetch pro bookings error for ${tab}:`, err);
       setError((err as { response?: { data?: { message?: string }; status?: number } })?.response?.data?.message || "Failed to load bookings");
       if ((err as { response?: { status?: number } })?.response?.status === 401) {
         dispatch(logoutUserSync());
@@ -186,22 +177,19 @@ const JobManagementPage = () => {
   }, [user?.id, accessToken, dispatch, navigate]);
 
   useEffect(() => {
-    if (tabSwitching) return; // avoid page loader during tab switch; handled by silent fetch
+    if (tabSwitching) return;
     fetchBookings(activeTab);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, accessToken, activeTab, currentPage, sortOption, tabSwitching]);
 
-  // Debounced search: avoid full-page loader to preserve input focus
   useEffect(() => {
     const handler = setTimeout(() => {
       if (!tabSwitching) {
-        // reset to page 1 on new search and fetch silently
         setCurrentPage((prev) => ({ ...prev, [activeTab]: 1 }));
         fetchBookingsSilent(activeTab, 1);
       }
     }, 300);
     return () => clearTimeout(handler);
-    // include only searchTerm and activeTab to debounce typing changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, activeTab, tabSwitching]);
 
@@ -209,9 +197,8 @@ const JobManagementPage = () => {
     const handleResize = () => {
       setIsLargeScreen(window.innerWidth >= 1024);
     };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
@@ -219,7 +206,6 @@ const JobManagementPage = () => {
       setSidebarOpen(false);
     }
   }, [isLargeScreen]);
-
 
   const handleTabChange = async (tab: "requests" | "scheduled" | "history") => {
     setTabSwitching(true);
@@ -255,11 +241,10 @@ const JobManagementPage = () => {
       await acceptBooking(selectedBooking.id);
       showSuccessMessage("Booking accepted successfully");
       setIsAcceptModalOpen(false);
+      setSelectedBooking(null);
       await fetchBookings(activeTab);
-      // Trigger BookingDetails refresh to show updated status
       setRefreshKey(prev => prev + 1);
     } catch (err: unknown) {
-      console.error("Accept booking error:", err);
       const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message || "An error occurred while accepting the booking";
       showErrorMessage(errorMessage);
       setIsAcceptModalOpen(false);
@@ -267,8 +252,6 @@ const JobManagementPage = () => {
       setActionLoading(false);
     }
   };
-
-  // inline reject handler via setIsRejectModalOpen(true)
 
   const confirmRejectBooking = async () => {
     if (!selectedBooking || !rejectionReason) return;
@@ -279,19 +262,16 @@ const JobManagementPage = () => {
       setIsRejectModalOpen(false);
       setRejectionReason("");
       setCustomRejectionReason("");
+      setSelectedBooking(null);
       await fetchBookings(activeTab);
-      // Trigger BookingDetails refresh to show updated status
       setRefreshKey(prev => prev + 1);
     } catch (err: unknown) {
-      console.error("Reject booking error:", err);
       showErrorMessage((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to reject booking");
       setIsRejectModalOpen(false);
     } finally {
       setActionLoading(false);
     }
   };
-
-  // inline quota handler via setIsQuotaModalOpen(true)
 
   const validateQuota = () => {
     const errors = {
@@ -301,7 +281,6 @@ const JobManagementPage = () => {
     };
     let isValid = true;
 
-    // Validate labor cost
     if (!quotaData.laborCost) {
       errors.laborCost = "Labor cost is required";
       isValid = false;
@@ -310,13 +289,11 @@ const JobManagementPage = () => {
       isValid = false;
     }
 
-    // Validate material cost (optional, but must be non-negative if provided)
     if (quotaData.materialCost && Number(quotaData.materialCost) < 0) {
       errors.materialCost = "Material cost cannot be negative";
       isValid = false;
     }
 
-    // Validate additional charges (optional, but must be non-negative if provided)
     if (quotaData.additionalCharges && Number(quotaData.additionalCharges) < 0) {
       errors.additionalCharges = "Additional charges cannot be negative";
       isValid = false;
@@ -355,10 +332,8 @@ const JobManagementPage = () => {
       setIsConfirmQuotaModalOpen(false);
       setQuotaData({ laborCost: "", materialCost: "", additionalCharges: "" });
       await fetchBookings(activeTab);
-      // Trigger BookingDetails refresh to show updated quota information
       setRefreshKey(prev => prev + 1);
     } catch (err: unknown) {
-      console.error("Generate quota error:", err);
       showErrorMessage((err as { response?: { data?: { message?: string } } })?.response?.data?.message || "Failed to generate quota");
       setIsConfirmQuotaModalOpen(false);
     } finally {
@@ -367,7 +342,6 @@ const JobManagementPage = () => {
   };
 
   const filteredAndSortedBookings = useMemo(() => {
-    // Backend now handles status filtering and createdAt sorting. Only apply search filter here.
     const term = searchTerm.toLowerCase();
     return bookings.filter((booking) => {
       const matchesIssue = booking.issueDescription.toLowerCase().includes(term);
@@ -424,7 +398,6 @@ const JobManagementPage = () => {
       );
       setComplaintOpen(false);
       setComplaintBooking(null);
-      // Refetch the open details panel and list so the complaint button hides immediately and stays in sync.
       setRefreshKey(prev => prev + 1);
       await fetchBookings(activeTab);
       showSuccessMessage("Complaint submitted successfully");
@@ -446,8 +419,8 @@ const JobManagementPage = () => {
   if (loading && !initialLoad) {
     return (
       <div className="flex flex-col h-screen bg-gray-50">
-        <ProTopNavbar 
-          toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+        <ProTopNavbar
+          toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           isLargeScreen={isLargeScreen}
           sidebarOpen={sidebarOpen}
         />
@@ -474,8 +447,8 @@ const JobManagementPage = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
-      <ProTopNavbar 
-        toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+      <ProTopNavbar
+        toggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         isLargeScreen={isLargeScreen}
         sidebarOpen={sidebarOpen}
       />
@@ -585,10 +558,8 @@ const JobManagementPage = () => {
                 />
               </div>
             ) : tabSwitching || initialLoad ? (
-              // Table-only skeletons during tab switching or initial load (always take precedence over empty state)
               <>
                 <div>
-                  {/* Mobile cards skeleton */}
                   <div className="md:hidden flex flex-col gap-4 animate-pulse">
                     {Array.from({ length: 6 }).map((_, i) => (
                       <div key={`job-card-skel-${i}`} className="bg-white p-4 rounded-md shadow border border-gray-200">
@@ -604,7 +575,6 @@ const JobManagementPage = () => {
                       </div>
                     ))}
                   </div>
-                  {/* Desktop rows skeleton (no headers/pagination) */}
                   <div className="hidden md:block overflow-x-auto animate-pulse">
                     <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                       <div className="divide-y divide-gray-200">

@@ -47,7 +47,7 @@ const getDayKeyFromDateIST = (date: Date): keyof IAvailability => {
 async function releaseSlotsForBooking(bookingId: string) {
   const booking = await Booking.findById(bookingId).lean();
   if (!booking) return;
-  if (!["accepted", "completed"].includes(booking.status)) return;
+  if (!["pending", "accepted", "completed"].includes(booking.status)) return;
   const pro = await ApprovedProModel.findById(booking.proId);
   if (pro) {
     const dayKey = getDayKeyFromDateIST(new Date(booking.preferredDate));
@@ -71,8 +71,15 @@ async function releaseSlotsForBooking(bookingId: string) {
     endTime: slot.endTime,
     booked: false,
   }));
-  const quota = await QuotaModel.findOne({ bookingId: booking._id }, { paymentStatus: 1 }).lean();
-  const bookingStatusUpdate = quota?.paymentStatus === "completed" ? { status: "completed" as const } : {};
+  let bookingStatusUpdate: { status?: "failed" | "completed" } = {};
+  if (booking.status === "pending") {
+    bookingStatusUpdate = { status: "failed" };
+  } else {
+    const quota = await QuotaModel.findOne({ bookingId: booking._id }, { paymentStatus: 1 }).lean();
+    if (quota?.paymentStatus === "completed") {
+      bookingStatusUpdate = { status: "completed" };
+    }
+  }
   await Booking.findByIdAndUpdate(booking._id, {
     ...bookingStatusUpdate,
     preferredTime: releasedSlots,
@@ -133,6 +140,7 @@ export async function resyncSlotReleaseJobs() {
   const candidates = await Booking.find(
     {
       $or: [
+        { status: 'pending', slotReleaseAt: { $ne: null } },
         { status: 'accepted' },
         { status: 'completed', slotReleaseAt: { $ne: null } },
       ],

@@ -24,7 +24,7 @@ import type { IAdminRepository } from "../repositories/IAdminRepository";
 import type { INotificationService } from "./INotificationService";
 import RedisConnector from "../config/redisConnector";
 import type { ITransactionRepository } from "../repositories/ITransactionRepository";
-import { cancelSlotRelease } from "./queue/SlotReleaseQueue";
+import { cancelSlotRelease, scheduleSlotRelease } from "./queue/SlotReleaseQueue";
 import { toUserProfileResponse } from "../mappers/userMapper";
 import { toNearbyProResponse } from "../mappers/proMapper";
 import { toBookingCompleteResponse, toBookingResponse } from "../mappers/bookingMapper";
@@ -308,6 +308,26 @@ export class UserService implements IUserService {
 
     if (!createdBooking) {
       throw new HttpError(HttpStatus.INTERNAL_SERVER_ERROR, MESSAGES.SERVER_ERROR);
+    }
+
+    try {
+      const toMins = (t: string) => {
+        const [h, m] = t.split(":").map(Number);
+        return h * 60 + m;
+      };
+      const lastEndMinutes = bookingData.preferredTime
+        .map((s) => toMins(s.endTime))
+        .reduce((max, cur) => (cur > max ? cur : max), 0);
+      const slotReleaseAt = getSlotEndDateInIST(preferredDate, lastEndMinutes);
+      const scheduled = await scheduleSlotRelease(createdBooking.id, slotReleaseAt);
+      if (scheduled) {
+        await this._bookingRepository.updateBooking(createdBooking.id, {
+          slotReleaseJobId: createdBooking.id,
+          slotReleaseAt,
+        });
+      }
+    } catch (error) {
+      logger.error(MESSAGES.FAILED_SCHEDULE_SLOT_RELEASE, { bookingId: createdBooking.id, error });
     }
 
 
