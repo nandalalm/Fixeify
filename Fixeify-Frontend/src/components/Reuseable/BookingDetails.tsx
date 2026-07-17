@@ -159,6 +159,8 @@ const formatDateDDMMYYYY = (d: Date | string | number) => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
+const statusesWithoutQuota = ["pending", "rejected", "cancelled", "failed"];
+
 const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, onBack, onRate, onRaiseComplaint, onAccept, onReject, onGenerateQuota, refreshKey = 0, showQuotaSection = true, onReady, onBookingUpdate }) => {
   const [booking, setBooking] = useState<BookingCompleteResponse | null>(null);
   const [quota, setQuota] = useState<QuotaResponse | null>(null);
@@ -183,6 +185,8 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
     let mounted = true;
     const load = async () => {
       setLoading(true);
+      setBannerError(null);
+      setQuota(null);
       try {
         const b: BookingCompleteResponse = viewerRole === "pro"
           ? await fetchProBookingById(bookingId)
@@ -195,7 +199,7 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
             onBookingUpdate(b);
           }
         }
-        if (mounted && b && !["pending", "rejected", "cancelled"].includes(b.status) && showQuotaSection) {
+        if (mounted && b && !statusesWithoutQuota.includes(b.status) && showQuotaSection) {
           try {
             const q = viewerRole === "pro"
               ? await fetchProQuotaByBookingId(bookingId)
@@ -204,8 +208,9 @@ const BookingDetails: React.FC<BookingDetailsProps> = ({ bookingId, viewerRole, 
                 : await fetchUserQuotaByBookingId(bookingId);
             if (mounted) setQuota(q);
           } catch (e: unknown) {
+            const status = (e as { response?: { status?: number } })?.response?.status;
             const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-            if (mounted && msg) setBannerError(msg);
+            if (mounted && status !== 404 && msg) setBannerError(msg);
           }
         } else {
           if (mounted) setQuota(null);
