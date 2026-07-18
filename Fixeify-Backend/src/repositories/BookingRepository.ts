@@ -468,7 +468,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     const startOfNextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const startOfPrevDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
 
-    const matchBase = { status: "completed", adminRevenue: { $exists: true, $ne: null } };
+    const matchBase = { status: { $in: ["accepted", "completed"] }, adminRevenue: { $exists: true, $ne: null } };
 
     const [
       totalAgg,
@@ -561,19 +561,19 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       ratingResult,
     ] = await Promise.all([
       this._model.aggregate([
-        { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null } } },
+        { $match: { proId: proObjectId, status: { $in: ["accepted", "completed"] }, proRevenue: { $exists: true, $ne: null } } },
         { $group: { _id: null, value: { $sum: "$proRevenue" } } },
       ]),
       this._model.aggregate([
-        { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfMonth, $lt: startOfNextMonth } } },
+        { $match: { proId: proObjectId, status: { $in: ["accepted", "completed"] }, proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfMonth, $lt: startOfNextMonth } } },
         { $group: { _id: null, value: { $sum: "$proRevenue" } } },
       ]),
       this._model.aggregate([
-        { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfYear, $lt: startOfNextYear } } },
+        { $match: { proId: proObjectId, status: { $in: ["accepted", "completed"] }, proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfYear, $lt: startOfNextYear } } },
         { $group: { _id: null, value: { $sum: "$proRevenue" } } },
       ]),
       this._model.aggregate([
-        { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfDay, $lt: startOfNextDay } } },
+        { $match: { proId: proObjectId, status: { $in: ["accepted", "completed"] }, proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: startOfDay, $lt: startOfNextDay } } },
         { $group: { _id: null, value: { $sum: "$proRevenue" } } },
       ]),
       this._model.countDocuments({ proId: proObjectId, status: "completed" }),
@@ -629,7 +629,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       ]),
 
       this._model.aggregate([
-        { $match: { status: "completed", proRevenue: { $exists: true, $ne: null } } },
+        { $match: { status: { $in: ["accepted", "completed"] }, proRevenue: { $exists: true, $ne: null } } },
         { $group: { _id: "$proId", totalRevenue: { $sum: "$proRevenue" } } },
         { $sort: { totalRevenue: -1 } },
         { $limit: 1 },
@@ -639,7 +639,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
       ]),
 
       this._model.aggregate([
-        { $match: { status: "completed", proRevenue: { $exists: true, $ne: null } } },
+        { $match: { status: { $in: ["accepted", "completed"] }, proRevenue: { $exists: true, $ne: null } } },
         { $group: { _id: "$proId", totalRevenue: { $sum: "$proRevenue" } } },
         { $sort: { totalRevenue: 1 } },
         { $limit: 1 },
@@ -667,7 +667,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - (lastNMonths - 1), 1);
     const pipeline = [
-      { $match: { status: "completed", adminRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
+      { $match: { status: { $in: ["accepted", "completed"] }, adminRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
       {
         $group: {
           _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
@@ -692,7 +692,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - (lastNMonths - 1), 1);
     const pipeline = [
-      { $match: { status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
+      { $match: { status: { $in: ["accepted", "completed"] }, proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
       {
         $group: {
           _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
@@ -718,7 +718,7 @@ export class MongoBookingRepository extends BaseRepository<BookingDocument> impl
     const start = new Date(now.getFullYear(), now.getMonth() - (lastNMonths - 1), 1);
     const proObjectId = new mongoose.Types.ObjectId(proId);
     const pipeline = [
-      { $match: { proId: proObjectId, status: "completed", proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
+      { $match: { proId: proObjectId, status: { $in: ["accepted", "completed"] }, proRevenue: { $exists: true, $ne: null }, createdAt: { $gte: start } } },
       {
         $group: {
           _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
