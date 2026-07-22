@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { TicketResponse } from "@/interfaces/ticketInterface";
 import { fetchBookingById as fetchAdminBookingById, fetchQuotaByBookingId as fetchAdminQuotaByBookingId } from "@/api/adminApi";
 import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
@@ -38,10 +38,17 @@ const AdminTicketDetails: React.FC<AdminTicketDetailsProps> = ({ ticket, onBack,
   const [banAction, setBanAction] = useState<'ban' | 'unban'>('ban');
   const [updatedTicket, setUpdatedTicket] = useState<TicketResponse>(ticket);
 
-  const complainantDisplay = useMemo(() => ticket.complainantName?.trim() || ticket.complainantId, [ticket]);
-  const againstDisplay = useMemo(() => ticket.againstName?.trim() || ticket.againstId, [ticket]);
   const bookingUser = booking?.user;
   const bookingPro = booking?.pro;
+  const getDisplayName = (type: "user" | "pro", id: string, ticketName?: string): string => {
+    const trimmedTicketName = ticketName?.trim();
+    if (trimmedTicketName && trimmedTicketName !== id) return trimmedTicketName;
+    if (type === "user" && bookingUser?.id === id) return bookingUser.name;
+    if (type === "pro" && bookingPro?.id === id) return `${bookingPro.firstName} ${bookingPro.lastName}`.trim();
+    return id;
+  };
+  const complainantDisplay = getDisplayName(ticket.complainantType, ticket.complainantId, ticket.complainantName);
+  const againstDisplay = getDisplayName(ticket.againstType, ticket.againstId, ticket.againstName);
   const getEmail = (type: "user" | "pro", id: string): string | undefined => {
     if (type === "user" && bookingUser?.id === id) return bookingUser.email;
     if (type === "pro" && bookingPro?.id === id) return bookingPro.email;
