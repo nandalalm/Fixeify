@@ -41,8 +41,7 @@ const ticketSchema = new Schema<TicketDocument>(
     },
     complainantId: { 
       type: Schema.Types.ObjectId, 
-      required: true,
-      refPath: 'complainantType === "user" ? "User" : "ApprovedPro"'
+      required: true
     },
     againstType: { 
       type: String, 
@@ -51,8 +50,7 @@ const ticketSchema = new Schema<TicketDocument>(
     },
     againstId: { 
       type: Schema.Types.ObjectId, 
-      required: true,
-      refPath: 'againstType === "user" ? "User" : "ApprovedPro"'
+      required: true
     },
     bookingId: { 
       type: Schema.Types.ObjectId, 

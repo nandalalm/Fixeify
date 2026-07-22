@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { getAllTickets, updateTicketStatus } from "@/api/ticketApi";
+import { fetchBookingById as fetchAdminBookingById } from "@/api/adminApi";
 import { TicketResponse, TicketPriority } from "@/interfaces/ticketInterface";
+import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import TicketTable from "@/components/Reuseable/TicketTable";
 import { ConfirmationModal } from "@/components/Reuseable/ConfirmationModal";
 import AdminTicketDetails from "@/components/Admin/AdminTicketDetails";
@@ -44,10 +46,40 @@ const AdminConflictManagement: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [anyTicketsExist, setAnyTicketsExist] = useState<boolean>(true);
 
-  const resolveName = async (type: "user" | "pro", id: string): Promise<string> => {
-    void type;
-    if (!id) return "";
-    return id;
+  const getBookingPartyName = (
+    booking: BookingCompleteResponse,
+    type: "user" | "pro",
+    id: string
+  ): string => {
+    if (type === "user" && booking.user.id === id) {
+      return booking.user.name;
+    }
+
+    if (type === "pro" && booking.pro.id === id) {
+      return `${booking.pro.firstName} ${booking.pro.lastName}`.trim();
+    }
+
+    return "";
+  };
+
+  const resolveTicketNames = async (ticket: TicketResponse): Promise<TicketResponse> => {
+    const complainantName = ticket.complainantName?.trim() || "";
+    const againstName = ticket.againstName?.trim() || "";
+
+    if (complainantName && againstName) {
+      return ticket;
+    }
+
+    try {
+      const booking = await fetchAdminBookingById(ticket.bookingId);
+      return {
+        ...ticket,
+        complainantName: complainantName || getBookingPartyName(booking, ticket.complainantType, ticket.complainantId),
+        againstName: againstName || getBookingPartyName(booking, ticket.againstType, ticket.againstId),
+      };
+    } catch {
+      return ticket;
+    }
   };
 
   const showSuccess = (msg: string) => {
@@ -116,9 +148,7 @@ const AdminConflictManagement: React.FC = () => {
       // Populate missing names client-side for admin view
       const populated = await Promise.all(
         raw.map(async (t) => {
-          const complainantName = (t.complainantName && t.complainantName.trim()) || await resolveName(t.complainantType, t.complainantId);
-          const againstName = (t.againstName && t.againstName.trim()) || await resolveName(t.againstType, t.againstId);
-          return { ...t, complainantName, againstName } as TicketResponse;
+          return resolveTicketNames(t);
         })
       );
       setTickets(populated);

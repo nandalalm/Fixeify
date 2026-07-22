@@ -2,12 +2,50 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/store/store";
 import { getTicketsByComplainant, getTicketById } from "@/api/ticketApi";
+import { fetchBookingById as fetchProBookingById } from "@/api/proApi";
 import { TicketResponse } from "@/interfaces/ticketInterface";
+import { BookingCompleteResponse } from "@/interfaces/bookingInterface";
 import TicketTable from "@/components/Reuseable/TicketTable";
 import TicketDetails from "@/components/Reuseable/TicketDetails";
 import ProTopNavbar from "@/components/Pro/ProTopNavbar";
 import { ProNavbar } from "@/components/Pro/ProNavbar";
 import { RotateCcw } from "lucide-react";
+
+const getBookingPartyName = (
+  booking: BookingCompleteResponse,
+  type: "user" | "pro",
+  id: string
+): string => {
+  if (type === "user" && booking.user.id === id) {
+    return booking.user.name;
+  }
+
+  if (type === "pro" && booking.pro.id === id) {
+    return `${booking.pro.firstName} ${booking.pro.lastName}`.trim();
+  }
+
+  return "";
+};
+
+const resolveTicketNames = async (ticket: TicketResponse): Promise<TicketResponse> => {
+  const complainantName = ticket.complainantName?.trim() || "";
+  const againstName = ticket.againstName?.trim() || "";
+
+  if (complainantName && againstName) {
+    return ticket;
+  }
+
+  try {
+    const booking = await fetchProBookingById(ticket.bookingId);
+    return {
+      ...ticket,
+      complainantName: complainantName || getBookingPartyName(booking, ticket.complainantType, ticket.complainantId),
+      againstName: againstName || getBookingPartyName(booking, ticket.againstType, ticket.againstId),
+    };
+  } catch {
+    return ticket;
+  }
+};
 
 const ProConflicts: React.FC = () => {
   const user = useSelector((s: RootState) => s.auth.user);
@@ -26,12 +64,6 @@ const ProConflicts: React.FC = () => {
   const [detailLoading, setDetailLoading] = useState<boolean>(false);
   const [anyTicketsExist, setAnyTicketsExist] = useState<boolean>(true);
 
-  const resolveName = async (type: "user" | "pro", id: string): Promise<string> => {
-    void type;
-    if (!id) return "";
-    return id;
-  };
-
   const load = useCallback(async () => {
     if (!proId) return;
     setLoading(true);
@@ -40,9 +72,7 @@ const ProConflicts: React.FC = () => {
       const raw = res.tickets || [];
       const populated = await Promise.all(
         raw.map(async (t) => {
-          const complainantName = (t.complainantName && t.complainantName.trim()) || await resolveName(t.complainantType, t.complainantId);
-          const againstName = (t.againstName && t.againstName.trim()) || await resolveName(t.againstType, t.againstId);
-          return { ...t, complainantName, againstName } as TicketResponse;
+          return resolveTicketNames(t);
         })
       );
       setTickets(populated);
