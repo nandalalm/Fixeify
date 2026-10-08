@@ -92,16 +92,15 @@ This design decouples time-based logic from request lifecycle and improves fault
 
 Fixeify is now fully Dockerized and deployed on a Google Cloud Platform VM.
 
-- The frontend is built with Vite and served through Nginx in a Docker container.
-- The backend runs as a separate Dockerized Node.js service.
-- Docker Compose is used to build and run the frontend and backend together.
-- CI/CD is implemented with GitHub Actions.
-- On every push to `main`, the deployment workflow SSHs into the GCP VM, pulls the latest code, stops the existing containers, rebuilds the Docker images, and starts the stack again in detached mode.
+- **CI** (every PR and push to `main`): lint, typecheck and build for backend and frontend.
+- **Images**: multi-stage builds (Node 22 Alpine backend running as non-root, Nginx Alpine frontend) are built in GitHub Actions and pushed to **GitHub Container Registry**, tagged with the commit SHA and `latest`.
+- **CD**: the workflow copies `docker-compose.yml` to the VM over SSH, pulls the new images and restarts the stack. Nothing is built on the VM.
+- Containers listen only on `127.0.0.1`; host Nginx with Let's Encrypt TLS ([deploy/nginx-fixeify.conf](deploy/nginx-fixeify.conf)) routes `/` to the frontend and `/api` + `/socket.io` to the backend.
 
-Production deployment command:
+What CD runs on the VM:
 
 ```bash
-docker compose --env-file ./Fixeify-Frontend/.env up --build -d
+docker compose pull && docker compose up -d --no-build
 ```
 
 ---

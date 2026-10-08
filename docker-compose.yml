@@ -1,18 +1,29 @@
+# Local:      docker compose --env-file ./Fixeify-Frontend/.env up --build
+# Production: images are built in GitHub Actions and pulled from GHCR
+#             docker compose pull && docker compose up -d --no-build
 services:
   backend:
+    image: ghcr.io/nandalalm/fixeify-backend:${IMAGE_TAG:-latest}
     build:
       context: ./Fixeify-Backend
     container_name: fixeify-backend
     restart: unless-stopped
+    init: true
     env_file:
       - ./Fixeify-Backend/.env
     environment:
       NODE_ENV: production
       PORT: 5000
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
+    image: ghcr.io/nandalalm/fixeify-frontend:${IMAGE_TAG:-latest}
     build:
       context: ./Fixeify-Frontend
       args:
@@ -27,6 +38,11 @@ services:
     container_name: fixeify-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "127.0.0.1:3000:80"
     depends_on:
       - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
